@@ -162,12 +162,35 @@ export class DuckDBService {
    * Create a table from JSON data
    */
   async createTableFromJSON(tableName: string, jsonData: any[]): Promise<void> {
-    const jsonStr = JSON.stringify(jsonData)
-    const sql = `
-      CREATE OR REPLACE TABLE ${tableName} AS 
-      SELECT * FROM read_json_auto('${jsonStr}')
-    `
-    await this.executeQuery(sql)
+    // DuckDB requires JSON data to be passed as VALUES, not read_json_auto which expects a file
+    if (jsonData.length === 0) {
+      throw new Error('Cannot create table from empty JSON array')
+    }
+
+    // Get the keys from the first object to define columns
+    const keys = Object.keys(jsonData[0])
+    const columns = keys.map((key) => `"${key}" VARCHAR`).join(', ')
+
+    // Create the table
+    await this.executeQuery(`CREATE OR REPLACE TABLE ${tableName} (${columns})`)
+
+    // Insert data
+    for (const row of jsonData) {
+      const values = keys
+        .map((key) => {
+          const value = row[key]
+          if (value === null || value === undefined) {
+            return 'NULL'
+          }
+          if (typeof value === 'string') {
+            return `'${value.replace(/'/g, "''")}'`
+          }
+          return String(value)
+        })
+        .join(', ')
+
+      await this.executeQuery(`INSERT INTO ${tableName} VALUES (${values})`)
+    }
   }
 
   /**
@@ -249,8 +272,8 @@ export class DuckDBService {
    */
   async getRowCount(tableName: string): Promise<number> {
     const sql = `SELECT COUNT(*) as count FROM ${tableName}`
-    const result = await this.executeScalar<{ count: number }>(sql)
-    return result ? result.count : 0
+    const result = await this.executeScalar<{ count: string | number }>(sql)
+    return result ? Number(result.count) : 0
   }
 
   /**

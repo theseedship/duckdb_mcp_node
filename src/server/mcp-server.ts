@@ -163,15 +163,19 @@ class DuckDBMCPServer {
       try {
         const { name, arguments: args } = request.params
 
+        if (!args) {
+          throw new Error(`Missing arguments for tool: ${name}`)
+        }
+
         // Validate security in production mode
-        if (process.env.MCP_SECURITY_MODE === 'production') {
-          this.validateQuery(args.sql)
+        if (process.env.MCP_SECURITY_MODE === 'production' && 'sql' in args) {
+          this.validateQuery(args.sql as string)
         }
 
         switch (name) {
           case 'query_duckdb': {
             const sql = args.sql as string
-            const limit = args.limit || 1000
+            const limit = (args.limit as number) || 1000
 
             // Add LIMIT if not present for safety
             const safeSql = sql.match(/LIMIT\s+\d+/i) ? sql : `${sql} LIMIT ${limit}`
@@ -200,7 +204,7 @@ class DuckDBMCPServer {
           }
 
           case 'list_tables': {
-            const schema = args.schema || 'main'
+            const schema = (args.schema as string) || 'main'
             const tables = await this.duckdb.executeQuery(`
               SELECT table_name, table_type 
               FROM information_schema.tables 
@@ -228,7 +232,7 @@ class DuckDBMCPServer {
 
           case 'describe_table': {
             const tableName = args.table_name as string
-            const schema = args.schema || 'main'
+            const schema = (args.schema as string) || 'main'
             const columns = await this.duckdb.getTableColumns(tableName, schema)
             const rowCount = await this.duckdb.getRowCount(tableName)
 
