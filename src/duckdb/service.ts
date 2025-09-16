@@ -1,0 +1,295 @@
+import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
+import { z } from 'zod'
+
+// Configuration schema for DuckDB
+const DuckDBConfigSchema = z.object({
+  memory: z.string().default('4GB'),
+  threads: z.number().default(4),
+  allowUnsignedExtensions: z.boolean().default(false),
+  s3Config: z
+    .object({
+      endpoint: z.string().optional(),
+      accessKey: z.string().optional(),
+      secretKey: z.string().optional(),
+      region: z.string().default('us-east-1'),
+      useSSL: z.boolean().default(false),
+    })
+    .optional(),
+})
+
+export type DuckDBConfig = z.infer<typeof DuckDBConfigSchema>
+
+/**
+ * DuckDB service for executing queries and managing connections
+ */
+export class DuckDBService {
+  private instance: DuckDBInstance | null = null
+  private connection: DuckDBConnection | null = null
+  private config: DuckDBConfig
+  private isInitialized = false
+
+  constructor(config?: Partial<DuckDBConfig>) {
+    this.config = DuckDBConfigSchema.parse(config || {})
+  }
+
+  /**
+   * Initialize DuckDB instance and connection
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return
+    }
+
+    try {
+      // Create DuckDB instance with configuration
+      const instanceConfig: any = {
+        max_memory: this.config.memory,
+        threads: this.config.threads.toString(),
+      }
+
+      if (this.config.allowUnsignedExtensions) {
+        instanceConfig.allow_unsigned_extensions = 'true'
+      }
+
+      this.instance = await DuckDBInstance.create(':memory:', instanceConfig)
+      this.connection = await this.instance.connect()
+
+      // Install and load basic extensions
+      await this.executeQuery('INSTALL httpfs')
+      await this.executeQuery('LOAD httpfs')
+
+      // Configure S3 if credentials provided
+      if (this.config.s3Config?.accessKey && this.config.s3Config?.secretKey) {
+        await this.configureS3()
+      }
+
+      this.isInitialized = true
+      console.log('DuckDB initialized successfully')
+    } catch (error) {
+      console.error('Failed to initialize DuckDB:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Configure S3 credentials for DuckDB
+   */
+  private async configureS3(): Promise<void> {
+    if (!this.connection || !this.config.s3Config) {
+      return
+    }
+
+    const { endpoint, accessKey, secretKey, region, useSSL } = this.config.s3Config
+
+    const sql = `
+      CREATE SECRET IF NOT EXISTS s3_secret (
+        TYPE S3,
+        KEY_ID '${accessKey}',
+        SECRET '${secretKey}',
+        ${endpoint ? `ENDPOINT '${endpoint}',` : ''}
+        REGION '${region}',
+        USE_SSL ${useSSL}
+      )
+    `
+
+    await this.executeQuery(sql)
+    console.log('S3 configuration applied')
+  }
+
+  /**
+   * Execute a SQL query and return results
+   */
+  async executeQuery<T = any>(sql: string, params?: any[]): Promise<T[]> {
+    if (!this.connection) {
+      await this.initialize()
+    }
+
+    try {
+      const result = await this.connection!.run(sql)
+      const rows = await result.getRowObjectsJson()
+      return rows as T[]
+    } catch (error: any) {
+      console.error('Query execution failed:', error)
+      throw new Error(`Query failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Execute a SQL query and return a single result
+   */
+  async executeScalar<T = any>(sql: string, params?: any[]): Promise<T | null> {
+    const results = await this.executeQuery<T>(sql, params)
+    return results.length > 0 ? results[0] : null
+  }
+
+  /**
+   * Get database schema information
+   */
+  async getSchema(): Promise<any[]> {
+    const sql = `
+      SELECT 
+        table_schema,
+        table_name,
+        table_type
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+      ORDER BY table_schema, table_name
+    `
+    return this.executeQuery(sql)
+  }
+
+  /**
+   * Get columns for a specific table
+   */
+  async getTableColumns(tableName: string, schema: string = 'main'): Promise<any[]> {
+    const sql = `
+      SELECT 
+        column_name,
+        data_type,
+        is_nullable,
+        column_default
+      FROM information_schema.columns
+      WHERE table_schema = '${schema}'
+        AND table_name = '${tableName}'
+      ORDER BY ordinal_position
+    `
+    return this.executeQuery(sql)
+  }
+
+  /**
+   * Create a table from JSON data
+   */
+  async createTableFromJSON(tableName: string, jsonData: any[]): Promise<void> {
+    const jsonStr = JSON.stringify(jsonData)
+    const sql = `
+      CREATE OR REPLACE TABLE ${tableName} AS 
+      SELECT * FROM read_json_auto('${jsonStr}')
+    `
+    await this.executeQuery(sql)
+  }
+
+  /**
+   * Read a Parquet file
+   */
+  async readParquet(path: string, limit?: number): Promise<any[]> {
+    let sql = `SELECT * FROM read_parquet('${path}')`
+    if (limit) {
+      sql += ` LIMIT ${limit}`
+    }
+    return this.executeQuery(sql)
+  }
+
+  /**
+   * Read a CSV file
+   */
+  async readCSV(path: string, limit?: number): Promise<any[]> {
+    let sql = `SELECT * FROM read_csv_auto('${path}')`
+    if (limit) {
+      sql += ` LIMIT ${limit}`
+    }
+    return this.executeQuery(sql)
+  }
+
+  /**
+   * Read a JSON file
+   */
+  async readJSON(path: string, limit?: number): Promise<any[]> {
+    let sql = `SELECT * FROM read_json_auto('${path}')`
+    if (limit) {
+      sql += ` LIMIT ${limit}`
+    }
+    return this.executeQuery(sql)
+  }
+
+  /**
+   * Export query results to a file
+   */
+  async exportToFile(
+    sql: string,
+    outputPath: string,
+    format: 'parquet' | 'csv' | 'json'
+  ): Promise<void> {
+    let exportSql: string
+
+    switch (format) {
+      case 'parquet':
+        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT PARQUET)`
+        break
+      case 'csv':
+        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT CSV, HEADER)`
+        break
+      case 'json':
+        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT JSON)`
+        break
+      default:
+        throw new Error(`Unsupported export format: ${format}`)
+    }
+
+    await this.executeQuery(exportSql)
+  }
+
+  /**
+   * Check if a table exists
+   */
+  async tableExists(tableName: string, schema: string = 'main'): Promise<boolean> {
+    const sql = `
+      SELECT COUNT(*) as count
+      FROM information_schema.tables
+      WHERE table_schema = '${schema}'
+        AND table_name = '${tableName}'
+    `
+    const result = await this.executeScalar<{ count: number }>(sql)
+    return result ? result.count > 0 : false
+  }
+
+  /**
+   * Get row count for a table
+   */
+  async getRowCount(tableName: string): Promise<number> {
+    const sql = `SELECT COUNT(*) as count FROM ${tableName}`
+    const result = await this.executeScalar<{ count: number }>(sql)
+    return result ? result.count : 0
+  }
+
+  /**
+   * Close the database connection
+   */
+  async close(): Promise<void> {
+    if (this.connection) {
+      // Note: DuckDB node-api doesn't have explicit close methods yet
+      // Just nullify references for garbage collection
+      this.connection = null
+      this.instance = null
+      this.isInitialized = false
+      console.log('DuckDB connection closed')
+    }
+  }
+
+  /**
+   * Check if the service is initialized
+   */
+  isReady(): boolean {
+    return this.isInitialized && this.connection !== null
+  }
+}
+
+// Singleton instance for convenience
+let duckDBInstance: DuckDBService | null = null
+
+/**
+ * Get or create a singleton DuckDB service instance
+ */
+export async function getDuckDBService(config?: Partial<DuckDBConfig>): Promise<DuckDBService> {
+  if (!duckDBInstance) {
+    duckDBInstance = new DuckDBService(config)
+    await duckDBInstance.initialize()
+  }
+  return duckDBInstance
+}
+
+/**
+ * Create a new DuckDB service instance (non-singleton)
+ */
+export function createDuckDBService(config?: Partial<DuckDBConfig>): DuckDBService {
+  return new DuckDBService(config)
+}
