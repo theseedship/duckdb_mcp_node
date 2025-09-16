@@ -3,7 +3,6 @@ import {
   MCPResponse,
   MCPNotification,
   JSONRPCId,
-  JSONRPCError,
   ErrorCode,
   MCPRequestSchema,
   MCPResponseSchema,
@@ -146,7 +145,7 @@ export class MessageRouter {
   /**
    * Register a method handler
    */
-  registerHandler(method: string, handler: (params: any) => Promise<any>) {
+  registerHandler(method: string, handler: (_params: any) => Promise<any>) {
     this.handlers.set(method, handler)
   }
 
@@ -205,9 +204,9 @@ export class CorrelationTracker {
   private pendingRequests = new Map<
     JSONRPCId,
     {
-      resolve: (response: MCPResponse) => void
-      reject: (error: Error) => void
-      timeout: NodeJS.Timeout
+      resolve: (_response: MCPResponse) => void
+      reject: (_error: Error) => void
+      timeout: ReturnType<typeof setTimeout>
     }
   >()
 

@@ -96,8 +96,10 @@ export class StdioTransport extends Transport {
     while (this.connected || this.messageQueue.length > 0) {
       // If we have messages in queue, yield them
       if (this.messageQueue.length > 0) {
-        const message = this.messageQueue.shift()!
-        yield message
+        const message = this.messageQueue.shift()
+        if (message) {
+          yield message
+        }
       } else {
         // Wait for next message
         const result = await this.waitForMessage()
@@ -143,7 +145,10 @@ export class StdioTransport extends Transport {
   private waitForMessage(): Promise<IteratorResult<MCPMessage>> {
     return new Promise((resolve) => {
       if (this.messageQueue.length > 0) {
-        resolve({ value: this.messageQueue.shift()!, done: false })
+        const message = this.messageQueue.shift()
+        if (message) {
+          resolve({ value: message, done: false })
+        }
       } else if (!this.connected) {
         resolve({ done: true, value: undefined })
       } else {
@@ -157,12 +162,16 @@ export class StdioTransport extends Transport {
    */
   private resolveWaitingIterators(done: boolean): void {
     while (this.waitingResolvers.length > 0 && (done || this.messageQueue.length > 0)) {
-      const resolver = this.waitingResolvers.shift()!
+      const resolver = this.waitingResolvers.shift()
+      if (!resolver) continue
 
       if (done) {
         resolver({ done: true, value: undefined })
       } else if (this.messageQueue.length > 0) {
-        resolver({ value: this.messageQueue.shift()!, done: false })
+        const message = this.messageQueue.shift()
+        if (message) {
+          resolver({ value: message, done: false })
+        }
       }
     }
   }
@@ -174,7 +183,7 @@ export class StdioTransport extends Transport {
 export class TCPTransport extends Transport {
   private host: string
   private port: number
-  private socket: any // Will be implemented when needed
+  private socket: unknown // Will be implemented when needed
   private connected = false
 
   constructor(host: string, port: number) {
@@ -194,12 +203,15 @@ export class TCPTransport extends Transport {
   }
 
   async send(message: MCPMessage): Promise<void> {
+    void message // Suppress unused parameter warning
     // TODO: Implement TCP send
     throw new Error('TCP transport not yet implemented')
   }
 
   async *receive(): AsyncIterator<MCPMessage> {
     // TODO: Implement TCP receive
+    // Yield statement to satisfy generator requirement (unreachable)
+    yield undefined as never
     throw new Error('TCP transport not yet implemented')
   }
 
@@ -213,7 +225,7 @@ export class TCPTransport extends Transport {
  */
 export class WebSocketTransport extends Transport {
   private url: string
-  private ws: any // Will be implemented when needed
+  private ws: unknown // Will be implemented when needed
   private connected = false
 
   constructor(url: string) {
@@ -232,12 +244,15 @@ export class WebSocketTransport extends Transport {
   }
 
   async send(message: MCPMessage): Promise<void> {
+    void message // Suppress unused parameter warning
     // TODO: Implement WebSocket send
     throw new Error('WebSocket transport not yet implemented')
   }
 
   async *receive(): AsyncIterator<MCPMessage> {
     // TODO: Implement WebSocket receive
+    // Yield statement to satisfy generator requirement (unreachable)
+    yield undefined as never
     throw new Error('WebSocket transport not yet implemented')
   }
 

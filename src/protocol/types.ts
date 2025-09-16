@@ -88,17 +88,17 @@ export type MCPClientConfig = z.infer<typeof MCPClientConfigSchema>
 
 // Error codes (JSON-RPC 2.0 standard)
 export enum ErrorCode {
-  ParseError = -32700,
+  // ParseError = -32700,
   InvalidRequest = -32600,
   MethodNotFound = -32601,
-  InvalidParams = -32602,
+  // InvalidParams = -32602,
   InternalError = -32603,
   // MCP-specific error codes
-  ResourceNotFound = -32001,
-  ToolExecutionFailed = -32002,
-  AuthenticationFailed = -32003,
-  SecurityViolation = -32004,
-  QueryTimeout = -32005,
+  // ResourceNotFound = -32001,
+  // ToolExecutionFailed = -32002,
+  // AuthenticationFailed = -32003,
+  // SecurityViolation = -32004,
+  // QueryTimeout = -32005,
 }
 
 // MCP Message type (union of all message types)

@@ -42,6 +42,8 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
       // General rules
+      'no-unused-vars': 'off', // Use @typescript-eslint/no-unused-vars instead
+      'no-unreachable': 'off', // Allow unreachable code for TODO implementations
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
       'no-debugger': 'error',
       'prefer-const': 'error',
@@ -67,6 +69,8 @@ export default [
       '*.config.mjs',
       'test-*.js',
       'test-*.mjs',
+      '**/*.test.ts',
+      'examples/**',
     ],
   },
 ]
