@@ -35,7 +35,7 @@
     "test:servers": "node scripts/test-with-servers.js",
     "test:integration": "node scripts/test-with-servers.js 'node tests/test-transport-integration.js'",
     "test:federation": "node tests/test-federation.js",
-    "inspector:reset": "node scripts/port-manager.js kill 6277 --force && npm run inspector",
+    "inspector:reset": "node scripts/port-manager.js kill 6274 --force && node scripts/port-manager.js kill 6277 --force && npm run inspector",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",

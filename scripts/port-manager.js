@@ -158,6 +158,7 @@ async function waitForPort(port, timeout = 5000) {
  */
 async function cleanupMCPPorts() {
   const MCP_PORTS = {
+    6274: 'MCP Inspector UI',
     6277: 'MCP Inspector Proxy',
     3001: 'HTTP Test Server',
     8080: 'WebSocket/HTTP Test Server',
@@ -260,7 +261,7 @@ ${COLORS.yellow}Common MCP Ports:${COLORS.reset}
     }
 
     case 'kill-all': {
-      const ports = [6277, 3001, 8080, 8081, 9999]
+      const ports = [6274, 6277, 3001, 8080, 8081, 9999]
       const results = await killPorts(ports, forceful)
       const allSuccess = results.every((r) => r.success)
 
