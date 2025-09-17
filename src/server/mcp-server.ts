@@ -861,7 +861,8 @@ class DuckDBMCPServer {
 }
 
 // Start the server if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Check if MCP_MODE environment variable is set (used by npm scripts)
+if (process.env.MCP_MODE === 'stdio' || process.argv.includes('--stdio')) {
   const server = new DuckDBMCPServer()
   server.start().catch((error) => {
     console.error('Failed to start server:', error)

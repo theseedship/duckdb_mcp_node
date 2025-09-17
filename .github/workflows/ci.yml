@@ -23,8 +23,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3
+
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          # Force rebuild native bindings for CI environment
+          npm rebuild @duckdb/node-api
 
       - name: Run type checking
         run: npm run typecheck
@@ -35,8 +43,20 @@ jobs:
       - name: Run formatting check
         run: npm run format:check
 
+      - name: Debug environment
+        run: |
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Working directory: $(pwd)"
+          echo "DuckDB package info:"
+          npm list @duckdb/node-api || true
+
       - name: Run tests
         run: npm run test:coverage
+        env:
+          NODE_ENV: test
+          CI: true
+          SUPPRESS_NO_CONFIG_WARNING: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
