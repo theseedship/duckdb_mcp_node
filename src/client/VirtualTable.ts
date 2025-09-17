@@ -1,6 +1,7 @@
 import { DuckDBService } from '../duckdb/service.js'
 import { MCPClient } from './MCPClient.js'
 import { ResourceMapper, MappedResource } from './ResourceMapper.js'
+import { escapeIdentifier } from '../utils/sql-escape.js'
 
 /**
  * Configuration for virtual tables
@@ -292,8 +293,8 @@ export class VirtualTableManager {
 
     // Create materialized copy
     await this.duckdb.executeQuery(`
-      CREATE TABLE ${materializedName} AS 
-      SELECT * FROM ${virtualTableName}
+      CREATE TABLE ${escapeIdentifier(materializedName)} AS 
+      SELECT * FROM ${escapeIdentifier(virtualTableName)}
     `)
 
     const rowCount = await this.duckdb.getRowCount(materializedName)

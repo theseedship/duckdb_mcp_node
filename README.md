@@ -1,3 +1,5 @@
+# NOT READY FOR PROD USE, WORK IN PROGRESS
+
 # DuckDB MCP Native
 
 Native Node.js/TypeScript implementation of DuckDB MCP (Model Context Protocol) extension.

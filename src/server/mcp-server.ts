@@ -780,7 +780,9 @@ class DuckDBMCPServer {
         }
 
         const tableName = match[1]
-        const data = await this.duckdb.executeQuery(`SELECT * FROM ${tableName} LIMIT 1000`)
+        const data = await this.duckdb.executeQuery(
+          `SELECT * FROM ${escapeIdentifier(tableName)} LIMIT 1000`
+        )
 
         return {
           contents: [

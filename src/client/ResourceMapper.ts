@@ -1,4 +1,5 @@
 import { DuckDBService } from '../duckdb/service.js'
+import { escapeIdentifier, escapeFilePath } from '../utils/sql-escape.js'
 
 /**
  * Resource types that can be mapped to DuckDB tables
@@ -181,8 +182,8 @@ export class ResourceMapper {
     try {
       await fs.writeFile(tempFile, csvContent)
       await this.duckdb.executeQuery(`
-        CREATE OR REPLACE TABLE ${tableName} AS 
-        SELECT * FROM read_csv_auto('${tempFile}')
+        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+        SELECT * FROM read_csv_auto(${escapeFilePath(tempFile)})
       `)
     } finally {
       // Clean up temp file
@@ -197,8 +198,8 @@ export class ResourceMapper {
     // Parquet data should be a file path or URL
     if (typeof data === 'string') {
       await this.duckdb.executeQuery(`
-        CREATE OR REPLACE TABLE ${tableName} AS 
-        SELECT * FROM read_parquet('${data}')
+        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+        SELECT * FROM read_parquet(${escapeFilePath(data)})
       `)
     } else if (Buffer.isBuffer(data)) {
       // If it's binary data, write to temp file
@@ -208,8 +209,8 @@ export class ResourceMapper {
       try {
         await fs.writeFile(tempFile, data)
         await this.duckdb.executeQuery(`
-          CREATE OR REPLACE TABLE ${tableName} AS 
-          SELECT * FROM read_parquet('${tempFile}')
+          CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+          SELECT * FROM read_parquet(${escapeFilePath(tempFile)})
         `)
       } finally {
         await fs.unlink(tempFile).catch(() => {})
@@ -288,7 +289,7 @@ export class ResourceMapper {
     }
 
     try {
-      await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${tableName}`)
+      await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${escapeIdentifier(tableName)}`)
       this.mappedResources.delete(tableName)
       console.info(`🗑️ Unmapped resource table '${tableName}'`)
     } catch (error) {
