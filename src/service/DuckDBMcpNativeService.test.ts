@@ -1,30 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
 
-// Mock the dependencies
+// Create mock constructors
+const MockedMCPClient = jest.fn()
+const MockedDuckDBMCPServer = jest.fn()
+const MockedResourceMapper = jest.fn()
+const MockedDuckDBService = jest.fn()
+
+// Mock the dependencies with our mock constructors
 jest.mock('../client/MCPClient.js', () => ({
-  MCPClient: jest.fn(),
+  MCPClient: MockedMCPClient,
 }))
 jest.mock('../server/mcp-server.js', () => ({
-  DuckDBMCPServer: jest.fn(),
+  DuckDBMCPServer: MockedDuckDBMCPServer,
 }))
 jest.mock('../client/ResourceMapper.js', () => ({
-  ResourceMapper: jest.fn(),
+  ResourceMapper: MockedResourceMapper,
 }))
 jest.mock('../duckdb/service.js', () => ({
-  DuckDBService: jest.fn(),
+  DuckDBService: MockedDuckDBService,
   getDuckDBService: jest.fn().mockResolvedValue({
     initialize: jest.fn(),
     executeQuery: jest.fn(),
   }),
 }))
-
-// Import after mocking
-import { MCPClient } from '../client/MCPClient.js'
-import { DuckDBMCPServer } from '../server/mcp-server.js'
-
-const MockedMCPClient = MCPClient as jest.Mock
-const MockedDuckDBMCPServer = DuckDBMCPServer as jest.Mock
 
 describe('DuckDBMcpNativeService', () => {
   let service: DuckDBMcpNativeService
