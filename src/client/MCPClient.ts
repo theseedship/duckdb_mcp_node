@@ -350,8 +350,9 @@ export class MCPClient {
       try {
         await fs.writeFile(tempFile, data)
 
-        // Try to load as CSV
-        await this.duckdb.readCSV(tempFile, tableName)
+        // Create table directly from CSV file
+        const sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_csv_auto('${tempFile}')`
+        await this.duckdb.executeQuery(sql)
       } finally {
         // Clean up temp file
         try {
@@ -363,7 +364,8 @@ export class MCPClient {
     } else if (data && typeof data === 'object' && data.type === 'parquet') {
       // Parquet file already saved to temp location
       try {
-        await this.duckdb.readParquet(data.path, tableName)
+        const sql = `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_parquet('${data.path}')`
+        await this.duckdb.executeQuery(sql)
       } finally {
         // Clean up temp file
         const fs = await import('fs/promises')

@@ -81,6 +81,11 @@ export class DuckDBService {
 
     const { endpoint, accessKey, secretKey, region, useSSL } = this.config.s3Config
 
+    // We only call this method when accessKey and secretKey are present
+    if (!accessKey || !secretKey) {
+      return
+    }
+
     // Escape all S3 parameters to prevent SQL injection
     const sql = `
       CREATE SECRET IF NOT EXISTS s3_secret (
