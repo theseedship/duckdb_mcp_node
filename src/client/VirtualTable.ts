@@ -99,7 +99,11 @@ export class VirtualTableManager {
       }
 
       // Set up auto-refresh if enabled
-      if (tableConfig.autoRefresh && tableConfig.refreshInterval > 0) {
+      if (
+        tableConfig.autoRefresh &&
+        tableConfig.refreshInterval &&
+        tableConfig.refreshInterval > 0
+      ) {
         virtualTable.refreshTimer = setInterval(
           () => this.refreshVirtualTable(tableName).catch(console.error),
           tableConfig.refreshInterval

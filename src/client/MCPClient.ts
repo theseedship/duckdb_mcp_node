@@ -94,7 +94,7 @@ export class MCPClient {
           clientTransport = new StdioClientTransport({
             command,
             args,
-            env: process.env,
+            env: process.env as Record<string, string>,
           })
           break
         }
@@ -189,6 +189,7 @@ export class MCPClient {
     const allResources: any[] = []
 
     for (const server of servers) {
+      if (!server) continue
       try {
         const result = await server.client.listResources()
         const resourcesWithServer = result.resources.map((resource) => ({
@@ -248,8 +249,11 @@ export class MCPClient {
 
     // Read from server
     try {
-      const result = await targetServer.client.readResource(resourceUri)
-      const data = result.contents[0]?.text ? JSON.parse(result.contents[0].text) : null
+      const result = await targetServer.client.readResource({ uri: resourceUri })
+      const content = result.contents[0]
+      // Ensure text is a string before parsing
+      const data =
+        content?.text && typeof content.text === 'string' ? JSON.parse(content.text) : null
 
       // Update cache
       if (this.config.cacheEnabled) {
@@ -324,7 +328,10 @@ export class MCPClient {
     }
 
     try {
-      const result = await server.client.callTool(toolName, args)
+      const result = await server.client.callTool({
+        name: toolName,
+        arguments: args,
+      })
       return result
     } catch (error) {
       throw new Error(`Failed to call tool '${toolName}' on server '${serverAlias}': ${error}`)
