@@ -1,13 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
+
+// Mock the dependencies
+jest.mock('../client/MCPClient.js', () => ({
+  MCPClient: jest.fn(),
+}))
+jest.mock('../server/mcp-server.js', () => ({
+  DuckDBMCPServer: jest.fn(),
+}))
+jest.mock('../client/ResourceMapper.js', () => ({
+  ResourceMapper: jest.fn(),
+}))
+jest.mock('../duckdb/service.js', () => ({
+  DuckDBService: jest.fn(),
+  getDuckDBService: jest.fn().mockResolvedValue({
+    initialize: jest.fn(),
+    executeQuery: jest.fn(),
+  }),
+}))
+
+// Import after mocking
 import { MCPClient } from '../client/MCPClient.js'
 import { DuckDBMCPServer } from '../server/mcp-server.js'
 
-// Mock the dependencies
-jest.mock('../client/MCPClient.js')
-jest.mock('../server/mcp-server.js')
-jest.mock('../client/ResourceMapper.js')
-jest.mock('../duckdb/service.js')
+const MockedMCPClient = MCPClient as jest.Mock
+const MockedDuckDBMCPServer = DuckDBMCPServer as jest.Mock
 
 describe('DuckDBMcpNativeService', () => {
   let service: DuckDBMcpNativeService
@@ -24,7 +41,7 @@ describe('DuckDBMcpNativeService', () => {
   describe('Server Management', () => {
     it('should start a server with default stdio transport', async () => {
       const mockStart = jest.fn()
-      ;(DuckDBMCPServer as any).mockImplementation(() => ({
+      MockedDuckDBMCPServer.mockImplementation(() => ({
         start: mockStart,
       }))
 
@@ -36,7 +53,7 @@ describe('DuckDBMcpNativeService', () => {
 
     it('should throw error when starting server with existing name', async () => {
       const mockStart = jest.fn()
-      ;(DuckDBMCPServer as any).mockImplementation(() => ({
+      MockedDuckDBMCPServer.mockImplementation(() => ({
         start: mockStart,
       }))
 
@@ -49,7 +66,7 @@ describe('DuckDBMcpNativeService', () => {
 
     it('should stop and remove a server', async () => {
       const mockStart = jest.fn()
-      ;(DuckDBMCPServer as any).mockImplementation(() => ({
+      MockedDuckDBMCPServer.mockImplementation(() => ({
         start: mockStart,
       }))
 
@@ -69,13 +86,12 @@ describe('DuckDBMcpNativeService', () => {
   describe('Client Management', () => {
     it('should attach to an MCP server', async () => {
       const mockAttachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([
         { uri: 'resource1', name: 'Resource 1' },
         { uri: 'resource2', name: 'Resource 2' },
       ])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         detachServer: jest.fn(),
@@ -93,12 +109,11 @@ describe('DuckDBMcpNativeService', () => {
 
     it('should cache resources when attaching', async () => {
       const mockAttachServer = jest.fn()
-      // @ts-ignore
       const mockListResources = jest
-        .fn()
+        .fn<() => Promise<any[]>>()
         .mockResolvedValue([{ uri: 'resource1', name: 'Resource 1' }])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         detachServer: jest.fn(),
@@ -121,10 +136,9 @@ describe('DuckDBMcpNativeService', () => {
 
     it('should skip cache when requested', async () => {
       const mockAttachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([])
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         detachServer: jest.fn(),
@@ -146,10 +160,9 @@ describe('DuckDBMcpNativeService', () => {
     it('should detach from an MCP server', async () => {
       const mockAttachServer = jest.fn()
       const mockDetachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([])
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         detachServer: mockDetachServer,
         listResources: mockListResources,
@@ -175,12 +188,10 @@ describe('DuckDBMcpNativeService', () => {
   describe('Tool Execution', () => {
     it('should call tool on connected client', async () => {
       const mockAttachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([])
-      // @ts-ignore
-      const mockCallTool = jest.fn().mockResolvedValue({ result: 'success' })
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([])
+      const mockCallTool = jest.fn<() => Promise<any>>().mockResolvedValue({ result: 'success' })
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         callTool: mockCallTool,
@@ -207,13 +218,12 @@ describe('DuckDBMcpNativeService', () => {
     it('should return service status', async () => {
       const mockStart = jest.fn()
       const mockAttachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([])
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([])
 
-      ;(DuckDBMCPServer as any).mockImplementation(() => ({
+      MockedDuckDBMCPServer.mockImplementation(() => ({
         start: mockStart,
       }))
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         detachServer: jest.fn(),
@@ -251,13 +261,11 @@ describe('DuckDBMcpNativeService', () => {
     it('should get client resources', async () => {
       const mockAttachServer = jest.fn()
       const mockListResources = jest
-        .fn()
-        // @ts-ignore
+        .fn<() => Promise<any[]>>()
         .mockResolvedValueOnce([{ uri: 'initial' }])
-        // @ts-ignore
         .mockResolvedValueOnce([{ uri: 'updated' }])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         detachServer: jest.fn(),
@@ -275,12 +283,12 @@ describe('DuckDBMcpNativeService', () => {
 
     it('should get client tools', async () => {
       const mockAttachServer = jest.fn()
-      // @ts-ignore
-      const mockListResources = jest.fn().mockResolvedValue([])
-      // @ts-ignore
-      const mockListTools = jest.fn().mockResolvedValue([{ name: 'tool1' }, { name: 'tool2' }])
+      const mockListResources = jest.fn<() => Promise<any[]>>().mockResolvedValue([])
+      const mockListTools = jest
+        .fn<() => Promise<any[]>>()
+        .mockResolvedValue([{ name: 'tool1' }, { name: 'tool2' }])
 
-      ;(MCPClient as any).mockImplementation(() => ({
+      MockedMCPClient.mockImplementation(() => ({
         attachServer: mockAttachServer,
         listResources: mockListResources,
         listTools: mockListTools,
