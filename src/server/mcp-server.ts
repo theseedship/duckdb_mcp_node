@@ -13,14 +13,13 @@ import {
 import { DuckDBService } from '../duckdb/service.js'
 import { MCPClient } from '../client/MCPClient.js'
 import { VirtualTableManager } from '../client/VirtualTable.js'
+import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
-// Redirect console.log temporarily to prevent dotenv from polluting stdout
-const originalLog = console.log
-console.log = () => {} // Suppress dotenv output
+// Suppress dotenv output to prevent stdout pollution
+process.env.SUPPRESS_NO_CONFIG_WARNING = 'true'
 dotenv.config()
-console.log = originalLog // Restore console.log
 
 /**
  * DuckDB MCP Server
@@ -385,7 +384,7 @@ class DuckDBMCPServer {
             const tables = await this.duckdb.executeQuery(`
               SELECT table_name, table_type 
               FROM information_schema.tables 
-              WHERE table_schema = '${schema}'
+              WHERE table_schema = ${escapeString(schema)}
               ORDER BY table_name
             `)
 
@@ -438,8 +437,8 @@ class DuckDBMCPServer {
             const tableName = args.table_name as string
 
             await this.duckdb.executeQuery(`
-              CREATE OR REPLACE TABLE ${tableName} AS 
-              SELECT * FROM read_csv_auto('${path}')
+              CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+              SELECT * FROM read_csv_auto(${escapeFilePath(path)})
             `)
 
             const rowCount = await this.duckdb.getRowCount(tableName)
@@ -467,8 +466,8 @@ class DuckDBMCPServer {
             const tableName = args.table_name as string
 
             await this.duckdb.executeQuery(`
-              CREATE OR REPLACE TABLE ${tableName} AS 
-              SELECT * FROM read_parquet('${path}')
+              CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+              SELECT * FROM read_parquet(${escapeFilePath(path)})
             `)
 
             const rowCount = await this.duckdb.getRowCount(tableName)

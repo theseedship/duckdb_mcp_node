@@ -1,5 +1,6 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
 import { z } from 'zod'
+import { escapeIdentifier, escapeString } from '../utils/sql-escape.js'
 
 // Configuration schema for DuckDB
 const DuckDBConfigSchema = z.object({
@@ -148,8 +149,8 @@ export class DuckDBService {
         is_nullable,
         column_default
       FROM information_schema.columns
-      WHERE table_schema = '${schema}'
-        AND table_name = '${tableName}'
+      WHERE table_schema = ${escapeString(schema)}
+        AND table_name = ${escapeString(tableName)}
       ORDER BY ordinal_position
     `
     return this.executeQuery(sql)
@@ -166,10 +167,10 @@ export class DuckDBService {
 
     // Get the keys from the first object to define columns
     const keys = Object.keys(jsonData[0])
-    const columns = keys.map((key) => `"${key}" VARCHAR`).join(', ')
+    const columns = keys.map((key) => `${escapeIdentifier(key)} VARCHAR`).join(', ')
 
     // Create the table
-    await this.executeQuery(`CREATE OR REPLACE TABLE ${tableName} (${columns})`)
+    await this.executeQuery(`CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} (${columns})`)
 
     // Insert data
     for (const row of jsonData) {
@@ -180,13 +181,13 @@ export class DuckDBService {
             return 'NULL'
           }
           if (typeof value === 'string') {
-            return `'${value.replace(/'/g, "''")}'`
+            return escapeString(value)
           }
           return String(value)
         })
         .join(', ')
 
-      await this.executeQuery(`INSERT INTO ${tableName} VALUES (${values})`)
+      await this.executeQuery(`INSERT INTO ${escapeIdentifier(tableName)} VALUES (${values})`)
     }
   }
 
@@ -194,9 +195,9 @@ export class DuckDBService {
    * Read a Parquet file
    */
   async readParquet(path: string, limit?: number): Promise<any[]> {
-    let sql = `SELECT * FROM read_parquet('${path}')`
+    let sql = `SELECT * FROM read_parquet(${escapeString(path)})`
     if (limit) {
-      sql += ` LIMIT ${limit}`
+      sql += ` LIMIT ${Math.min(parseInt(String(limit), 10) || 1000, 100000)}`
     }
     return this.executeQuery(sql)
   }
@@ -205,9 +206,9 @@ export class DuckDBService {
    * Read a CSV file
    */
   async readCSV(path: string, limit?: number): Promise<any[]> {
-    let sql = `SELECT * FROM read_csv_auto('${path}')`
+    let sql = `SELECT * FROM read_csv_auto(${escapeString(path)})`
     if (limit) {
-      sql += ` LIMIT ${limit}`
+      sql += ` LIMIT ${Math.min(parseInt(String(limit), 10) || 1000, 100000)}`
     }
     return this.executeQuery(sql)
   }
@@ -216,9 +217,9 @@ export class DuckDBService {
    * Read a JSON file
    */
   async readJSON(path: string, limit?: number): Promise<any[]> {
-    let sql = `SELECT * FROM read_json_auto('${path}')`
+    let sql = `SELECT * FROM read_json_auto(${escapeString(path)})`
     if (limit) {
-      sql += ` LIMIT ${limit}`
+      sql += ` LIMIT ${Math.min(parseInt(String(limit), 10) || 1000, 100000)}`
     }
     return this.executeQuery(sql)
   }
@@ -268,7 +269,7 @@ export class DuckDBService {
    * Get row count for a table
    */
   async getRowCount(tableName: string): Promise<number> {
-    const sql = `SELECT COUNT(*) as count FROM ${tableName}`
+    const sql = `SELECT COUNT(*) as count FROM ${escapeIdentifier(tableName)}`
     const result = await this.executeScalar<{ count: string | number }>(sql)
     return result ? Number(result.count) : 0
   }

@@ -86,9 +86,21 @@ export class MCPClient {
 
       switch (transport) {
         case 'stdio': {
-          // Parse stdio URL format: stdio://command?args=arg1,arg2
+          // Parse stdio URL format: stdio://command?args=arg1,arg2 or stdio:///path/to/command?args=arg1,arg2
           const urlParts = new URL(url)
-          const command = urlParts.hostname || urlParts.pathname.slice(2)
+
+          // If hostname exists (e.g., stdio://python), use it
+          // If hostname is empty (e.g., stdio:///usr/bin/python), use pathname
+          let command: string
+          if (urlParts.hostname) {
+            command = urlParts.hostname
+          } else {
+            // Remove the leading slash for absolute paths
+            command = urlParts.pathname.startsWith('/')
+              ? urlParts.pathname
+              : urlParts.pathname.slice(1)
+          }
+
           const args = urlParts.searchParams.get('args')?.split(',') || []
 
           clientTransport = new StdioClientTransport({
@@ -251,9 +263,29 @@ export class MCPClient {
     try {
       const result = await targetServer.client.readResource({ uri: resourceUri })
       const content = result.contents[0]
-      // Ensure text is a string before parsing
-      const data =
-        content?.text && typeof content.text === 'string' ? JSON.parse(content.text) : null
+
+      let data: any = null
+
+      if (content?.text && typeof content.text === 'string') {
+        // Check MIME type or try to detect content type
+        const mimeType = content.mimeType || ''
+
+        if (mimeType.includes('json') || mimeType === '') {
+          // Try to parse as JSON, fallback to raw text
+          try {
+            data = JSON.parse(content.text)
+          } catch {
+            // If it's not JSON, return as raw text (CSV, TSV, etc.)
+            data = content.text
+          }
+        } else if (mimeType.includes('csv') || mimeType.includes('text')) {
+          // Return raw text for CSV, text files
+          data = content.text
+        } else {
+          // For other types, return raw text
+          data = content.text
+        }
+      }
 
       // Update cache
       if (this.config.cacheEnabled) {
