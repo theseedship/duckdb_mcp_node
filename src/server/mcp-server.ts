@@ -348,8 +348,10 @@ class DuckDBMCPServer {
             const sql = args.sql as string
             const limit = (args.limit as number) || 1000
 
-            // Add LIMIT if not present for safety
-            const safeSql = sql.match(/LIMIT\s+\d+/i) ? sql : `${sql} LIMIT ${limit}`
+            // Only add LIMIT to SELECT queries for safety
+            const isSelectQuery = sql.trim().toUpperCase().startsWith('SELECT')
+            const hasLimit = sql.match(/LIMIT\s+\d+/i)
+            const safeSql = isSelectQuery && !hasLimit ? `${sql} LIMIT ${limit}` : sql
 
             const startTime = Date.now()
             const results = await this.duckdb.executeQuery(safeSql)
@@ -694,8 +696,10 @@ class DuckDBMCPServer {
             const sql = args.sql as string
             const limit = (args.limit as number) || 1000
 
-            // Add LIMIT if not present for safety
-            const safeSql = sql.match(/LIMIT\s+\d+/i) ? sql : `${sql} LIMIT ${limit}`
+            // Only add LIMIT to SELECT queries for safety
+            const isSelectQuery = sql.trim().toUpperCase().startsWith('SELECT')
+            const hasLimit = sql.match(/LIMIT\s+\d+/i)
+            const safeSql = isSelectQuery && !hasLimit ? `${sql} LIMIT ${limit}` : sql
 
             const startTime = Date.now()
             const results = await this.virtualTables.executeHybridQuery(safeSql)
@@ -832,9 +836,19 @@ class DuckDBMCPServer {
    * Start the MCP server
    */
   async start() {
-    // Initialize DuckDB
-    await this.duckdb.initialize()
-    console.error('DuckDB initialized')
+    // Initialize DuckDB with a timeout
+    const initPromise = this.duckdb.initialize()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('DuckDB initialization timeout')), 5000)
+    )
+
+    try {
+      await Promise.race([initPromise, timeoutPromise])
+      console.error('DuckDB initialized')
+    } catch (error) {
+      console.error('Failed to initialize DuckDB:', error)
+      throw error
+    }
 
     // Start MCP server with stdio transport
     const transport = new StdioServerTransport()

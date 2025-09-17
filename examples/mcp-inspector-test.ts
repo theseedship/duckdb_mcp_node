@@ -75,17 +75,15 @@ async function testMCPInspector() {
     console.log('═══════════════════════════════════════════')
 
     // Create sales table
-    await client.callTool('query_duckdb', {
-      sql: `
-        CREATE TABLE sales (
-          id INTEGER,
-          product VARCHAR,
-          quantity INTEGER,
-          price DOUBLE,
-          date DATE
-        )
-      `,
-    })
+    console.log('Creating sales table...')
+    try {
+      const createResult = await client.callTool('query_duckdb', {
+        sql: `CREATE TABLE IF NOT EXISTS sales (id INTEGER, product VARCHAR, quantity INTEGER, price DOUBLE, date DATE)`,
+      })
+      console.log('Table creation result:', JSON.parse(createResult.content[0].text).success)
+    } catch (error) {
+      console.error('Error creating table:', error)
+    }
 
     await client.callTool('query_duckdb', {
       sql: `
