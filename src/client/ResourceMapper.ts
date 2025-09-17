@@ -84,6 +84,12 @@ export class ResourceMapper {
     mimeType?: string,
     serverAlias?: string
   ): Promise<MappedResource> {
+    // Handle special case: Parquet file reference object from MCPClient
+    if (data && typeof data === 'object' && data.type === 'parquet' && data.path) {
+      // This is a Parquet file reference, not JSON data
+      return this.handleParquetFileReference(resourceUri, tableName, data.path, serverAlias)
+    }
+
     const resourceType = this.detectResourceType(
       mimeType,
       typeof data === 'string' ? data : JSON.stringify(data)
@@ -217,6 +223,54 @@ export class ResourceMapper {
       }
     } else {
       throw new Error('Invalid data format for Parquet resource')
+    }
+  }
+
+  /**
+   * Handle Parquet file reference from MCPClient
+   */
+  private async handleParquetFileReference(
+    resourceUri: string,
+    tableName: string,
+    filePath: string,
+    serverAlias?: string
+  ): Promise<MappedResource> {
+    try {
+      // Create table from Parquet file
+      await this.duckdb.executeQuery(`
+        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
+        SELECT * FROM read_parquet(${escapeFilePath(filePath)})
+      `)
+
+      // Clean up temp file after loading
+      const fs = await import('fs/promises')
+      await fs.unlink(filePath).catch(() => {
+        console.warn(`Could not delete temp Parquet file: ${filePath}`)
+      })
+
+      // Get table metadata
+      const columns = await this.duckdb.getTableColumns(tableName)
+      const rowCount = await this.duckdb.getRowCount(tableName)
+
+      const mapped: MappedResource = {
+        resourceUri,
+        tableName,
+        resourceType: ResourceType.PARQUET,
+        serverAlias,
+        createdAt: new Date(),
+        rowCount,
+        columns: columns.map((col: any) => ({
+          name: col.column_name,
+          type: col.data_type,
+        })),
+      }
+
+      this.mappedResources.set(tableName, mapped)
+      return mapped
+    } catch (error) {
+      throw new Error(
+        `Failed to map Parquet resource '${resourceUri}' to table '${tableName}': ${error}`
+      )
     }
   }
 

@@ -302,12 +302,15 @@ export class MCPClient {
         }
       }
 
-      // Update cache
+      // Update cache - but don't cache temp file references
       if (this.config.cacheEnabled) {
-        this.resourceCache.set(cacheKey, {
-          data,
-          timestamp: Date.now(),
-        })
+        // Don't cache Parquet file references as the temp file will be deleted
+        if (!(data && typeof data === 'object' && data.type === 'parquet' && data.path)) {
+          this.resourceCache.set(cacheKey, {
+            data,
+            timestamp: Date.now(),
+          })
+        }
       }
 
       return data
