@@ -52,14 +52,14 @@ This is the **Node.js/TypeScript implementation** of the DuckDB MCP (Model Conte
 - 5-minute TTL resource caching
 - Tool invocation on remote servers
 
-### 🚧 In Progress
+### ✅ Recently Completed (Sept 17, 2025)
 
 #### Transport Layer
 
 - ✅ stdio transport (working)
-- ❌ HTTP transport (not implemented)
-- ❌ WebSocket transport (not implemented)
-- ❌ TCP transport (not implemented)
+- ✅ HTTP transport (implemented)
+- ✅ WebSocket transport (implemented)
+- ✅ TCP transport (implemented)
 
 #### Virtual Filesystem
 
@@ -72,13 +72,13 @@ This is the **Node.js/TypeScript implementation** of the DuckDB MCP (Model Conte
 
 | Feature              | C++ Version   | Python Version  | Node.js Version (This) |
 | -------------------- | ------------- | --------------- | ---------------------- |
-| **Protocol**         | Full MCP      | Full MCP        | Partial (stdio only)   |
+| **Protocol**         | Full MCP      | Full MCP        | Full MCP               |
 | **Virtual Tables**   | MCPFS         | Query-based     | Direct mapping         |
 | **Binary Resources** | ✅            | ✅              | ✅ (fixed)             |
 | **SQL Execution**    | Native        | Native          | Via duckdb-node-neo    |
 | **Cloud Storage**    | S3            | S3 + MotherDuck | S3 only                |
 | **Security**         | SQL injection | SaaS mode       | SQL injection          |
-| **Transports**       | stdio/TCP     | stdio/stream    | stdio only             |
+| **Transports**       | stdio/TCP     | stdio/HTTP/WS   | stdio/HTTP/WS/TCP      |
 | **Caching**          | File-based    | In-memory       | In-memory (5min TTL)   |
 
 ## Architecture Components

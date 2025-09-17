@@ -4,32 +4,34 @@
 
 Native Node.js/TypeScript implementation of DuckDB MCP (Model Context Protocol) extension.
 
-## Current Status (September 2025)
+## Current Status (September 17, 2025)
 
 **✅ Working Features:**
 
 - Native TypeScript implementation (no C++ dependencies)
-- JSON-RPC 2.0 implementation with **stdio transport only**
+- JSON-RPC 2.0 implementation with **all transports**
 - DuckDB integration with SQL queries and table management
 - SQL injection prevention and security modes
 - Resource caching with 5-minute TTL
 - 14 MCP server tools for database operations
-- Virtual table creation from JSON/CSV/Parquet
+- Virtual table creation from JSON/CSV/Parquet (Parquet bug fixed!)
+- **NEW: HTTP transport with polling support**
+- **NEW: WebSocket transport with auto-reconnection**
+- **NEW: TCP transport for C++ compatibility**
 
 **🚧 Not Yet Implemented:**
 
-- HTTP transport (throws error)
-- WebSocket transport (throws error)
-- TCP transport (not started)
+- MotherDuck cloud integration
 - Virtual filesystem for mcp:// URIs
 - Connection pooling
 - Authentication layer
+- SaaS security mode (from Python version)
 - Full test coverage (currently ~7-15%, not production ready)
 
 ## Features
 
 - 🚀 **Native TypeScript**: Pure Node.js implementation, no C++ dependencies
-- 🔧 **MCP Protocol**: JSON-RPC 2.0 implementation with stdio transport (HTTP/WebSocket pending)
+- 🔧 **MCP Protocol**: JSON-RPC 2.0 implementation with stdio, HTTP, WebSocket, and TCP transports
 - 📊 **DuckDB Integration**: Execute SQL queries, manage tables, load data files
 - 🔒 **Security**: SQL injection prevention, configurable security modes
 - 📦 **Modular**: Clean architecture with reusable components
@@ -100,9 +102,9 @@ The 9 additional tools mentioned in `duckdb-mcp-tools.ts` (mcpServe, mcpAttach, 
 ### Transport Support
 
 - ✅ **stdio**: Fully working
-- ❌ **HTTP**: Not implemented (throws error)
-- ❌ **WebSocket**: Not implemented (throws error)
-- ❌ **TCP**: Not started
+- ✅ **HTTP**: Implemented with polling support
+- ✅ **WebSocket**: Implemented with auto-reconnection
+- ✅ **TCP**: Implemented with keep-alive
 
 ### Testing
 

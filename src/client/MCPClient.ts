@@ -7,6 +7,9 @@ import {
 import { z } from 'zod'
 import { URL } from 'url'
 import { DuckDBService } from '../duckdb/service.js'
+import { HTTPTransport } from '../protocol/http-transport.js'
+import { WebSocketTransport } from '../protocol/websocket-transport.js'
+import { TCPTransport } from '../protocol/tcp-transport.js'
 
 /**
  * Configuration for MCP Client
@@ -65,7 +68,7 @@ export class MCPClient {
   async attachServer(
     url: string,
     alias: string,
-    transport: 'stdio' | 'http' | 'websocket' = 'stdio'
+    transport: 'stdio' | 'http' | 'websocket' | 'tcp' = 'stdio'
   ): Promise<void> {
     if (this.attachedServers.has(alias)) {
       throw new Error(`Server with alias '${alias}' is already attached`)
@@ -111,13 +114,71 @@ export class MCPClient {
           break
         }
 
-        case 'http':
-          // TODO: Implement HTTP transport
-          throw new Error('HTTP transport not yet implemented')
+        case 'http': {
+          // Parse HTTP URL and headers
+          const urlParts = new URL(url)
+          const headers: Record<string, string> = {}
 
-        case 'websocket':
-          // TODO: Implement WebSocket transport
-          throw new Error('WebSocket transport not yet implemented')
+          // Extract headers from URL params if present
+          urlParts.searchParams.forEach((value, key) => {
+            if (key.startsWith('header_')) {
+              headers[key.replace('header_', '')] = value
+            }
+          })
+
+          // Create custom transport wrapper for SDK compatibility
+          const httpTransport = new HTTPTransport(url, headers)
+          await httpTransport.connect()
+
+          // Create a compatible transport for the SDK client
+          clientTransport = {
+            start: async () => httpTransport,
+            close: async () => httpTransport.disconnect(),
+          }
+          break
+        }
+
+        case 'websocket': {
+          // Parse WebSocket URL and headers
+          const urlParts = new URL(url)
+          const headers: Record<string, string> = {}
+
+          // Extract headers from URL params if present
+          urlParts.searchParams.forEach((value, key) => {
+            if (key.startsWith('header_')) {
+              headers[key.replace('header_', '')] = value
+            }
+          })
+
+          // Create custom transport wrapper for SDK compatibility
+          const wsTransport = new WebSocketTransport(url, headers)
+          await wsTransport.connect()
+
+          // Create a compatible transport for the SDK client
+          clientTransport = {
+            start: async () => wsTransport,
+            close: async () => wsTransport.disconnect(),
+          }
+          break
+        }
+
+        case 'tcp': {
+          // Parse TCP URL format: tcp://host:port
+          const urlParts = new URL(url)
+          const host = urlParts.hostname || 'localhost'
+          const port = parseInt(urlParts.port || '9999')
+
+          // Create custom transport wrapper for SDK compatibility
+          const tcpTransport = new TCPTransport(host, port)
+          await tcpTransport.connect()
+
+          // Create a compatible transport for the SDK client
+          clientTransport = {
+            start: async () => tcpTransport,
+            close: async () => tcpTransport.disconnect(),
+          }
+          break
+        }
 
         default:
           throw new Error(`Unsupported transport: ${transport}`)
