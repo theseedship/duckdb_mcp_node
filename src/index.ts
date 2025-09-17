@@ -26,7 +26,7 @@ export { DuckDBService, getDuckDBService, createDuckDBService } from './duckdb/s
 export { DuckDBMCPServer } from './server/mcp-server.js'
 export { MCPClient } from './client/MCPClient.js'
 export { ResourceMapper } from './client/ResourceMapper.js'
-export { VirtualTable } from './client/VirtualTable.js'
+export { VirtualTableManager } from './client/VirtualTable.js'
 export {
   DuckDBMcpNativeService,
   getDuckDBMcpNativeService,

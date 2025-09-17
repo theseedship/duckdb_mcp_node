@@ -65,7 +65,7 @@ export const MCPServerConfigSchema = z.object({
 })
 
 // MCP Client Configuration
-export const MCPClientConfigSchema = z.object({
+export const MCPProtocolClientConfigSchema = z.object({
   serverName: z.string(),
   transport: z.enum(['stdio', 'tcp', 'websocket', 'http']),
   command: z.string().optional(), // For stdio transport
@@ -84,7 +84,7 @@ export type MCPNotification = z.infer<typeof MCPNotificationSchema>
 export type MCPResource = z.infer<typeof MCPResourceSchema>
 export type MCPTool = z.infer<typeof MCPToolSchema>
 export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>
-export type MCPClientConfig = z.infer<typeof MCPClientConfigSchema>
+export type MCPProtocolClientConfig = z.infer<typeof MCPProtocolClientConfigSchema>
 
 // Error codes (JSON-RPC 2.0 standard)
 export enum ErrorCode {

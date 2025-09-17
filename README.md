@@ -7,8 +7,11 @@ Native Node.js/TypeScript implementation of DuckDB MCP (Model Context Protocol) 
 - 🚀 **Native TypeScript**: Pure Node.js implementation, no C++ dependencies
 - 🔧 **MCP Protocol**: Full JSON-RPC 2.0 implementation with stdio/TCP/WebSocket transports
 - 📊 **DuckDB Integration**: Execute SQL queries, manage tables, load data files
-- 🔒 **Security**: Configurable security modes for development and production
+- 🔒 **Security**: SQL injection prevention, configurable security modes
 - 📦 **Modular**: Clean architecture with reusable components
+- 🔄 **Resource Management**: Virtual tables, resource mapping, auto-refresh
+- 💾 **Smart Caching**: 5-minute TTL resource cache with configurable options
+- 🛠️ **Rich Toolset**: 9+ MCP tools for comprehensive database control
 
 ## Installation
 
@@ -44,58 +47,107 @@ npm run example:query
 
 The MCP server exposes the following tools:
 
-### `query_duckdb`
+### Core Database Tools
 
-Execute SQL queries on DuckDB.
+#### `query_duckdb`
 
-```json
-{
-  "sql": "SELECT * FROM my_table",
-  "limit": 1000
-}
+Execute SQL queries on DuckDB with automatic result limiting and security features.
+
+#### `create_table_from_json`
+
+Create DuckDB tables from JSON data with automatic schema inference.
+
+#### `read_parquet`
+
+Read and query Parquet files directly without loading into memory.
+
+#### `read_csv`
+
+Import CSV files with automatic type detection and parsing.
+
+#### `export_data`
+
+Export query results to various formats (Parquet, CSV, JSON).
+
+### MCP Service Management Tools
+
+#### `mcpServe`
+
+Start an MCP server to expose DuckDB tables and resources.
+
+#### `mcpAttach`
+
+Connect to external MCP servers and access their resources.
+
+#### `mcpDetach`
+
+Disconnect from MCP servers and clean up resources.
+
+#### `mcpCreateVirtualTable`
+
+Map MCP resources to DuckDB virtual tables for SQL querying.
+
+#### `mcpCallTool`
+
+Execute tools on connected MCP servers.
+
+#### `mcpStatus`
+
+Get status of all active servers and clients.
+
+#### `mcpListResources`
+
+List available resources from connected MCP servers.
+
+#### `mcpListTools`
+
+List available tools from connected MCP servers.
+
+#### `mcpClearCache`
+
+Clear the resource cache to force fresh data retrieval.
+
+## API Usage
+
+### TypeScript/JavaScript
+
+```typescript
+import { getDuckDBService, getDuckDBMcpNativeService, MCPClient } from '@deposium/duckdb-mcp-native'
+
+// Initialize DuckDB
+const duckdb = await getDuckDBService()
+
+// Execute queries
+const results = await duckdb.executeQuery('SELECT * FROM employees')
+
+// Start MCP server
+const service = getDuckDBMcpNativeService()
+await service.startServer('my-server')
+
+// Connect to external MCP server
+await service.attachMCP('stdio://path/to/server', 'alias')
+
+// Create virtual table from MCP resource
+await service.createVirtualTable('alias', 'resource://data', 'my_table')
 ```
 
-### `list_tables`
+### MCP Client Example
 
-List all tables in DuckDB.
+```typescript
+// Create a client to consume MCP resources
+const client = new MCPClient()
+await client.attachServer('stdio://duckdb-server', 'db', 'stdio')
 
-```json
-{
-  "schema": "main"
-}
-```
+// List available resources
+const resources = await client.listResources()
 
-### `describe_table`
+// Read a resource (table data)
+const data = await client.readResource('duckdb://table/employees')
 
-Get schema information for a table.
-
-```json
-{
-  "table_name": "my_table",
-  "schema": "main"
-}
-```
-
-### `load_csv`
-
-Load a CSV file into DuckDB.
-
-```json
-{
-  "path": "/path/to/file.csv",
-  "table_name": "my_table"
-}
-```
-
-### `load_parquet`
-
-Load a Parquet file into DuckDB.
-
-```json
-{
-  "path": "s3://bucket/file.parquet",
-  "table_name": "my_table"
-}
+// Execute a tool
+const result = await client.callTool('db', 'query_duckdb', {
+  sql: 'SELECT COUNT(*) FROM employees',
+})
 ```
 
 ## MCP Client Features (Phase 2)
@@ -363,27 +415,34 @@ MCP_SECURITY_MODE=production
 
 ## Roadmap
 
-- [x] Phase 1: Core Protocol Implementation
+- [x] **Phase 1: Core Protocol Implementation** ✅
   - [x] JSON-RPC 2.0 message layer
   - [x] Stdio transport
   - [x] Basic error handling
+  - [x] Security: SQL injection prevention
 
-- [x] Phase 2: DuckDB Integration
-  - [x] Query execution
+- [x] **Phase 2: DuckDB Integration** ✅
+  - [x] Query execution with auto-limiting
   - [x] Table management
   - [x] File loading (CSV, Parquet, JSON)
+  - [x] Data export capabilities
 
-- [ ] Phase 3: Advanced Features
+- [x] **Phase 3: MCP Client & Service** ✅
+  - [x] MCP client for external resources
+  - [x] Virtual table mapping
+  - [x] Resource caching (5-min TTL)
+  - [x] DuckDBMcpNativeService unified API
+  - [x] 9+ MCP management tools
   - [ ] TCP and WebSocket transports
-  - [ ] MCP client for external resources
   - [ ] Virtual filesystem for mcp:// URIs
-  - [ ] Resource publishing
 
-- [ ] Phase 4: Production Ready
-  - [ ] Comprehensive test suite
+- [ ] **Phase 4: Production Ready**
+  - [x] Comprehensive test suite (24 tests)
+  - [x] CI/CD with GitHub Actions
   - [ ] Performance optimizations
   - [ ] Connection pooling
-  - [ ] Rate limiting
+  - [ ] Authentication layer
+  - [ ] NPM package publication
 
 ## License
 

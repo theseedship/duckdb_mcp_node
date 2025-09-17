@@ -20,6 +20,7 @@
     "example:inspector": "tsx examples/mcp-inspector-test.ts",
     "example:test": "tsx examples/test-server.ts",
     "example:simple": "tsx examples/test-simple.ts",
+    "example:service-integration": "tsx examples/service-integration-test.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

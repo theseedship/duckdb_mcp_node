@@ -39,9 +39,9 @@ export interface ServiceStatus {
 }
 
 /**
- * Virtual table configuration
+ * Virtual table configuration for service layer
  */
-export interface VirtualTableConfig {
+export interface ServiceVirtualTableConfig {
   tableName: string
   resourceUri: string
   refreshInterval?: number
