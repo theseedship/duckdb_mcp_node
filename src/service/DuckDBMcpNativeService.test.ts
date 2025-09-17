@@ -1,17 +1,63 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
 
-// Skip all tests for now due to ESM/Jest mock issues
-// TODO: Fix mocking for ESM modules
-describe.skip('DuckDBMcpNativeService', () => {
+// Mock the MCPClient to avoid real connections
+jest.mock('../client/MCPClient.js', () => ({
+  MCPClient: jest.fn().mockImplementation(() => ({
+    attachServer: jest.fn().mockResolvedValue(undefined),
+    detachServer: jest.fn().mockResolvedValue(undefined),
+    listResources: jest.fn().mockResolvedValue([]),
+    readResource: jest.fn().mockResolvedValue({}),
+    callTool: jest.fn().mockResolvedValue({}),
+    getAttachedServer: jest.fn().mockReturnValue({
+      alias: 'test-alias',
+      url: 'stdio://test',
+      transport: 'stdio',
+      client: {},
+      resources: [],
+      tools: [],
+      lastRefresh: new Date(),
+    }),
+    listAttachedServers: jest.fn().mockReturnValue([]),
+    clearCache: jest.fn(),
+    disconnectAll: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
+}))
+
+// Mock DuckDBMCPServer to avoid starting real servers
+jest.mock('../server/mcp-server.js', () => ({
+  DuckDBMCPServer: jest.fn().mockImplementation(() => ({
+    start: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+  })),
+}))
+
+// Tests for DuckDBMcpNativeService
+describe('DuckDBMcpNativeService', () => {
   let service: DuckDBMcpNativeService
+  let consoleErrorSpy: jest.SpiedFunction<typeof console.error>
 
   beforeEach(() => {
+    // Suppress console.error during tests
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     service = createDuckDBMcpNativeService()
   })
 
-  afterEach(() => {
-    // Clean up
+  afterEach(async () => {
+    // Clean up all servers and clients
+    const serverNames = service.getServerNames()
+    for (const name of serverNames) {
+      await service.stopServer(name).catch(() => {})
+    }
+
+    const clientAliases = service.getClientAliases()
+    for (const alias of clientAliases) {
+      await service.detachMCP(alias).catch(() => {})
+    }
+
+    service.clearCache()
+    consoleErrorSpy.mockRestore()
   })
 
   describe('Server Management', () => {
@@ -46,6 +92,7 @@ describe.skip('DuckDBMcpNativeService', () => {
     it('should attach to an MCP server', async () => {
       const resources = await service.attachMCP('stdio://test', 'test-alias')
       expect(resources).toBeDefined()
+      expect(resources).toEqual([]) // Mocked to return empty array
       expect(service.getClientAliases()).toContain('test-alias')
     })
 
@@ -135,7 +182,7 @@ describe.skip('DuckDBMcpNativeService', () => {
       await service.attachMCP('stdio://test', 'test-alias')
       const tools = await service.getClientTools('test-alias')
 
-      // MCPClient doesn't have listTools yet, so we expect empty array
+      // Mocked to return empty array
       expect(tools).toEqual([])
     })
   })
