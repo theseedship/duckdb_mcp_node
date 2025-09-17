@@ -54,9 +54,9 @@ export class DuckDBService {
       this.instance = await DuckDBInstance.create(':memory:', instanceConfig)
       this.connection = await this.instance.connect()
 
-      // Install and load basic extensions
-      await this.executeQuery('INSTALL httpfs')
-      await this.executeQuery('LOAD httpfs')
+      // Skip extension loading for now to prevent timeouts
+      // Extensions can be loaded on-demand when needed
+      // TODO: Make extension loading lazy or async
 
       // Configure S3 if credentials provided
       if (this.config.s3Config?.accessKey && this.config.s3Config?.secretKey) {
@@ -64,7 +64,7 @@ export class DuckDBService {
       }
 
       this.isInitialized = true
-      console.info('DuckDB initialized successfully')
+      console.error('DuckDB initialized successfully')
     } catch (error) {
       console.error('Failed to initialize DuckDB:', error)
       throw error
@@ -93,21 +93,18 @@ export class DuckDBService {
     `
 
     await this.executeQuery(sql)
-    console.info('S3 configuration applied')
+    console.error('S3 configuration applied')
   }
 
   /**
    * Execute a SQL query and return results
    */
   async executeQuery<T = any>(sql: string, _params?: any[]): Promise<T[]> {
-    if (!this.connection) {
-      await this.initialize()
+    if (!this.isInitialized || !this.connection) {
+      throw new Error('Database not initialized. Call initialize() first.')
     }
 
     try {
-      if (!this.connection) {
-        throw new Error('Database connection not initialized')
-      }
       const result = await this.connection.run(sql)
       const rows = await result.getRowObjectsJson()
       return rows as T[]
@@ -286,7 +283,7 @@ export class DuckDBService {
       this.connection = null
       this.instance = null
       this.isInitialized = false
-      console.info('DuckDB connection closed')
+      console.error('DuckDB connection closed')
     }
   }
 

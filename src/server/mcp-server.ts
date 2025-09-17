@@ -16,7 +16,11 @@ import { VirtualTableManager } from '../client/VirtualTable.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
+// Redirect console.log temporarily to prevent dotenv from polluting stdout
+const originalLog = console.log
+console.log = () => {} // Suppress dotenv output
 dotenv.config()
+console.log = originalLog // Restore console.log
 
 /**
  * DuckDB MCP Server
