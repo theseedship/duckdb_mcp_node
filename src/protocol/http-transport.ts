@@ -42,22 +42,35 @@ export class HTTPTransport extends Transport {
     try {
       // Initialize connection with server
       const response = await this.client.post('/mcp/initialize', {
-        protocolVersion: '1.0.0',
-        capabilities: {
-          resources: true,
-          tools: true,
+        jsonrpc: '2.0',
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {
+            roots: {},
+          },
+          clientInfo: {
+            name: 'duckdb-mcp-http-client',
+            version: '1.0.0',
+          },
         },
+        id: 'init-' + Date.now(),
       })
 
-      if (response.data.sessionId) {
-        this.sessionId = response.data.sessionId
-        this.client.defaults.headers['X-Session-ID'] = this.sessionId
+      // Extract the result from the JSON-RPC response
+      const result = response.data.result || response.data
+
+      if (result.sessionId) {
+        this.sessionId = result.sessionId
+        if (this.client.defaults.headers && this.sessionId) {
+          this.client.defaults.headers['X-Session-ID'] = this.sessionId
+        }
       }
 
       this.connected = true
 
       // Start polling for messages if server supports server-sent events
-      if (response.data.capabilities?.serverSentEvents) {
+      if (result.capabilities?.serverSentEvents) {
         this.startPolling()
       }
 

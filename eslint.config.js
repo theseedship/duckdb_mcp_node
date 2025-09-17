@@ -37,14 +37,13 @@ export default [
       // TypeScript rules
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      // TODO: Fix all any types and re-enable this rule
-      '@typescript-eslint/no-explicit-any': 'off', // Temporarily disabled to fix CI
+      '@typescript-eslint/no-explicit-any': 'warn', // Gradual migration from any
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
       // General rules
       'no-unused-vars': 'off', // Use @typescript-eslint/no-unused-vars instead
-      'no-unreachable': 'off', // Allow unreachable code for TODO implementations
+      'no-unreachable': 'error', // Disallow unreachable code
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
       'no-debugger': 'error',
       'prefer-const': 'error',

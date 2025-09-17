@@ -21,6 +21,14 @@ export * from './service/types.js'
 // Tools exports
 export * from './tools/duckdb-mcp-tools.js'
 
+// Federation exports
+export * from './federation/ResourceRegistry.js'
+export * from './federation/ConnectionPool.js'
+export * from './federation/QueryRouter.js'
+
+// Utilities exports
+export * from './utils/connection-reset.js'
+
 // Main API
 export { DuckDBService, getDuckDBService, createDuckDBService } from './duckdb/service.js'
 export { DuckDBMCPServer } from './server/mcp-server.js'
@@ -33,10 +41,17 @@ export {
   createDuckDBMcpNativeService,
 } from './service/DuckDBMcpNativeService.js'
 export {
-  StdioTransport,
-  TCPTransport,
-  WebSocketTransport,
   Transport,
-} from './protocol/transport.js'
+  StdioTransport,
+  HTTPTransport,
+  WebSocketTransport,
+  TCPTransport,
+} from './protocol/index.js'
 export { MessageFormatter, MessageRouter, CorrelationTracker } from './protocol/messages.js'
 export { duckdbMcpTools, duckdbMcpSchemas } from './tools/duckdb-mcp-tools.js'
+
+// Federation API
+export { ResourceRegistry } from './federation/ResourceRegistry.js'
+export { MCPConnectionPool } from './federation/ConnectionPool.js'
+export { QueryRouter } from './federation/QueryRouter.js'
+export { ConnectionReset } from './utils/connection-reset.js'

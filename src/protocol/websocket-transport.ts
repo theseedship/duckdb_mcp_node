@@ -202,7 +202,7 @@ export class WebSocketTransport extends Transport {
 
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.ping((error) => {
+        this.ws.ping((error?: Error) => {
           if (error) {
             console.error('Ping failed:', error)
           }

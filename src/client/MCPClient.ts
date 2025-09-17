@@ -7,9 +7,8 @@ import {
 import { z } from 'zod'
 import { URL } from 'url'
 import { DuckDBService } from '../duckdb/service.js'
-import { HTTPTransport } from '../protocol/http-transport.js'
-import { WebSocketTransport } from '../protocol/websocket-transport.js'
-import { TCPTransport } from '../protocol/tcp-transport.js'
+import { HTTPTransport, WebSocketTransport, TCPTransport } from '../protocol/index.js'
+import { SDKTransportAdapter } from '../protocol/sdk-transport-adapter.js'
 
 /**
  * Configuration for MCP Client
@@ -28,7 +27,7 @@ export interface MCPClientConfig {
 export interface AttachedServer {
   alias: string
   url: string
-  transport: 'stdio' | 'http' | 'websocket'
+  transport: 'stdio' | 'http' | 'websocket' | 'tcp'
   client: Client
   resources?: z.infer<typeof ListResourcesResultSchema>['resources']
   tools?: z.infer<typeof ListToolsResultSchema>['tools']
@@ -126,15 +125,9 @@ export class MCPClient {
             }
           })
 
-          // Create custom transport wrapper for SDK compatibility
+          // Create HTTP transport and wrap with SDK adapter
           const httpTransport = new HTTPTransport(url, headers)
-          await httpTransport.connect()
-
-          // Create a compatible transport for the SDK client
-          clientTransport = {
-            start: async () => httpTransport,
-            close: async () => httpTransport.disconnect(),
-          }
+          clientTransport = new SDKTransportAdapter(httpTransport)
           break
         }
 
@@ -150,15 +143,9 @@ export class MCPClient {
             }
           })
 
-          // Create custom transport wrapper for SDK compatibility
+          // Create WebSocket transport and wrap with SDK adapter
           const wsTransport = new WebSocketTransport(url, headers)
-          await wsTransport.connect()
-
-          // Create a compatible transport for the SDK client
-          clientTransport = {
-            start: async () => wsTransport,
-            close: async () => wsTransport.disconnect(),
-          }
+          clientTransport = new SDKTransportAdapter(wsTransport)
           break
         }
 
@@ -168,15 +155,9 @@ export class MCPClient {
           const host = urlParts.hostname || 'localhost'
           const port = parseInt(urlParts.port || '9999')
 
-          // Create custom transport wrapper for SDK compatibility
+          // Create TCP transport and wrap with SDK adapter
           const tcpTransport = new TCPTransport(host, port)
-          await tcpTransport.connect()
-
-          // Create a compatible transport for the SDK client
-          clientTransport = {
-            start: async () => tcpTransport,
-            close: async () => tcpTransport.disconnect(),
-          }
+          clientTransport = new SDKTransportAdapter(tcpTransport)
           break
         }
 
