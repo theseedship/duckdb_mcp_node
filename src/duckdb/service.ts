@@ -1,6 +1,6 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
 import { z } from 'zod'
-import { escapeIdentifier, escapeString } from '../utils/sql-escape.js'
+import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 
 // Configuration schema for DuckDB
 const DuckDBConfigSchema = z.object({
@@ -65,7 +65,6 @@ export class DuckDBService {
       }
 
       this.isInitialized = true
-      console.error('DuckDB initialized successfully')
     } catch (error) {
       console.error('Failed to initialize DuckDB:', error)
       throw error
@@ -82,19 +81,20 @@ export class DuckDBService {
 
     const { endpoint, accessKey, secretKey, region, useSSL } = this.config.s3Config
 
+    // Escape all S3 parameters to prevent SQL injection
     const sql = `
       CREATE SECRET IF NOT EXISTS s3_secret (
         TYPE S3,
-        KEY_ID '${accessKey}',
-        SECRET '${secretKey}',
-        ${endpoint ? `ENDPOINT '${endpoint}',` : ''}
-        REGION '${region}',
+        KEY_ID ${escapeString(accessKey)},
+        SECRET ${escapeString(secretKey)},
+        ${endpoint ? `ENDPOINT ${escapeString(endpoint)},` : ''}
+        REGION ${escapeString(region)},
         USE_SSL ${useSSL}
       )
     `
 
     await this.executeQuery(sql)
-    console.error('S3 configuration applied')
+    // S3 configuration applied successfully
   }
 
   /**
@@ -234,15 +234,18 @@ export class DuckDBService {
   ): Promise<void> {
     let exportSql: string
 
+    // Escape the output path to prevent SQL injection
+    const safePath = escapeFilePath(outputPath)
+
     switch (format) {
       case 'parquet':
-        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT PARQUET)`
+        exportSql = `COPY (${sql}) TO ${safePath} (FORMAT PARQUET)`
         break
       case 'csv':
-        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT CSV, HEADER)`
+        exportSql = `COPY (${sql}) TO ${safePath} (FORMAT CSV, HEADER)`
         break
       case 'json':
-        exportSql = `COPY (${sql}) TO '${outputPath}' (FORMAT JSON)`
+        exportSql = `COPY (${sql}) TO ${safePath} (FORMAT JSON)`
         break
       default:
         throw new Error(`Unsupported export format: ${format}`)
@@ -255,21 +258,23 @@ export class DuckDBService {
    * Check if a table exists
    */
   async tableExists(tableName: string, schema: string = 'main'): Promise<boolean> {
+    // DuckDB Node API doesn't support prepared statements yet, use escaped strings
     const sql = `
       SELECT COUNT(*) as count
       FROM information_schema.tables
-      WHERE table_schema = '${schema}'
-        AND table_name = '${tableName}'
+      WHERE table_schema = ${escapeString(schema)}
+        AND table_name = ${escapeString(tableName)}
     `
-    const result = await this.executeScalar<{ count: number }>(sql)
-    return result ? result.count > 0 : false
+    const result = await this.executeScalar<{ count: string | number }>(sql)
+    return result ? Number(result.count) > 0 : false
   }
 
   /**
    * Get row count for a table
    */
-  async getRowCount(tableName: string): Promise<number> {
-    const sql = `SELECT COUNT(*) as count FROM ${escapeIdentifier(tableName)}`
+  async getRowCount(tableName: string, schema: string = 'main'): Promise<number> {
+    const qualifiedName = `${escapeIdentifier(schema)}.${escapeIdentifier(tableName)}`
+    const sql = `SELECT COUNT(*) as count FROM ${qualifiedName}`
     const result = await this.executeScalar<{ count: string | number }>(sql)
     return result ? Number(result.count) : 0
   }
@@ -279,12 +284,17 @@ export class DuckDBService {
    */
   async close(): Promise<void> {
     if (this.connection) {
-      // Note: DuckDB node-api doesn't have explicit close methods yet
-      // Just nullify references for garbage collection
+      try {
+        // Properly disconnect the DuckDB connection
+        this.connection.disconnectSync()
+      } catch {
+        // Silently ignore disconnect errors during cleanup
+      }
+
+      // Nullify references for garbage collection
       this.connection = null
       this.instance = null
       this.isInitialized = false
-      console.error('DuckDB connection closed')
     }
   }
 

@@ -410,7 +410,7 @@ class DuckDBMCPServer {
             const tableName = args.table_name as string
             const schema = (args.schema as string) || 'main'
             const columns = await this.duckdb.getTableColumns(tableName, schema)
-            const rowCount = await this.duckdb.getRowCount(tableName)
+            const rowCount = await this.duckdb.getRowCount(tableName, schema)
 
             return {
               content: [
@@ -849,7 +849,7 @@ class DuckDBMCPServer {
 
     try {
       await Promise.race([initPromise, timeoutPromise])
-      console.error('DuckDB initialized')
+      // DuckDB initialized successfully
     } catch (error) {
       console.error('Failed to initialize DuckDB:', error)
       throw error
@@ -858,7 +858,7 @@ class DuckDBMCPServer {
     // Start MCP server with stdio transport
     const transport = new StdioServerTransport()
     await this.server.connect(transport)
-    console.error('DuckDB MCP Server started')
+    // DuckDB MCP Server started successfully
   }
 }
 

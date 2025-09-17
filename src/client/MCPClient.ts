@@ -265,10 +265,25 @@ export class MCPClient {
       const content = result.contents[0]
 
       let data: any = null
+      const mimeType = content?.mimeType || ''
 
-      if (content?.text && typeof content.text === 'string') {
+      if (content?.blob && typeof content.blob === 'string') {
+        // Handle binary content (base64 encoded)
+        const binaryData = Buffer.from(content.blob, 'base64')
+
+        // For Parquet files, save to temp file for DuckDB to read
+        if (mimeType.includes('parquet') || resourceUri.endsWith('.parquet')) {
+          const tempFile = `/tmp/mcp_parquet_${Date.now()}_${Math.random().toString(36).slice(2)}.parquet`
+          const fs = await import('fs/promises')
+
+          await fs.writeFile(tempFile, binaryData)
+          data = { type: 'parquet', path: tempFile }
+        } else {
+          // Return raw binary data for other types
+          data = { type: 'binary', data: binaryData }
+        }
+      } else if (content?.text && typeof content.text === 'string') {
         // Check MIME type or try to detect content type
-        const mimeType = content.mimeType || ''
 
         if (mimeType.includes('json') || mimeType === '') {
           // Try to parse as JSON, fallback to raw text
@@ -316,19 +331,58 @@ export class MCPClient {
     // Read resource data
     const data = await this.readResource(resourceUri, serverAlias)
 
-    if (!data || !Array.isArray(data)) {
-      throw new Error(`Resource '${resourceUri}' does not contain valid table data`)
-    }
-
-    if (data.length === 0) {
+    if (!data) {
       throw new Error(`Resource '${resourceUri}' contains no data`)
     }
 
-    // Create table from JSON data
-    await this.duckdb.createTableFromJSON(tableName, data)
+    // Handle different data types
+    if (Array.isArray(data)) {
+      // JSON array data
+      if (data.length === 0) {
+        throw new Error(`Resource '${resourceUri}' contains no data`)
+      }
+      await this.duckdb.createTableFromJSON(tableName, data)
+    } else if (typeof data === 'string') {
+      // CSV or text data - write to temp file and load
+      const tempFile = `/tmp/mcp_${Date.now()}_${Math.random().toString(36).slice(2)}.csv`
+      const fs = await import('fs/promises')
 
+      try {
+        await fs.writeFile(tempFile, data)
+
+        // Try to load as CSV
+        await this.duckdb.readCSV(tempFile, tableName)
+      } finally {
+        // Clean up temp file
+        try {
+          await fs.unlink(tempFile)
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } else if (data && typeof data === 'object' && data.type === 'parquet') {
+      // Parquet file already saved to temp location
+      try {
+        await this.duckdb.readParquet(data.path, tableName)
+      } finally {
+        // Clean up temp file
+        const fs = await import('fs/promises')
+        try {
+          await fs.unlink(data.path)
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } else if (data && typeof data === 'object' && data.type === 'binary') {
+      // Other binary formats not yet supported
+      throw new Error(`Binary resource type not supported for virtual tables`)
+    } else {
+      throw new Error(`Resource '${resourceUri}' contains unsupported data type`)
+    }
+
+    const rowCount = Array.isArray(data) ? data.length : 'unknown'
     console.info(
-      `✅ Created virtual table '${tableName}' from resource '${resourceUri}' with ${data.length} rows`
+      `✅ Created virtual table '${tableName}' from resource '${resourceUri}' with ${rowCount} rows`
     )
   }
 
@@ -340,8 +394,26 @@ export class MCPClient {
     resourceUri: string,
     serverAlias?: string
   ): Promise<void> {
-    // Invalidate cache
-    const cacheKey = serverAlias ? `${serverAlias}:${resourceUri}` : resourceUri
+    // Parse URI to get the same cache key format as readResource
+    let alias: string
+    let path: string
+
+    if (resourceUri.startsWith('mcp://')) {
+      const match = resourceUri.match(/^mcp:\/\/([^/]+)\/(.+)$/)
+      if (!match) {
+        throw new Error(`Invalid MCP URI format: ${resourceUri}`)
+      }
+      ;[, alias, path] = match
+    } else {
+      if (!serverAlias) {
+        throw new Error('Server alias required for relative URI')
+      }
+      alias = serverAlias
+      path = resourceUri
+    }
+
+    // Invalidate cache using the same key format as readResource
+    const cacheKey = `${alias}:${path}`
     this.resourceCache.delete(cacheKey)
 
     // Recreate table
