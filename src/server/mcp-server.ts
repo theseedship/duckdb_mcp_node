@@ -11,6 +11,8 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js'
 import { DuckDBService } from '../duckdb/service.js'
+import { MCPClient } from '../client/MCPClient.js'
+import { VirtualTableManager } from '../client/VirtualTable.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -23,6 +25,8 @@ dotenv.config()
 class DuckDBMCPServer {
   private server: Server
   private duckdb: DuckDBService
+  private mcpClient: MCPClient
+  private virtualTables: VirtualTableManager
 
   constructor() {
     // Initialize MCP server
@@ -54,6 +58,18 @@ class DuckDBMCPServer {
           }
         : undefined,
     })
+
+    // Initialize MCP client for virtual tables
+    this.mcpClient = new MCPClient({
+      name: process.env.MCP_SERVER_NAME || 'duckdb-mcp-native',
+      version: process.env.MCP_SERVER_VERSION || '0.1.0',
+      cacheEnabled: process.env.MCP_CACHE_ENABLED !== 'false',
+      cacheTTL: parseInt(process.env.MCP_CACHE_TTL || '300'),
+    })
+    this.mcpClient.setDuckDBService(this.duckdb)
+
+    // Initialize virtual table manager
+    this.virtualTables = new VirtualTableManager(this.duckdb, this.mcpClient)
 
     this.setupHandlers()
   }
@@ -152,6 +168,161 @@ class DuckDBMCPServer {
                 },
               },
               required: ['path', 'table_name'],
+            },
+          },
+          {
+            name: 'attach_mcp',
+            description: 'Attach an external MCP server',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                url: {
+                  type: 'string',
+                  description: 'MCP server URL (e.g., stdio://command?args=arg1,arg2)',
+                },
+                alias: {
+                  type: 'string',
+                  description: 'Unique alias for the server',
+                },
+                transport: {
+                  type: 'string',
+                  enum: ['stdio', 'http', 'websocket'],
+                  description: 'Transport type (default: stdio)',
+                  default: 'stdio',
+                },
+              },
+              required: ['url', 'alias'],
+            },
+          },
+          {
+            name: 'detach_mcp',
+            description: 'Detach an MCP server',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                alias: {
+                  type: 'string',
+                  description: 'Alias of the server to detach',
+                },
+              },
+              required: ['alias'],
+            },
+          },
+          {
+            name: 'list_attached_servers',
+            description: 'List all attached MCP servers',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'list_mcp_resources',
+            description: 'List resources from attached MCP servers',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                server_alias: {
+                  type: 'string',
+                  description: 'Optional server alias to filter resources',
+                },
+              },
+            },
+          },
+          {
+            name: 'create_virtual_table',
+            description: 'Create a virtual table from an MCP resource',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                table_name: {
+                  type: 'string',
+                  description: 'Name for the virtual table',
+                },
+                resource_uri: {
+                  type: 'string',
+                  description: 'MCP resource URI',
+                },
+                server_alias: {
+                  type: 'string',
+                  description: 'Server alias (optional if using mcp:// URI)',
+                },
+                auto_refresh: {
+                  type: 'boolean',
+                  description: 'Enable auto-refresh (default: false)',
+                  default: false,
+                },
+                refresh_interval: {
+                  type: 'number',
+                  description: 'Refresh interval in ms (default: 60000)',
+                  default: 60000,
+                },
+                lazy_load: {
+                  type: 'boolean',
+                  description: 'Load data on first access (default: false)',
+                  default: false,
+                },
+                max_rows: {
+                  type: 'number',
+                  description: 'Maximum rows to load',
+                },
+              },
+              required: ['table_name', 'resource_uri'],
+            },
+          },
+          {
+            name: 'drop_virtual_table',
+            description: 'Drop a virtual table',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                table_name: {
+                  type: 'string',
+                  description: 'Name of the virtual table to drop',
+                },
+              },
+              required: ['table_name'],
+            },
+          },
+          {
+            name: 'list_virtual_tables',
+            description: 'List all virtual tables',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'refresh_virtual_table',
+            description: 'Refresh a virtual table with latest data',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                table_name: {
+                  type: 'string',
+                  description: 'Name of the virtual table to refresh',
+                },
+              },
+              required: ['table_name'],
+            },
+          },
+          {
+            name: 'query_hybrid',
+            description: 'Execute a hybrid query across local and virtual tables',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sql: {
+                  type: 'string',
+                  description: 'SQL query to execute',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Optional limit for results (default: 1000)',
+                  default: 1000,
+                },
+              },
+              required: ['sql'],
             },
           },
         ],
@@ -305,6 +476,241 @@ class DuckDBMCPServer {
                       success: true,
                       message: `Parquet loaded into table ${tableName}`,
                       rowCount,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'attach_mcp': {
+            const url = args.url as string
+            const alias = args.alias as string
+            const transport = (args.transport as 'stdio' | 'http' | 'websocket') || 'stdio'
+
+            await this.mcpClient.attachServer(url, alias, transport)
+            const server = this.mcpClient.getAttachedServer(alias)
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: `Attached MCP server '${alias}'`,
+                      resources: server?.resources?.length || 0,
+                      tools: server?.tools?.length || 0,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'detach_mcp': {
+            const alias = args.alias as string
+            await this.mcpClient.detachServer(alias)
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: `Detached MCP server '${alias}'`,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'list_attached_servers': {
+            const servers = this.mcpClient.listAttachedServers()
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      servers: servers.map((s) => ({
+                        alias: s.alias,
+                        url: s.url,
+                        transport: s.transport,
+                        resources: s.resources?.length || 0,
+                        tools: s.tools?.length || 0,
+                        lastRefresh: s.lastRefresh,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'list_mcp_resources': {
+            const serverAlias = args.server_alias as string | undefined
+            const resources = await this.mcpClient.listResources(serverAlias)
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      resources,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'create_virtual_table': {
+            const tableName = args.table_name as string
+            const resourceUri = args.resource_uri as string
+            const serverAlias = args.server_alias as string | undefined
+            const config = {
+              autoRefresh: args.auto_refresh as boolean,
+              refreshInterval: args.refresh_interval as number,
+              lazyLoad: args.lazy_load as boolean,
+              maxRows: args.max_rows as number | undefined,
+            }
+
+            const virtualTable = await this.virtualTables.createVirtualTable(
+              tableName,
+              resourceUri,
+              serverAlias,
+              config
+            )
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: `Created virtual table '${tableName}'`,
+                      rowCount: virtualTable.metadata.rowCount || 0,
+                      columns: virtualTable.metadata.columns,
+                      config: virtualTable.config,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'drop_virtual_table': {
+            const tableName = args.table_name as string
+            await this.virtualTables.dropVirtualTable(tableName)
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: `Dropped virtual table '${tableName}'`,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'list_virtual_tables': {
+            const tables = this.virtualTables.listVirtualTables()
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      tables: tables.map((t) => ({
+                        name: t.name,
+                        resourceUri: t.resourceUri,
+                        serverAlias: t.serverAlias,
+                        rowCount: t.metadata.rowCount,
+                        config: t.config,
+                        lastRefresh: t.metadata.lastRefresh,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'refresh_virtual_table': {
+            const tableName = args.table_name as string
+            await this.virtualTables.refreshVirtualTable(tableName)
+            const table = this.virtualTables.getVirtualTable(tableName)
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: `Refreshed virtual table '${tableName}'`,
+                      rowCount: table?.metadata.rowCount || 0,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            }
+          }
+
+          case 'query_hybrid': {
+            const sql = args.sql as string
+            const limit = (args.limit as number) || 1000
+
+            // Add LIMIT if not present for safety
+            const safeSql = sql.match(/LIMIT\s+\d+/i) ? sql : `${sql} LIMIT ${limit}`
+
+            const startTime = Date.now()
+            const results = await this.virtualTables.executeHybridQuery(safeSql)
+            const executionTime = Date.now() - startTime
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      rowCount: results.length,
+                      executionTimeMs: executionTime,
+                      data: results,
                     },
                     null,
                     2

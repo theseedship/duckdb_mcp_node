@@ -98,6 +98,110 @@ Load a Parquet file into DuckDB.
 }
 ```
 
+## MCP Client Features (Phase 2)
+
+The DuckDB MCP server now includes advanced MCP client capabilities for connecting to external MCP servers and creating virtual tables.
+
+### Virtual Tables and External MCP Servers
+
+#### `attach_mcp`
+
+Attach an external MCP server to enable data federation.
+
+```json
+{
+  "url": "stdio://weather-server?args=--api-key,YOUR_KEY",
+  "alias": "weather",
+  "transport": "stdio"
+}
+```
+
+#### `create_virtual_table`
+
+Create a virtual table from an MCP resource.
+
+```json
+{
+  "table_name": "weather_data",
+  "resource_uri": "weather://current",
+  "server_alias": "weather",
+  "auto_refresh": true,
+  "refresh_interval": 60000,
+  "lazy_load": false,
+  "max_rows": 10000
+}
+```
+
+#### `query_hybrid`
+
+Execute hybrid queries across local and virtual tables.
+
+```json
+{
+  "sql": "SELECT * FROM sales JOIN weather_data ON sales.date = weather_data.date",
+  "limit": 1000
+}
+```
+
+### Additional MCP Client Tools
+
+- **`detach_mcp`**: Detach an MCP server
+- **`list_attached_servers`**: List all attached MCP servers
+- **`list_mcp_resources`**: List resources from attached servers
+- **`drop_virtual_table`**: Drop a virtual table
+- **`list_virtual_tables`**: List all virtual tables
+- **`refresh_virtual_table`**: Refresh virtual table with latest data
+
+### Virtual Table Features
+
+- **Auto-refresh**: Automatically update virtual tables at specified intervals
+- **Lazy Loading**: Load data only when first accessed
+- **Row Limiting**: Control memory usage by limiting rows
+- **Hybrid Queries**: Seamlessly join local and remote data
+- **Resource Mapping**: Automatic detection and conversion of JSON, CSV, and Parquet formats
+- **Caching**: Configurable caching for improved performance
+
+## Examples
+
+### Running Examples
+
+```bash
+# Test MCP Inspector compatibility
+npm run example:inspector
+
+# Run client library example
+npm run example:client
+
+# Test basic server functionality
+npm run example:test
+```
+
+### Using the MCP Client Library
+
+```typescript
+import { DuckDBService } from '@deposium/duckdb-mcp-native'
+import { MCPClient, VirtualTableManager } from '@deposium/duckdb-mcp-native/client'
+
+// Initialize services
+const duckdb = new DuckDBService()
+const mcpClient = new MCPClient()
+const virtualTables = new VirtualTableManager(duckdb, mcpClient)
+
+// Attach external MCP server
+await mcpClient.attachServer('stdio://data-server', 'external', 'stdio')
+
+// Create virtual table from MCP resource
+await virtualTables.createVirtualTable('external_data', 'data://sales', 'external', {
+  autoRefresh: true,
+  refreshInterval: 60000,
+})
+
+// Execute hybrid query
+const results = await virtualTables.executeHybridQuery(
+  'SELECT * FROM local_table JOIN external_data ON ...'
+)
+```
+
 ## Configuration
 
 Create a `.env` file based on `.env.example`:
@@ -187,6 +291,26 @@ const result = await client.callTool('query_duckdb', {
 
 ```
 src/
+├── duckdb/           # DuckDB service layer
+│   ├── service.ts    # Core DuckDB operations
+│   └── types.ts      # Type definitions
+├── client/           # MCP Client (Phase 2)
+│   ├── MCPClient.ts  # External MCP server connections
+│   ├── ResourceMapper.ts # Resource to table mapping
+│   ├── VirtualTable.ts   # Virtual table management
+│   └── index.ts      # Client exports
+├── server/           # MCP Server
+│   └── mcp-server.ts # Main server implementation
+├── examples/         # Usage examples
+│   ├── client-example.ts       # Client library usage
+│   ├── mcp-inspector-test.ts   # MCP Inspector compatibility
+│   └── test-server.ts          # Basic server testing
+└── index.ts          # Main entry point
+```
+
+### Component Overview
+
+```
 ├── protocol/          # MCP Protocol implementation
 │   ├── types.ts       # TypeScript types for JSON-RPC 2.0
 │   ├── messages.ts    # Message formatting and routing
