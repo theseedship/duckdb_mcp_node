@@ -66,12 +66,16 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/deposium/duckdb-mcp-native.git"
+    "url": "https://github.com/theseedship/duckdb_mcp_node.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "bugs": {
-    "url": "https://github.com/deposium/duckdb-mcp-native/issues"
+    "url": "https://github.com/theseedship/duckdb_mcp_node/issues"
   },
-  "homepage": "https://github.com/deposium/duckdb-mcp-native#readme",
+  "homepage": "https://github.com/theseedship/duckdb_mcp_node#readme",
   "dependencies": {
     "@duckdb/node-api": "^1.3.4-alpha.27",
     "@modelcontextprotocol/sdk": "^1.17.3",

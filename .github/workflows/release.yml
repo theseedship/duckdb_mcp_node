@@ -1,9 +1,15 @@
-name: Release
+name: Release (Manual)
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
 
 jobs:
   release:
@@ -19,30 +25,105 @@ jobs:
         with:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
+          scope: '@deposium'
+
+      - name: Validate version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Manual release version: $VERSION"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "Tag release version: $VERSION"
+          fi
+
+          # Check if version matches package.json
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Error: Tag/input version ($VERSION) doesn't match package.json ($PACKAGE_VERSION)"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm rebuild @duckdb/node-api
 
-      - name: Run tests
-        run: npm test
+      - name: Run full test suite
+        run: npm run check:all
+        env:
+          NODE_ENV: test
+          CI: true
 
       - name: Build
         run: npm run build
 
+      - name: Generate changelog
+        run: |
+          # Extract changelog for this version
+          npm install -g conventional-changelog-cli
+          conventional-changelog -p angular -i CHANGELOG_RELEASE.md -s -r 1
+
+      - name: Check npm authentication
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish to npm
-        run: npm publish
+        run: |
+          # Check if already published
+          if npm view @deposium/duckdb-mcp-native@${{ env.VERSION }} > /dev/null 2>&1; then
+            echo "⚠️ Version ${{ env.VERSION }} already published to npm"
+          else
+            npm publish --access public
+            echo "✅ Published version ${{ env.VERSION }} to npm"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          body_path: CHANGELOG_RELEASE.md
+          files: |
+            dist/**/*.js
+            dist/**/*.d.ts
+            package.json
+            README.md
+          draft: false
+          prerelease: ${{ contains(env.VERSION, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update npm tags
+        run: |
+          # Add dist-tag for prerelease versions
+          if [[ "${{ env.VERSION }}" == *"-"* ]]; then
+            TAG=$(echo "${{ env.VERSION }}" | sed 's/.*-\([^.]*\).*/\1/')
+            npm dist-tag add @deposium/duckdb-mcp-native@${{ env.VERSION }} $TAG
+            echo "Added dist-tag: $TAG"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Notify success
+        uses: actions/github-script@v7
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this release:
-            - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
-          draft: false
-          prerelease: false
+          script: |
+            const version = '${{ env.VERSION }}';
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: `v${version}`
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🎉 Released version ${version}!\n\n📦 npm: https://www.npmjs.com/package/@deposium/duckdb-mcp-native/v/${version}\n📝 Release notes: ${release.html_url}`
+            });

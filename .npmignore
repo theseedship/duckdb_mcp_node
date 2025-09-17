@@ -1,0 +1,77 @@
+# Source files
+src/
+*.ts
+!dist/**/*.d.ts
+
+# Test files
+tests/
+*.test.*
+*.spec.*
+__tests__/
+coverage/
+.nyc_output/
+
+# Development files
+examples/
+scripts/
+docs/
+doc-internal/
+*.md
+!README.md
+
+# Configuration files
+.github/
+.husky/
+.vscode/
+.idea/
+.env*
+.eslintrc*
+.prettierrc*
+jest.config.*
+tsconfig.*
+!tsconfig.json
+.editorconfig
+.gitignore
+.npmignore
+commitlint.config.*
+eslint.config.*
+
+# Build artifacts
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# DuckDB files
+*.duckdb
+*.wal
+*.db
+
+# Package files (except the built package)
+*.tgz
+*.tar.gz
+*.zip
+
+# Git
+.git/
+.gitignore
+
+# Other
+node_modules/
+.npm
+.yarn
+pnpm-lock.yaml
+yarn.lock
