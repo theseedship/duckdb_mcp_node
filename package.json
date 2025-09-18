@@ -33,6 +33,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "dev": "tsx src/index.ts",

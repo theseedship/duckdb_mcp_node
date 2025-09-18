@@ -17,7 +17,10 @@ export default {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  modulePaths: ['<rootDir>/src'],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
