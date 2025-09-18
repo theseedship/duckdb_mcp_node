@@ -1,5 +1,8 @@
 # DuckDB MCP Native
 
+[![npm version](https://badge.fury.io/js/@seed-ship%2Fduckdb-mcp-native.svg)](https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation capabilities.
 
 ## Status
@@ -22,10 +25,15 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - Virtual filesystem (mcp:// URIs)
 - Test coverage (target: 80%)
 
-## Quick Start
+## Installation
 
 ```bash
-# Install
+# Install from npm
+npm install @seed-ship/duckdb-mcp-native
+
+# Or for development
+git clone https://github.com/theseedship/duckdb_mcp_node
+cd duckdb_mcp_node
 npm install
 
 # Start MCP server
