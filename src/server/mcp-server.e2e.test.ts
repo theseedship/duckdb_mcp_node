@@ -60,7 +60,7 @@ describe('MCP Server E2E Tests', () => {
     await duckdb.initialize()
 
     // Create server with real DuckDB
-    server = new DuckDBMCPServer(duckdb)
+    server = new DuckDBMCPServer({ duckdbService: duckdb })
   })
 
   afterEach(async () => {
