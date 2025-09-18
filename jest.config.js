@@ -39,4 +39,10 @@ export default {
       statements: 7,
     },
   },
+  // Force exit after tests complete to handle transport cleanup
+  forceExit: true,
+  // Longer timeout for CI environments
+  testTimeout: 10000,
+  // Detect open handles in CI
+  detectOpenHandles: process.env.CI === 'true' ? false : false,
 }

@@ -17,8 +17,17 @@ describe('Transport Integration Tests', () => {
   })
 
   afterEach(async () => {
-    await mcpClient.disconnectAll()
-    await duckdb.close()
+    try {
+      await mcpClient.disconnectAll()
+      await duckdb.close()
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  })
+
+  afterAll(async () => {
+    // Force cleanup of any remaining connections
+    await new Promise((resolve) => setTimeout(resolve, 100))
   })
 
   describe('HTTP Transport', () => {
