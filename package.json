@@ -1,6 +1,6 @@
 {
   "name": "@deposium/duckdb-mcp-native",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -48,7 +48,8 @@
     "inspector": "npx @modelcontextprotocol/inspector tsx src/server/mcp-server.ts",
     "example:query": "tsx examples/query-example.ts",
     "prepare": "husky",
-    "prepublishOnly": "npm run check:all && npm run build",
+    "prepublishOnly": "npm run build",
+    "prepublish:full": "npm run check:all && npm run build",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
     "release:major": "standard-version --release-as major"

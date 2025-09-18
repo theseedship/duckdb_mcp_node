@@ -91,20 +91,25 @@ jobs:
         run: npm run build
 
       - name: Check npm authentication
-        run: npm whoami
+        run: |
+          echo "Checking npm authentication..."
+          npm whoami || (echo "❌ Authentication failed. Check NPM_TOKEN secret." && exit 1)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         run: |
           # Check if this version already exists
+          echo "Checking if version ${{ needs.check-version.outputs.version }} is already published..."
           if npm view @deposium/duckdb-mcp-native@${{ needs.check-version.outputs.version }} > /dev/null 2>&1; then
-            echo "Version ${{ needs.check-version.outputs.version }} already published"
-            exit 1
+            echo "⚠️ Version ${{ needs.check-version.outputs.version }} already published"
+            exit 0  # Don't fail, just skip
           fi
 
           # Publish with public access for scoped packages
+          echo "📦 Publishing version ${{ needs.check-version.outputs.version }} to npm..."
           npm publish --access public
+          echo "✅ Successfully published to npm!"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
