@@ -80,10 +80,22 @@ vi.mock('../client/MCPClient.js', () => ({
 describe('DuckDBMCPServer Simple Tests', () => {
   let server: DuckDBMCPServer
   let consoleErrorSpy: any
+  let mockDuckDB: any
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    server = new DuckDBMCPServer()
+
+    // Create a simple mock DuckDB service
+    mockDuckDB = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      isReady: vi.fn().mockReturnValue(true),
+      executeQuery: vi.fn().mockResolvedValue([]),
+    }
+
+    server = new DuckDBMCPServer({
+      duckdbService: mockDuckDB,
+    })
   })
 
   afterEach(async () => {
@@ -196,12 +208,18 @@ describe('DuckDBMCPServer Simple Tests', () => {
 
     it('should handle initialization with timeout', async () => {
       // Create a new server with slow initialization
-      const slowServer = new DuckDBMCPServer()
+      const slowMockDuckDB = {
+        initialize: vi
+          .fn()
+          .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100))),
+        close: vi.fn().mockResolvedValue(undefined),
+        isReady: vi.fn().mockReturnValue(true),
+        executeQuery: vi.fn().mockResolvedValue([]),
+      }
 
-      // @ts-ignore
-      slowServer.duckdb.initialize.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      )
+      const slowServer = new DuckDBMCPServer({
+        duckdbService: slowMockDuckDB,
+      })
 
       // Should complete within timeout
       await expect(slowServer.start()).resolves.toBeUndefined()
