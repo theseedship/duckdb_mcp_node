@@ -68,7 +68,7 @@ jobs:
         with:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
-          scope: '@deposium'
+          scope: '@seed-ship'
 
       - name: Install dependencies
         run: |
@@ -101,7 +101,7 @@ jobs:
         run: |
           # Check if this version already exists
           echo "Checking if version ${{ needs.check-version.outputs.version }} is already published..."
-          if npm view @deposium/duckdb-mcp-native@${{ needs.check-version.outputs.version }} > /dev/null 2>&1; then
+          if npm view @seed-ship/duckdb-mcp-native@${{ needs.check-version.outputs.version }} > /dev/null 2>&1; then
             echo "⚠️ Version ${{ needs.check-version.outputs.version }} already published"
             exit 0  # Don't fail, just skip
           fi
@@ -123,12 +123,12 @@ jobs:
           body: |
             ## 🚀 Published to npm
 
-            Package: [@deposium/duckdb-mcp-native](https://www.npmjs.com/package/@deposium/duckdb-mcp-native)
+            Package: [@seed-ship/duckdb-mcp-native](https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native)
             Version: ${{ needs.check-version.outputs.version }}
 
             ### Installation
             ```bash
-            npm install @deposium/duckdb-mcp-native@${{ needs.check-version.outputs.version }}
+            npm install @seed-ship/duckdb-mcp-native@${{ needs.check-version.outputs.version }}
             ```
 
             ### Changes
@@ -145,5 +145,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha,
-              body: `✅ Successfully published version ${version} to npm!\n\nInstall with: \`npm install @deposium/duckdb-mcp-native@${version}\``
+              body: `✅ Successfully published version ${version} to npm!\n\nInstall with: \`npm install @seed-ship/duckdb-mcp-native@${version}\``
             })

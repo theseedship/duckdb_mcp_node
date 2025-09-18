@@ -2,7 +2,7 @@
 
 ## 🚀 Overview
 
-This package is published to npm as `@deposium/duckdb-mcp-native` with automatic publishing via GitHub Actions.
+This package is published to npm as `@seed-ship/duckdb-mcp-native` with automatic publishing via GitHub Actions.
 
 ## 📦 Publishing Methods
 
@@ -191,7 +191,7 @@ npm login --scope=@deposium
 
 ```bash
 # Check published versions
-npm view @deposium/duckdb-mcp-native versions
+npm view @seed-ship/duckdb-mcp-native versions
 
 # Bump to next version
 npm version patch
@@ -217,26 +217,26 @@ npm pack --dry-run
 
 ```bash
 # View package info
-npm view @deposium/duckdb-mcp-native
+npm view @seed-ship/duckdb-mcp-native
 
 # View all versions
-npm view @deposium/duckdb-mcp-native versions
+npm view @seed-ship/duckdb-mcp-native versions
 
 # View dist-tags
-npm view @deposium/duckdb-mcp-native dist-tags
+npm view @seed-ship/duckdb-mcp-native dist-tags
 ```
 
 ## 🏷️ Dist Tags
 
 ```bash
 # Latest stable
-npm install @deposium/duckdb-mcp-native@latest
+npm install @seed-ship/duckdb-mcp-native@latest
 
 # Beta versions (if available)
-npm install @deposium/duckdb-mcp-native@beta
+npm install @seed-ship/duckdb-mcp-native@beta
 
 # Specific version
-npm install @deposium/duckdb-mcp-native@0.1.0
+npm install @seed-ship/duckdb-mcp-native@0.1.0
 ```
 
 ## 🔒 Security Notes

@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
-          scope: '@deposium'
+          scope: '@seed-ship'
 
       - name: Validate version
         run: |
@@ -74,7 +74,7 @@ jobs:
       - name: Publish to npm
         run: |
           # Check if already published
-          if npm view @deposium/duckdb-mcp-native@${{ env.VERSION }} > /dev/null 2>&1; then
+          if npm view @seed-ship/duckdb-mcp-native@${{ env.VERSION }} > /dev/null 2>&1; then
             echo "⚠️ Version ${{ env.VERSION }} already published to npm"
           else
             npm publish --access public
@@ -104,7 +104,7 @@ jobs:
           # Add dist-tag for prerelease versions
           if [[ "${{ env.VERSION }}" == *"-"* ]]; then
             TAG=$(echo "${{ env.VERSION }}" | sed 's/.*-\([^.]*\).*/\1/')
-            npm dist-tag add @deposium/duckdb-mcp-native@${{ env.VERSION }} $TAG
+            npm dist-tag add @seed-ship/duckdb-mcp-native@${{ env.VERSION }} $TAG
             echo "Added dist-tag: $TAG"
           fi
         env:
@@ -125,5 +125,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `🎉 Released version ${version}!\n\n📦 npm: https://www.npmjs.com/package/@deposium/duckdb-mcp-native/v/${version}\n📝 Release notes: ${release.html_url}`
+              body: `🎉 Released version ${version}!\n\n📦 npm: https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native/v/${version}\n📝 Release notes: ${release.html_url}`
             });

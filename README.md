@@ -77,7 +77,7 @@ npm run dev:server
 ### As Library
 
 ```typescript
-import { getDuckDBService } from 'duckdb-mcp-native'
+import { getDuckDBService } from '@seed-ship/duckdb-mcp-native'
 
 const duckdb = await getDuckDBService()
 const result = await duckdb.executeQuery('SELECT * FROM table')
@@ -86,7 +86,7 @@ const result = await duckdb.executeQuery('SELECT * FROM table')
 ### Federation Example
 
 ```typescript
-import { getDuckDBMcpNativeService } from 'duckdb-mcp-native'
+import { getDuckDBMcpNativeService } from '@seed-ship/duckdb-mcp-native'
 
 const service = getDuckDBMcpNativeService()
 

@@ -126,7 +126,7 @@ await transport.connect()
 ### Example 1: Multi-Transport Setup
 
 ```typescript
-import { DuckDBMcpNativeService } from '@deposium/duckdb-mcp-native'
+import { DuckDBMcpNativeService } from '@seed-ship/duckdb-mcp-native'
 
 const service = new DuckDBMcpNativeService()
 await service.initialize()
