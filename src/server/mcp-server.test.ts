@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DuckDBMCPServer } from './mcp-server.js'
 import type { DuckDBService } from '../duckdb/service.js'
 import type { MCPClient } from '../client/MCPClient.js'
 
 // Mock the MCP SDK Server
-jest.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: jest.fn().mockImplementation(() => {
-    const handlers = new Map()
-    return {
-      setRequestHandler: jest.fn((schema, handler) => {
+vi.mock('@modelcontextprotocol/sdk/server/index.js', () => {
+  const handlers = new Map()
+  return {
+    Server: vi.fn().mockImplementation(() => ({
+      setRequestHandler: vi.fn((schema, handler) => {
         // Store handlers - real implementation uses Zod schemas
         if (typeof schema === 'string') {
           handlers.set(schema, handler)
@@ -16,54 +16,54 @@ jest.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
           handlers.set('handler_' + handlers.size, handler)
         }
       }),
-      connect: jest.fn().mockResolvedValue(undefined),
-      close: jest.fn().mockResolvedValue(undefined),
-      error: jest.fn(),
+      connect: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      error: vi.fn(),
       // Expose handlers for testing
       _handlers: handlers,
-    }
-  }),
-}))
+    })),
+  }
+})
 
 // Mock stdio transport
-jest.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: jest.fn().mockImplementation(() => ({})),
+vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
+  StdioServerTransport: vi.fn().mockImplementation(() => ({})),
 }))
 
 // Mock DuckDB service
-const createMockDuckDBService = (): jest.Mocked<DuckDBService> =>
+const createMockDuckDBService = () =>
   ({
-    initialize: jest.fn().mockResolvedValue(undefined),
-    executeQuery: jest.fn().mockResolvedValue([
+    initialize: vi.fn().mockResolvedValue(undefined),
+    executeQuery: vi.fn().mockResolvedValue([
       { id: 1, name: 'test1' },
       { id: 2, name: 'test2' },
     ]),
-    executeScalar: jest.fn().mockResolvedValue({ count: 10 }),
-    getSchema: jest.fn().mockResolvedValue([
+    executeScalar: vi.fn().mockResolvedValue({ count: 10 }),
+    getSchema: vi.fn().mockResolvedValue([
       { table_schema: 'main', table_name: 'users', table_type: 'TABLE' },
       { table_schema: 'main', table_name: 'products', table_type: 'TABLE' },
     ]),
-    getTableColumns: jest.fn().mockResolvedValue([
+    getTableColumns: vi.fn().mockResolvedValue([
       { column_name: 'id', data_type: 'INTEGER', is_nullable: 'NO' },
       { column_name: 'name', data_type: 'VARCHAR', is_nullable: 'YES' },
     ]),
-    createTableFromJSON: jest.fn().mockResolvedValue(undefined),
-    readParquet: jest.fn().mockResolvedValue([{ data: 'parquet' }]),
-    readCSV: jest.fn().mockResolvedValue([{ data: 'csv' }]),
-    readJSON: jest.fn().mockResolvedValue([{ data: 'json' }]),
-    exportToFile: jest.fn().mockResolvedValue(undefined),
-    tableExists: jest.fn().mockResolvedValue(true),
-    getRowCount: jest.fn().mockResolvedValue(100),
-    close: jest.fn().mockResolvedValue(undefined),
-    isReady: jest.fn().mockReturnValue(true),
+    createTableFromJSON: vi.fn().mockResolvedValue(undefined),
+    readParquet: vi.fn().mockResolvedValue([{ data: 'parquet' }]),
+    readCSV: vi.fn().mockResolvedValue([{ data: 'csv' }]),
+    readJSON: vi.fn().mockResolvedValue([{ data: 'json' }]),
+    exportToFile: vi.fn().mockResolvedValue(undefined),
+    tableExists: vi.fn().mockResolvedValue(true),
+    getRowCount: vi.fn().mockResolvedValue(100),
+    close: vi.fn().mockResolvedValue(undefined),
+    isReady: vi.fn().mockReturnValue(true),
   }) as any
 
 // Mock MCPClient
-const createMockMCPClient = (): jest.Mocked<MCPClient> =>
+const createMockMCPClient = () =>
   ({
-    attachServer: jest.fn().mockResolvedValue(undefined),
-    detachServer: jest.fn().mockResolvedValue(undefined),
-    listAttachedServers: jest.fn().mockReturnValue([
+    attachServer: vi.fn().mockResolvedValue(undefined),
+    detachServer: vi.fn().mockResolvedValue(undefined),
+    listAttachedServers: vi.fn().mockReturnValue([
       {
         alias: 'test-server',
         url: 'stdio://test',
@@ -74,27 +74,27 @@ const createMockMCPClient = (): jest.Mocked<MCPClient> =>
         lastRefresh: new Date(),
       },
     ]),
-    listResources: jest.fn().mockResolvedValue([{ uri: 'test://resource1', name: 'Resource 1' }]),
-    readResource: jest.fn().mockResolvedValue({ data: 'test' }),
-    createVirtualTable: jest.fn().mockResolvedValue(undefined),
-    refreshVirtualTable: jest.fn().mockResolvedValue(undefined),
-    callTool: jest.fn().mockResolvedValue({ result: 'success' }),
-    clearCache: jest.fn(),
-    disconnectAll: jest.fn().mockResolvedValue(undefined),
-    getAttachedServer: jest.fn().mockReturnValue(undefined),
-    setDuckDBService: jest.fn(),
+    listResources: vi.fn().mockResolvedValue([{ uri: 'test://resource1', name: 'Resource 1' }]),
+    readResource: vi.fn().mockResolvedValue({ data: 'test' }),
+    createVirtualTable: vi.fn().mockResolvedValue(undefined),
+    refreshVirtualTable: vi.fn().mockResolvedValue(undefined),
+    callTool: vi.fn().mockResolvedValue({ result: 'success' }),
+    clearCache: vi.fn(),
+    disconnectAll: vi.fn().mockResolvedValue(undefined),
+    getAttachedServer: vi.fn().mockReturnValue(undefined),
+    setDuckDBService: vi.fn(),
   }) as any
 
-describe.skip('DuckDBMCPServer - Temporarily skipped due to ESM mocking issues', () => {
+describe('DuckDBMCPServer', () => {
   let server: DuckDBMCPServer
-  let mockDuckDB: jest.Mocked<DuckDBService>
-  let mockMCPClient: jest.Mocked<MCPClient>
-  let consoleErrorSpy: jest.SpiedFunction<typeof console.error>
+  let mockDuckDB: any
+  let mockMCPClient: any
+  let consoleErrorSpy: any
   let handlers: Map<string, Function>
 
   beforeEach(() => {
     // Suppress console.error during tests
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     // Create mocks
     mockDuckDB = createMockDuckDBService()
@@ -133,7 +133,7 @@ describe.skip('DuckDBMCPServer - Temporarily skipped due to ESM mocking issues',
   afterEach(async () => {
     // Cleanup
     consoleErrorSpy.mockRestore()
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     // Close DuckDB connection if it exists
     try {
       await mockDuckDB.close()

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
 
 /**
@@ -7,11 +7,11 @@ import { DuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
  */
 describe('DuckDBMcpNativeService Unit Tests', () => {
   let service: DuckDBMcpNativeService
-  let consoleErrorSpy: jest.SpiedFunction<typeof console.error>
+  let consoleErrorSpy: any
 
   beforeEach(() => {
     // Suppress console.error during tests
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     // Create service with mocked dependencies
     service = new DuckDBMcpNativeService()

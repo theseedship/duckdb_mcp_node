@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
 
 // Mock the MCPClient to avoid real connections
-jest.mock('../client/MCPClient.js', () => ({
-  MCPClient: jest.fn().mockImplementation(() => ({
-    attachServer: jest.fn().mockResolvedValue(undefined),
-    detachServer: jest.fn().mockResolvedValue(undefined),
-    listResources: jest.fn().mockResolvedValue([]),
-    readResource: jest.fn().mockResolvedValue({}),
-    callTool: jest.fn().mockResolvedValue({}),
-    getAttachedServer: jest.fn().mockReturnValue({
+vi.mock('../client/MCPClient.js', () => ({
+  MCPClient: vi.fn().mockImplementation(() => ({
+    attachServer: vi.fn().mockResolvedValue(undefined),
+    detachServer: vi.fn().mockResolvedValue(undefined),
+    listResources: vi.fn().mockResolvedValue([]),
+    readResource: vi.fn().mockResolvedValue({}),
+    callTool: vi.fn().mockResolvedValue({}),
+    getAttachedServer: vi.fn().mockReturnValue({
       alias: 'test-alias',
       url: 'stdio://test',
       transport: 'stdio',
@@ -18,29 +18,29 @@ jest.mock('../client/MCPClient.js', () => ({
       tools: [],
       lastRefresh: new Date(),
     }),
-    listAttachedServers: jest.fn().mockReturnValue([]),
-    clearCache: jest.fn(),
-    disconnectAll: jest.fn().mockResolvedValue(undefined),
-    close: jest.fn().mockResolvedValue(undefined),
+    listAttachedServers: vi.fn().mockReturnValue([]),
+    clearCache: vi.fn(),
+    disconnectAll: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
   })),
 }))
 
 // Mock DuckDBMCPServer to avoid starting real servers
-jest.mock('../server/mcp-server.js', () => ({
-  DuckDBMCPServer: jest.fn().mockImplementation(() => ({
-    start: jest.fn().mockResolvedValue(undefined),
-    stop: jest.fn().mockResolvedValue(undefined),
+vi.mock('../server/mcp-server.js', () => ({
+  DuckDBMCPServer: vi.fn().mockImplementation(() => ({
+    start: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
   })),
 }))
 
 // Tests for DuckDBMcpNativeService
-describe.skip('DuckDBMcpNativeService - Temporarily skipped due to ESM mocking issues', () => {
+describe('DuckDBMcpNativeService', () => {
   let service: DuckDBMcpNativeService
-  let consoleErrorSpy: jest.SpiedFunction<typeof console.error>
+  let consoleErrorSpy: any
 
   beforeEach(() => {
     // Suppress console.error during tests
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     service = createDuckDBMcpNativeService()
   })
 

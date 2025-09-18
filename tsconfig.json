@@ -20,6 +20,6 @@
     "isolatedModules": true,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "test-*.js", "test-*.mjs", "**/__mocks__/**"]
+  "include": ["src/**/*", "vitest.config.ts", "vitest.setup.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "test-*.js", "test-*.mjs"]
 }

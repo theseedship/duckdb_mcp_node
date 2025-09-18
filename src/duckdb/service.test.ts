@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { DuckDBService, createDuckDBService } from './service.js'
 
 describe('DuckDBService', () => {

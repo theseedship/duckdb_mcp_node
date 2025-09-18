@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { MCPClient } from './MCPClient.js'
 import type { DuckDBService } from '../duckdb/service.js'
 
 // Create a mock Client class
 const mockClientInstance = {
-  connect: jest.fn().mockResolvedValue(undefined),
-  close: jest.fn().mockResolvedValue(undefined),
-  listResources: jest.fn().mockResolvedValue({
+  connect: vi.fn().mockResolvedValue(undefined),
+  close: vi.fn().mockResolvedValue(undefined),
+  listResources: vi.fn().mockResolvedValue({
     resources: [
       {
         uri: 'test://resource1',
@@ -20,13 +20,13 @@ const mockClientInstance = {
       },
     ],
   }),
-  listTools: jest.fn().mockResolvedValue({
+  listTools: vi.fn().mockResolvedValue({
     tools: [
       { name: 'tool1', description: 'Test tool 1' },
       { name: 'tool2', description: 'Test tool 2' },
     ],
   }),
-  readResource: jest.fn().mockResolvedValue({
+  readResource: vi.fn().mockResolvedValue({
     contents: [
       {
         text: JSON.stringify([{ id: 1, name: 'test' }]),
@@ -34,40 +34,40 @@ const mockClientInstance = {
       },
     ],
   }),
-  callTool: jest.fn().mockResolvedValue({
+  callTool: vi.fn().mockResolvedValue({
     result: 'tool executed',
   }),
 }
 
 // Mock the MCP SDK client
-jest.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: jest.fn(() => mockClientInstance),
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
+  Client: vi.fn(() => mockClientInstance),
 }))
 
 // Mock stdio transport to prevent real process spawning
-jest.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
-  StdioClientTransport: jest.fn().mockImplementation(() => ({
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
+  StdioClientTransport: vi.fn().mockImplementation(() => ({
     // Return a mock transport that doesn't spawn processes
   })),
 }))
 
 // Mock fs for file operations
-jest.mock('fs/promises', () => ({
-  writeFile: jest.fn().mockResolvedValue(undefined),
-  unlink: jest.fn().mockResolvedValue(undefined),
+vi.mock('fs/promises', () => ({
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  unlink: vi.fn().mockResolvedValue(undefined),
 }))
 
-describe.skip('MCPClient - Temporarily skipped due to ESM mocking issues', () => {
+describe('MCPClient', () => {
   let client: MCPClient
-  let mockDuckDB: jest.Mocked<DuckDBService>
+  let mockDuckDB: any
 
   beforeEach(() => {
     // Create mock DuckDB service
     mockDuckDB = {
-      createTableFromJSON: jest.fn().mockResolvedValue(undefined),
-      executeQuery: jest.fn().mockResolvedValue([]),
-      readCSV: jest.fn().mockResolvedValue([]),
-      readParquet: jest.fn().mockResolvedValue([]),
+      createTableFromJSON: vi.fn().mockResolvedValue(undefined),
+      executeQuery: vi.fn().mockResolvedValue([]),
+      readCSV: vi.fn().mockResolvedValue([]),
+      readParquet: vi.fn().mockResolvedValue([]),
     } as any
 
     client = new MCPClient({
@@ -85,7 +85,7 @@ describe.skip('MCPClient - Temporarily skipped due to ESM mocking issues', () =>
     try {
       await client.disconnectAll()
     } catch {}
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('Configuration', () => {
@@ -244,7 +244,7 @@ describe.skip('MCPClient - Temporarily skipped due to ESM mocking issues', () =>
       csvClient.setDuckDBService(mockDuckDB)
 
       // Mock readResource to return CSV string
-      jest.spyOn(csvClient, 'readResource').mockResolvedValue('id,name\n1,test')
+      vi.spyOn(csvClient, 'readResource').mockResolvedValue('id,name\n1,test')
 
       await csvClient.attachServer('stdio://csv', 'csv-alias', 'stdio')
       await csvClient.createVirtualTable('csv_table', 'csv://data', 'csv-alias')
@@ -263,7 +263,7 @@ describe.skip('MCPClient - Temporarily skipped due to ESM mocking issues', () =>
     })
 
     it('should throw for empty resource data', async () => {
-      jest.spyOn(client, 'readResource').mockResolvedValue([])
+      vi.spyOn(client, 'readResource').mockResolvedValue([])
 
       await expect(
         client.createVirtualTable('empty_table', 'empty://resource', 'test-alias')
