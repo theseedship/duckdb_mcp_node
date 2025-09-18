@@ -198,12 +198,12 @@ describe('DuckDBMCPServer', () => {
     mockDuckDB = createMockDuckDBService()
     mockMCPClient = createMockMCPClient()
 
-    // Create server with mocked dependencies
-    server = new DuckDBMCPServer()
+    // Create server with mocked dependencies passed via config
+    server = new DuckDBMCPServer({
+      duckdbService: mockDuckDB as any,
+    })
 
-    // Replace internal services with mocks
-    // @ts-ignore - accessing private property
-    server.duckdb = mockDuckDB
+    // Replace mcpClient with mock (still needs to be done after constructor)
     // @ts-ignore
     server.mcpClient = mockMCPClient
   })
