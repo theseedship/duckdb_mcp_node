@@ -3,19 +3,18 @@ import { DuckDBMCPServer } from './mcp-server.js'
 
 // Mock the MCP SDK Server
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn().mockImplementation(() => {
+  Server: vi.fn(() => {
     const handlers = new Map()
-    const mockSetRequestHandler = vi.fn((schema, handler) => {
-      // Store handlers by extracting the method name from the schema if possible
-      if (typeof schema === 'string') {
-        handlers.set(schema, handler)
-      } else {
-        // For Zod schemas, just store with a generic key
-        handlers.set('handler_' + handlers.size, handler)
-      }
-    })
     return {
-      setRequestHandler: mockSetRequestHandler,
+      setRequestHandler: vi.fn((schema, handler) => {
+        // Store handlers by extracting the method name from the schema if possible
+        if (typeof schema === 'string') {
+          handlers.set(schema, handler)
+        } else {
+          // For Zod schemas, just store with a generic key
+          handlers.set('handler_' + handlers.size, handler)
+        }
+      }),
       connect: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
       error: vi.fn(),
@@ -62,7 +61,7 @@ vi.mock('../duckdb/service.js', () => ({
 
 // Mock MCPClient
 vi.mock('../client/MCPClient.js', () => ({
-  MCPClient: vi.fn().mockImplementation(() => ({
+  MCPClient: vi.fn(() => ({
     setDuckDBService: vi.fn(),
     attachServer: vi.fn().mockResolvedValue(undefined),
     detachServer: vi.fn().mockResolvedValue(undefined),

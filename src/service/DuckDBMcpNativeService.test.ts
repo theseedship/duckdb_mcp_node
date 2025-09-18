@@ -3,7 +3,7 @@ import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMc
 
 // Mock the MCPClient to avoid real connections
 vi.mock('../client/MCPClient.js', () => ({
-  MCPClient: vi.fn().mockImplementation(() => ({
+  MCPClient: vi.fn(() => ({
     attachServer: vi.fn().mockResolvedValue(undefined),
     detachServer: vi.fn().mockResolvedValue(undefined),
     listResources: vi.fn().mockResolvedValue([]),
@@ -22,12 +22,13 @@ vi.mock('../client/MCPClient.js', () => ({
     clearCache: vi.fn(),
     disconnectAll: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
+    setDuckDBService: vi.fn(),
   })),
 }))
 
 // Mock DuckDBMCPServer to avoid starting real servers
 vi.mock('../server/mcp-server.js', () => ({
-  DuckDBMCPServer: vi.fn().mockImplementation(() => ({
+  DuckDBMCPServer: vi.fn(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
   })),

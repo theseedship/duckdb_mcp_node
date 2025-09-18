@@ -2,46 +2,56 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { MCPClient } from './MCPClient.js'
 import type { DuckDBService } from '../duckdb/service.js'
 
-// Create a mock Client class
-const mockClientInstance = {
-  connect: vi.fn().mockResolvedValue(undefined),
-  close: vi.fn().mockResolvedValue(undefined),
-  listResources: vi.fn().mockResolvedValue({
-    resources: [
-      {
-        uri: 'test://resource1',
-        name: 'Resource 1',
-        mimeType: 'application/json',
-      },
-      {
-        uri: 'test://resource2',
-        name: 'Resource 2',
-        mimeType: 'text/csv',
-      },
-    ],
-  }),
-  listTools: vi.fn().mockResolvedValue({
-    tools: [
-      { name: 'tool1', description: 'Test tool 1' },
-      { name: 'tool2', description: 'Test tool 2' },
-    ],
-  }),
-  readResource: vi.fn().mockResolvedValue({
-    contents: [
-      {
-        text: JSON.stringify([{ id: 1, name: 'test' }]),
-        mimeType: 'application/json',
-      },
-    ],
-  }),
-  callTool: vi.fn().mockResolvedValue({
-    result: 'tool executed',
-  }),
-}
+// Use vi.hoisted to ensure mocks are available before module imports
+const { getMockClientInstance } = vi.hoisted(() => {
+  const getMockClientInstance = () => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    listResources: vi.fn().mockResolvedValue({
+      resources: [
+        {
+          uri: 'test://resource1',
+          name: 'Resource 1',
+          mimeType: 'application/json',
+        },
+        {
+          uri: 'test://resource2',
+          name: 'Resource 2',
+          mimeType: 'text/csv',
+        },
+      ],
+    }),
+    listTools: vi.fn().mockResolvedValue({
+      tools: [
+        { name: 'tool1', description: 'Test tool 1' },
+        { name: 'tool2', description: 'Test tool 2' },
+      ],
+    }),
+    readResource: vi.fn().mockResolvedValue({
+      contents: [
+        {
+          text: JSON.stringify([{ id: 1, name: 'test' }]),
+          mimeType: 'application/json',
+        },
+      ],
+    }),
+    callTool: vi.fn().mockResolvedValue({
+      result: 'tool executed',
+    }),
+  })
+
+  return { getMockClientInstance }
+})
+
+// Keep a reference to the current mock instance for tests
+let mockClientInstance: any
 
 // Mock the MCP SDK client
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: vi.fn(() => mockClientInstance),
+  Client: vi.fn(() => {
+    mockClientInstance = getMockClientInstance()
+    return mockClientInstance
+  }),
 }))
 
 // Mock stdio transport to prevent real process spawning
@@ -57,11 +67,35 @@ vi.mock('fs/promises', () => ({
   unlink: vi.fn().mockResolvedValue(undefined),
 }))
 
+// Mock protocol transports
+vi.mock('../protocol/index.js', () => ({
+  HTTPTransport: vi.fn(() => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  })),
+  WebSocketTransport: vi.fn(() => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  })),
+  TCPTransport: vi.fn(() => ({
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  })),
+}))
+
+// Mock SDK transport adapter
+vi.mock('../protocol/sdk-transport-adapter.js', () => ({
+  SDKTransportAdapter: vi.fn((transport) => transport),
+}))
+
 describe('MCPClient', () => {
   let client: MCPClient
   let mockDuckDB: any
 
   beforeEach(() => {
+    // Reset all mock functions
+    vi.clearAllMocks()
+
     // Create mock DuckDB service
     mockDuckDB = {
       createTableFromJSON: vi.fn().mockResolvedValue(undefined),
@@ -341,16 +375,22 @@ describe('MCPClient', () => {
   })
 
   describe('Error Handling', () => {
-    it('should throw for HTTP transport not implemented', async () => {
-      await expect(
-        client.attachServer('http://localhost:8080', 'http-alias', 'http')
-      ).rejects.toThrow('HTTP transport not yet implemented')
+    it('should attach HTTP transport successfully', async () => {
+      await client.attachServer('http://localhost:8080', 'http-alias', 'http')
+
+      const servers = client.listAttachedServers()
+      expect(servers).toHaveLength(1)
+      expect(servers[0].alias).toBe('http-alias')
+      expect(servers[0].transport).toBe('http')
     })
 
-    it('should throw for WebSocket transport not implemented', async () => {
-      await expect(
-        client.attachServer('ws://localhost:8080', 'ws-alias', 'websocket')
-      ).rejects.toThrow('WebSocket transport not yet implemented')
+    it('should attach WebSocket transport successfully', async () => {
+      await client.attachServer('ws://localhost:8080', 'ws-alias', 'websocket')
+
+      const servers = client.listAttachedServers()
+      expect(servers).toHaveLength(1)
+      expect(servers[0].alias).toBe('ws-alias')
+      expect(servers[0].transport).toBe('websocket')
     })
 
     it('should throw for unsupported transport', async () => {

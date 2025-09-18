@@ -3,31 +3,125 @@ import { DuckDBMCPServer } from './mcp-server.js'
 import type { DuckDBService } from '../duckdb/service.js'
 import type { MCPClient } from '../client/MCPClient.js'
 
-// Mock the MCP SDK Server
-vi.mock('@modelcontextprotocol/sdk/server/index.js', () => {
+// Use vi.hoisted for mocks that need to be available before imports
+const { mockHandlers } = vi.hoisted(() => {
   const handlers = new Map()
-  return {
-    Server: vi.fn().mockImplementation(() => ({
-      setRequestHandler: vi.fn((schema, handler) => {
-        // Store handlers - real implementation uses Zod schemas
-        if (typeof schema === 'string') {
-          handlers.set(schema, handler)
-        } else {
-          handlers.set('handler_' + handlers.size, handler)
-        }
-      }),
-      connect: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      error: vi.fn(),
-      // Expose handlers for testing
-      _handlers: handlers,
-    })),
-  }
+  return { mockHandlers: handlers }
 })
+
+// Mock the MCP SDK Server
+vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
+  Server: vi.fn(() => ({
+    setRequestHandler: vi.fn((schema, handler) => {
+      // Map schema objects to handler keys based on their structure
+      let key = 'unknown'
+
+      // Check schema object or name to determine handler type
+      if (schema?.parse?.name?.includes('ListTools') || schema === 'tools/list') {
+        key = 'tools/list'
+      } else if (schema?.parse?.name?.includes('CallTool') || schema === 'tools/call') {
+        key = 'tools/call'
+      } else if (schema?.parse?.name?.includes('ListResources') || schema === 'resources/list') {
+        key = 'resources/list'
+      } else if (schema?.parse?.name?.includes('ReadResource') || schema === 'resources/read') {
+        key = 'resources/read'
+      }
+
+      mockHandlers.set(key, handler)
+    }),
+    connect: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    error: vi.fn(),
+    // Expose handlers for testing
+    _handlers: mockHandlers,
+  })),
+}))
 
 // Mock stdio transport
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
   StdioServerTransport: vi.fn().mockImplementation(() => ({})),
+}))
+
+// Mock DuckDBService
+vi.mock('../duckdb/service.js', () => ({
+  DuckDBService: vi.fn(() => ({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    executeQuery: vi.fn().mockResolvedValue([
+      { id: 1, name: 'test1' },
+      { id: 2, name: 'test2' },
+    ]),
+    executeScalar: vi.fn().mockResolvedValue({ count: 10 }),
+    getSchema: vi.fn().mockResolvedValue([
+      { table_schema: 'main', table_name: 'users', table_type: 'TABLE' },
+      { table_schema: 'main', table_name: 'products', table_type: 'TABLE' },
+    ]),
+    getTableColumns: vi.fn().mockResolvedValue([
+      { column_name: 'id', data_type: 'INTEGER', is_nullable: 'NO' },
+      { column_name: 'name', data_type: 'VARCHAR', is_nullable: 'YES' },
+    ]),
+    createTableFromJSON: vi.fn().mockResolvedValue(undefined),
+    readParquet: vi.fn().mockResolvedValue([{ data: 'parquet' }]),
+    readCSV: vi.fn().mockResolvedValue([{ data: 'csv' }]),
+    readJSON: vi.fn().mockResolvedValue([{ data: 'json' }]),
+    exportToFile: vi.fn().mockResolvedValue(undefined),
+    tableExists: vi.fn().mockResolvedValue(true),
+    getRowCount: vi.fn().mockResolvedValue(100),
+    close: vi.fn().mockResolvedValue(undefined),
+    isReady: vi.fn().mockReturnValue(true),
+  })),
+  getDuckDBService: vi.fn().mockReturnValue({
+    initialize: vi.fn().mockResolvedValue(undefined),
+    executeQuery: vi.fn().mockResolvedValue([
+      { id: 1, name: 'test1' },
+      { id: 2, name: 'test2' },
+    ]),
+    executeScalar: vi.fn().mockResolvedValue({ count: 10 }),
+    getSchema: vi.fn().mockResolvedValue([
+      { table_schema: 'main', table_name: 'users', table_type: 'TABLE' },
+      { table_schema: 'main', table_name: 'products', table_type: 'TABLE' },
+    ]),
+    getTableColumns: vi.fn().mockResolvedValue([
+      { column_name: 'id', data_type: 'INTEGER', is_nullable: 'NO' },
+      { column_name: 'name', data_type: 'VARCHAR', is_nullable: 'YES' },
+    ]),
+    createTableFromJSON: vi.fn().mockResolvedValue(undefined),
+    readParquet: vi.fn().mockResolvedValue([{ data: 'parquet' }]),
+    readCSV: vi.fn().mockResolvedValue([{ data: 'csv' }]),
+    readJSON: vi.fn().mockResolvedValue([{ data: 'json' }]),
+    exportToFile: vi.fn().mockResolvedValue(undefined),
+    tableExists: vi.fn().mockResolvedValue(true),
+    getRowCount: vi.fn().mockResolvedValue(100),
+    close: vi.fn().mockResolvedValue(undefined),
+    isReady: vi.fn().mockReturnValue(true),
+  }),
+}))
+
+// Mock MCPClient
+vi.mock('../client/MCPClient.js', () => ({
+  MCPClient: vi.fn(() => ({
+    attachServer: vi.fn().mockResolvedValue(undefined),
+    detachServer: vi.fn().mockResolvedValue(undefined),
+    listAttachedServers: vi.fn().mockReturnValue([
+      {
+        alias: 'test-server',
+        url: 'stdio://test',
+        transport: 'stdio',
+        client: {},
+        resources: [],
+        tools: [],
+        lastRefresh: new Date(),
+      },
+    ]),
+    listResources: vi.fn().mockResolvedValue([{ uri: 'test://resource1', name: 'Resource 1' }]),
+    readResource: vi.fn().mockResolvedValue({ data: 'test' }),
+    createVirtualTable: vi.fn().mockResolvedValue(undefined),
+    refreshVirtualTable: vi.fn().mockResolvedValue(undefined),
+    callTool: vi.fn().mockResolvedValue({ result: 'success' }),
+    clearCache: vi.fn(),
+    disconnectAll: vi.fn().mockResolvedValue(undefined),
+    getAttachedServer: vi.fn().mockReturnValue(undefined),
+    setDuckDBService: vi.fn(),
+  })),
 }))
 
 // Mock DuckDB service
@@ -90,18 +184,19 @@ describe('DuckDBMCPServer', () => {
   let mockDuckDB: any
   let mockMCPClient: any
   let consoleErrorSpy: any
-  let handlers: Map<string, Function>
+  // Use the same mockHandlers from vi.hoisted
+  const handlers = mockHandlers
 
   beforeEach(() => {
+    // Clear the handlers before each test
+    mockHandlers.clear()
+
     // Suppress console.error during tests
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     // Create mocks
     mockDuckDB = createMockDuckDBService()
     mockMCPClient = createMockMCPClient()
-
-    // Track registered handlers
-    handlers = new Map()
 
     // Create server with mocked dependencies
     server = new DuckDBMCPServer()
@@ -111,23 +206,6 @@ describe('DuckDBMCPServer', () => {
     server.duckdb = mockDuckDB
     // @ts-ignore
     server.mcpClient = mockMCPClient
-
-    // Capture registered handlers
-    // @ts-ignore
-    const mockServer = server.server
-    mockServer.setRequestHandler.mockImplementation((schema: any, handler: Function) => {
-      // Extract method name from schema if possible
-      const methodName = schema?.parse?.toString().includes('tools/list')
-        ? 'tools/list'
-        : schema?.parse?.toString().includes('tools/call')
-          ? 'tools/call'
-          : schema?.parse?.toString().includes('resources/list')
-            ? 'resources/list'
-            : schema?.parse?.toString().includes('resources/read')
-              ? 'resources/read'
-              : 'unknown'
-      handlers.set(methodName, handler)
-    })
   })
 
   afterEach(async () => {
@@ -164,9 +242,7 @@ describe('DuckDBMCPServer', () => {
   describe('Tool Handlers', () => {
     beforeEach(async () => {
       await server.start()
-
-      // Simulate handler registration
-      server.setupRequestHandlers()
+      // Handlers are set up in constructor, no need to call setupRequestHandlers
     })
 
     describe('query_duckdb', () => {
@@ -392,7 +468,7 @@ describe('DuckDBMCPServer', () => {
   describe('Resource Handlers', () => {
     beforeEach(async () => {
       await server.start()
-      server.setupRequestHandlers()
+      // Handlers are set up in constructor, no need to call setupRequestHandlers
     })
 
     it('should list resources', async () => {
@@ -420,7 +496,7 @@ describe('DuckDBMCPServer', () => {
   describe('Error Handling', () => {
     beforeEach(async () => {
       await server.start()
-      server.setupRequestHandlers()
+      // Handlers are set up in constructor, no need to call setupRequestHandlers
     })
 
     it('should handle unknown tool gracefully', async () => {
