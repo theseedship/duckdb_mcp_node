@@ -14,6 +14,8 @@ import { DuckDBService } from '../duckdb/service.js'
 import { MCPClient } from '../client/MCPClient.js'
 import { VirtualTableManager } from '../client/VirtualTable.js'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
+import { nativeToolHandlers, nativeToolDefinitions } from '../tools/native-tools.js'
+import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -30,8 +32,18 @@ class DuckDBMCPServer {
   private duckdb: DuckDBService
   private mcpClient: MCPClient
   private virtualTables: VirtualTableManager
+  private spaceFactory?: SpaceContextFactory
+  private currentSpace?: SpaceContext
+  private embeddedMode: boolean = false
 
-  constructor() {
+  constructor(config?: {
+    embeddedMode?: boolean
+    duckdbService?: DuckDBService
+    spaceFactory?: SpaceContextFactory
+  }) {
+    this.embeddedMode = config?.embeddedMode || false
+    this.spaceFactory = config?.spaceFactory
+
     // Initialize MCP server
     this.server = new Server(
       {
@@ -46,21 +58,23 @@ class DuckDBMCPServer {
       }
     )
 
-    // Initialize DuckDB service
-    this.duckdb = new DuckDBService({
-      memory: process.env.DUCKDB_MEMORY || '4GB',
-      threads: parseInt(process.env.DUCKDB_THREADS || '4'),
-      allowUnsignedExtensions: process.env.ALLOW_UNSIGNED_EXTENSIONS === 'true',
-      s3Config: process.env.MINIO_ACCESS_KEY
-        ? {
-            endpoint: process.env.MINIO_ENDPOINT,
-            accessKey: process.env.MINIO_ACCESS_KEY,
-            secretKey: process.env.MINIO_SECRET_KEY,
-            region: process.env.MINIO_REGION || 'us-east-1',
-            useSSL: process.env.MINIO_USE_SSL === 'true',
-          }
-        : undefined,
-    })
+    // Use provided DuckDB service or create new one
+    this.duckdb =
+      config?.duckdbService ||
+      new DuckDBService({
+        memory: process.env.DUCKDB_MEMORY || '4GB',
+        threads: parseInt(process.env.DUCKDB_THREADS || '4'),
+        allowUnsignedExtensions: process.env.ALLOW_UNSIGNED_EXTENSIONS === 'true',
+        s3Config: process.env.MINIO_ACCESS_KEY
+          ? {
+              endpoint: process.env.MINIO_ENDPOINT,
+              accessKey: process.env.MINIO_ACCESS_KEY,
+              secretKey: process.env.MINIO_SECRET_KEY,
+              region: process.env.MINIO_REGION || 'us-east-1',
+              useSSL: process.env.MINIO_USE_SSL === 'true',
+            }
+          : undefined,
+      })
 
     // Initialize MCP client for virtual tables
     this.mcpClient = new MCPClient({
@@ -838,6 +852,63 @@ class DuckDBMCPServer {
   }
 
   /**
+   * Get native tool handlers for embedding in other MCP servers
+   * This is the main API for using DuckDB MCP as a library
+   */
+  getNativeHandlers() {
+    // Build context with space support
+    const context = {
+      duckdb: this.duckdb,
+      spaceId: this.currentSpace?.getId(),
+      applySpaceContext: this.currentSpace
+        ? (sql: string) => this.currentSpace!.applyToQuery(sql)
+        : undefined,
+    }
+
+    // Return handlers bound to this context
+    return Object.fromEntries(
+      Object.entries(nativeToolHandlers).map(([name, handler]) => [
+        name,
+        (args: any) => handler(args, context),
+      ])
+    )
+  }
+
+  /**
+   * Get native tool definitions for MCP registration
+   */
+  getNativeToolDefinitions() {
+    return nativeToolDefinitions
+  }
+
+  /**
+   * Switch to a different space context (hidden feature)
+   * @internal
+   */
+  async switchSpace(spaceId: string, config?: any) {
+    if (!this.spaceFactory) {
+      this.spaceFactory = new SpaceContextFactory(this.duckdb)
+    }
+
+    this.currentSpace = await this.spaceFactory.getOrCreate(spaceId, config)
+    return this.currentSpace
+  }
+
+  /**
+   * Get the DuckDB service instance
+   */
+  getDuckDBService() {
+    return this.duckdb
+  }
+
+  /**
+   * Get the MCP client instance
+   */
+  getMCPClient() {
+    return this.mcpClient
+  }
+
+  /**
    * Start the MCP server
    */
   async start() {
@@ -855,10 +926,12 @@ class DuckDBMCPServer {
       throw error
     }
 
-    // Start MCP server with stdio transport
-    const transport = new StdioServerTransport()
-    await this.server.connect(transport)
-    // DuckDB MCP Server started successfully
+    // Only start stdio transport if not in embedded mode
+    if (!this.embeddedMode) {
+      const transport = new StdioServerTransport()
+      await this.server.connect(transport)
+      // DuckDB MCP Server started successfully
+    }
   }
 }
 

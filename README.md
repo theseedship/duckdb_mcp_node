@@ -91,6 +91,39 @@ const duckdb = await getDuckDBService()
 const result = await duckdb.executeQuery('SELECT * FROM table')
 ```
 
+### Embedding in Another MCP Server
+
+The package provides native tool handlers that can be embedded directly into other MCP servers:
+
+```typescript
+import { nativeToolHandlers, nativeToolDefinitions } from '@seed-ship/duckdb-mcp-native/native'
+
+// In your MCP server initialization
+server.registerTools(nativeToolDefinitions)
+
+// Direct handler usage
+const result = await nativeToolHandlers.query_duckdb({
+  sql: 'SELECT * FROM users',
+  limit: 100,
+})
+
+// Or with custom DuckDB instance
+import { DuckDBMCPServer } from '@seed-ship/duckdb-mcp-native/server'
+
+const duckdbServer = new DuckDBMCPServer({
+  embeddedMode: true,
+  duckdbService: yourDuckDBInstance,
+})
+
+// Get handlers bound to your instance
+const handlers = duckdbServer.getNativeHandlers()
+
+// Register in your MCP server
+yourMCPServer.registerTools(duckdbServer.getNativeToolDefinitions())
+```
+
+This allows you to add DuckDB capabilities to existing MCP servers without running a separate server process.
+
 ### Federation Example
 
 ```typescript
