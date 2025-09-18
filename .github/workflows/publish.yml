@@ -6,6 +6,13 @@ on:
       - main
     paths:
       - 'package.json'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force publish even if version unchanged'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   check-version:
@@ -25,17 +32,24 @@ jobs:
           # Get current version
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "Current version: $CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          # Check if force publish requested
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.force }}" == "true" ]; then
+            echo "Force publish requested"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           # Get previous version
           git checkout HEAD~1
-          PREVIOUS_VERSION=$(node -p "require('./package.json').version")
+          PREVIOUS_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "0.0.0")
           echo "Previous version: $PREVIOUS_VERSION"
 
           # Check if changed
           if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
             echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
             echo "changed=true" >> $GITHUB_OUTPUT
-            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           else
             echo "Version unchanged"
             echo "changed=false" >> $GITHUB_OUTPUT

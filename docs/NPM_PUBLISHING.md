@@ -54,9 +54,20 @@ git push --follow-tags
 
 1. **Login to npmjs.com**
 2. **Go to Account Settings → Access Tokens**
-3. **Generate New Token:**
-   - Type: **Automation** (survives 2FA changes)
+3. **Generate New Token - Two Options:**
+
+   **Option A: Granular Access Token** (Recommended - More Secure)
+   - Click "Generate New Token" → "Granular Access Token"
    - Name: `github-actions-duckdb-mcp-node`
+   - Expiration: 365 days or "Does not expire"
+   - Packages: Select "All packages" or specifically `@deposium/*`
+   - Permissions: "Read and Write"
+
+   **Option B: Classic Token** (Simpler)
+   - Click "Generate New Token" → "Classic Token"
+   - Type: "Publish"
+   - Name: `github-actions-duckdb-mcp-node`
+
 4. **Copy the token** (starts with `npm_`)
 
 ### 2. GitHub Repository Setup
@@ -134,7 +145,37 @@ Before publishing a new version:
 - [ ] README accurate
 - [ ] Version bumped appropriately
 
+## 🚨 First-Time Publishing
+
+If GitHub Actions isn't working, use the manual script:
+
+```bash
+# Set your NPM token
+export NPM_TOKEN='npm_xxxxxxxxxxxx'
+
+# Run initial publish script
+./scripts/initial-publish.sh
+
+# Or publish directly
+npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+npm publish --access public
+```
+
 ## 🛠️ Troubleshooting
+
+### GitHub Actions Not Triggering
+
+The workflow only triggers when:
+
+1. Version changes in package.json
+2. Manual trigger via GitHub Actions UI
+
+To force trigger:
+
+1. Go to Actions tab on GitHub
+2. Select "Publish to NPM"
+3. Click "Run workflow"
+4. Check "Force publish" if needed
 
 ### "Permission denied" on npm publish
 
