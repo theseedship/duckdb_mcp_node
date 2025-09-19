@@ -56,16 +56,23 @@ export class DuckDBService {
       this.instance = await DuckDBInstance.create(':memory:', instanceConfig)
       this.connection = await this.instance.connect()
 
+      // Mark as initialized once connection is ready
+      this.isInitialized = true
+
       // Skip extension loading for now to prevent timeouts
       // Extensions can be loaded on-demand when needed
       // TODO: Make extension loading lazy or async
 
-      // Configure S3 if credentials provided
+      // Configure S3 if credentials provided (optional, non-blocking)
       if (this.config.s3Config?.accessKey && this.config.s3Config?.secretKey) {
-        await this.configureS3()
+        try {
+          await this.configureS3()
+          logger.info('S3 configuration applied successfully')
+        } catch (error) {
+          logger.warn('Failed to configure S3, continuing without S3 support:', error)
+          // Continue without S3 - database is still functional
+        }
       }
-
-      this.isInitialized = true
     } catch (error) {
       logger.error('Failed to initialize DuckDB:', error)
       throw error
