@@ -103,11 +103,10 @@ describe('Logger', () => {
       const childLogger = createLogger('Database')
       childLogger.error('connection failed', { host: 'localhost', port: 5432 })
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[Database]',
-        'connection failed',
-        { host: 'localhost', port: 5432 }
-      )
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[Database]', 'connection failed', {
+        host: 'localhost',
+        port: 5432,
+      })
     })
   })
 })
