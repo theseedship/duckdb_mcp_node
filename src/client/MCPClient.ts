@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { URL } from 'url'
 import { DuckDBService } from '../duckdb/service.js'
 import { HTTPTransport, WebSocketTransport, TCPTransport } from '../protocol/index.js'
+import { logger } from '../utils/logger.js'
 import { SDKTransportAdapter } from '../protocol/sdk-transport-adapter.js'
 
 /**
@@ -183,7 +184,7 @@ export class MCPClient {
         lastRefresh: new Date(),
       })
 
-      console.info(
+      logger.info(
         `✅ Attached MCP server '${alias}' with ${resources.resources.length} resources and ${tools.tools.length} tools`
       )
     } catch (error) {
@@ -211,7 +212,7 @@ export class MCPClient {
       }
     }
 
-    console.info(`✅ Detached MCP server '${alias}'`)
+    logger.info(`✅ Detached MCP server '${alias}'`)
   }
 
   /**
@@ -253,7 +254,7 @@ export class MCPClient {
         }))
         allResources.push(...resourcesWithServer)
       } catch (error) {
-        console.error(`Failed to list resources from '${server.alias}':`, error)
+        logger.error(`Failed to list resources from '${server.alias}':`, error)
       }
     }
 
@@ -295,7 +296,7 @@ export class MCPClient {
       if (cached) {
         const age = (Date.now() - cached.timestamp) / 1000
         if (age < this.config.cacheTTL) {
-          console.info(`📦 Using cached resource: ${cacheKey}`)
+          logger.info(`📦 Using cached resource: ${cacheKey}`)
           return cached.data
         }
       }
@@ -428,7 +429,7 @@ export class MCPClient {
     }
 
     const rowCount = Array.isArray(data) ? data.length : 'unknown'
-    console.info(
+    logger.info(
       `✅ Created virtual table '${tableName}' from resource '${resourceUri}' with ${rowCount} rows`
     )
   }
@@ -466,7 +467,7 @@ export class MCPClient {
     // Recreate table
     await this.createVirtualTable(tableName, resourceUri, serverAlias)
 
-    console.info(`🔄 Refreshed virtual table '${tableName}'`)
+    logger.info(`🔄 Refreshed virtual table '${tableName}'`)
   }
 
   /**
@@ -505,7 +506,7 @@ export class MCPClient {
       this.resourceCache.clear()
     }
 
-    console.info(
+    logger.info(
       `🧹 Cleared cache ${serverAlias ? `for server '${serverAlias}'` : 'for all servers'}`
     )
   }

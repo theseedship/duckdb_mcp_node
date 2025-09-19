@@ -1,6 +1,7 @@
 import { DuckDBService } from '../duckdb/service.js'
 import { MCPConnectionPool } from './ConnectionPool.js'
 import { ResourceRegistry } from './ResourceRegistry.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Represents a federated query plan
@@ -277,7 +278,7 @@ export class QueryRouter {
 
       return null
     } catch (error) {
-      console.error(`Failed to fetch data from '${serverAlias}':`, error)
+      logger.error(`Failed to fetch data from '${serverAlias}':`, error)
       throw new Error(`Failed to fetch remote data from '${serverAlias}': ${error}`)
     }
   }
@@ -327,7 +328,7 @@ export class QueryRouter {
       throw new Error(`Unsupported data type for temp table creation`)
     }
 
-    console.info(`📊 Created temp table '${tempTableName}' for server '${serverAlias}'`)
+    logger.info(`📊 Created temp table '${tempTableName}' for server '${serverAlias}'`)
     return tempTableName
   }
 
@@ -339,7 +340,7 @@ export class QueryRouter {
       try {
         await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${table}`)
       } catch (error) {
-        console.warn(`Failed to drop temp table '${table}':`, error)
+        logger.warn(`Failed to drop temp table '${table}':`, error)
       }
     }
   }

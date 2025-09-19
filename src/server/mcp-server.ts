@@ -16,12 +16,12 @@ import { VirtualTableManager } from '../client/VirtualTable.js'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { nativeToolHandlers, nativeToolDefinitions } from '../tools/native-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
+import { logger } from '../utils/logger.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
-// Suppress dotenv output to prevent stdout pollution
-process.env.SUPPRESS_NO_CONFIG_WARNING = 'true'
-dotenv.config()
+// Use quiet mode to prevent stdout pollution
+dotenv.config({ quiet: true } as any)
 
 /**
  * DuckDB MCP Server
@@ -745,7 +745,7 @@ class DuckDBMCPServer {
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`)
         }
       } catch (error: any) {
-        console.error('Tool execution error:', error)
+        logger.error('Tool execution error:', error)
         return {
           content: [
             {
@@ -778,7 +778,7 @@ class DuckDBMCPServer {
           })),
         }
       } catch (error) {
-        console.error('Error listing resources:', error)
+        logger.error('Error listing resources:', error)
         return { resources: [] }
       }
     })
@@ -808,7 +808,7 @@ class DuckDBMCPServer {
           ],
         }
       } catch (error: any) {
-        console.error('Error reading resource:', error)
+        logger.error('Error reading resource:', error)
         throw new McpError(ErrorCode.InternalError, `Failed to read resource: ${error.message}`)
       }
     })
@@ -922,7 +922,7 @@ class DuckDBMCPServer {
       await Promise.race([initPromise, timeoutPromise])
       // DuckDB initialized successfully
     } catch (error) {
-      console.error('Failed to initialize DuckDB:', error)
+      logger.error('Failed to initialize DuckDB:', error)
       throw error
     }
 
@@ -936,11 +936,18 @@ class DuckDBMCPServer {
 }
 
 // Start the server if run directly
-// Check if MCP_MODE environment variable is set (used by npm scripts)
-if (process.env.MCP_MODE === 'stdio' || process.argv.includes('--stdio')) {
+// Auto-start when this is the main module being executed
+// Works with: node, tsx, ts-node, MCP Inspector
+const isMainModule =
+  import.meta.url === `file://${process.argv[1]}` || // Direct execution
+  process.argv[1]?.includes('mcp-server') || // Script name match
+  process.env.MCP_MODE === 'stdio' || // Explicit MCP mode
+  process.argv.includes('--stdio') // CLI flag
+
+if (isMainModule) {
   const server = new DuckDBMCPServer()
   server.start().catch((error) => {
-    console.error('Failed to start server:', error)
+    logger.error('Failed to start server:', error)
     process.exit(1)
   })
 }

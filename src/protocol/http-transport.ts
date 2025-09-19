@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios'
 import { Transport } from './transport.js'
 import { MCPMessage } from './types.js'
 import { MessageFormatter } from './messages.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * HTTP transport implementation for MCP communication
@@ -74,7 +75,7 @@ export class HTTPTransport extends Transport {
         this.startPolling()
       }
 
-      console.info(`✅ Connected to HTTP MCP server at ${this.url}`)
+      logger.info(`✅ Connected to HTTP MCP server at ${this.url}`)
     } catch (error) {
       this.connected = false
       throw new Error(`Failed to connect to HTTP server: ${error}`)
@@ -105,7 +106,7 @@ export class HTTPTransport extends Transport {
       this.connected = false
       this.sessionId = undefined
       this.resolveWaitingIterators(true)
-      console.info(`✅ Disconnected from HTTP MCP server`)
+      logger.info(`✅ Disconnected from HTTP MCP server`)
     }
   }
 

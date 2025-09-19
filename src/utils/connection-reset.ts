@@ -4,6 +4,7 @@ import { HTTPTransport } from '../protocol/http-transport.js'
 import { WebSocketTransport } from '../protocol/websocket-transport.js'
 import { TCPTransport } from '../protocol/tcp-transport.js'
 import { execSync } from 'child_process'
+import { logger } from './logger.js'
 
 /**
  * Connection Reset Utility
@@ -57,7 +58,7 @@ export class ConnectionReset {
         await client.disconnectAll()
         count++
       } catch (error) {
-        console.warn(`Failed to disconnect client: ${error}`)
+        logger.warn(`Failed to disconnect client: ${error}`)
       }
     }
 
@@ -76,7 +77,7 @@ export class ConnectionReset {
         await pool.close()
         count++
       } catch (error) {
-        console.warn(`Failed to close pool: ${error}`)
+        logger.warn(`Failed to close pool: ${error}`)
       }
     }
 
@@ -99,7 +100,7 @@ export class ConnectionReset {
         }
         count++
       } catch (error) {
-        console.warn(`Failed to disconnect transport: ${error}`)
+        logger.warn(`Failed to disconnect transport: ${error}`)
       }
     }
 
@@ -143,7 +144,7 @@ export class ConnectionReset {
         if (pid) {
           // Kill the process
           process.kill(parseInt(pid), 'SIGKILL')
-          console.info(`Killed process ${pid} on port ${port}`)
+          logger.info(`Killed process ${pid} on port ${port}`)
         }
       } catch {
         // Ignore errors, port might not be in use
@@ -197,10 +198,10 @@ export async function resetAllConnections(): Promise<void> {
   const reset = getConnectionReset()
   const results = await reset.resetAll()
 
-  console.info(`🔄 Connection Reset Complete:`)
-  console.info(`   - Clients reset: ${results.clients}`)
-  console.info(`   - Pools reset: ${results.pools}`)
-  console.info(`   - Transports reset: ${results.transports}`)
+  logger.info(`🔄 Connection Reset Complete:`)
+  logger.info(`   - Clients reset: ${results.clients}`)
+  logger.info(`   - Pools reset: ${results.pools}`)
+  logger.info(`   - Transports reset: ${results.transports}`)
 }
 
 /**
@@ -212,7 +213,7 @@ export async function emergencyReset(): Promise<void> {
   // Common MCP ports
   const ports = [6277, 3001, 8080, 8081, 9999]
 
-  console.info('🚨 Emergency Connection Reset')
+  logger.info('🚨 Emergency Connection Reset')
 
   // Kill port processes
   await reset.killPortProcesses(ports)
@@ -220,5 +221,5 @@ export async function emergencyReset(): Promise<void> {
   // Clear all registrations
   reset.clearAll()
 
-  console.info('✅ Emergency reset complete')
+  logger.info('✅ Emergency reset complete')
 }

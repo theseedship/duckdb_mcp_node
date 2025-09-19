@@ -1,5 +1,6 @@
 import { DuckDBService } from '../duckdb/service.js'
 import { escapeIdentifier, escapeFilePath } from '../utils/sql-escape.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Resource types that can be mapped to DuckDB tables
@@ -245,7 +246,7 @@ export class ResourceMapper {
       // Clean up temp file after loading
       const fs = await import('fs/promises')
       await fs.unlink(filePath).catch(() => {
-        console.warn(`Could not delete temp Parquet file: ${filePath}`)
+        logger.warn(`Could not delete temp Parquet file: ${filePath}`)
       })
 
       // Get table metadata
@@ -345,7 +346,7 @@ export class ResourceMapper {
     try {
       await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${escapeIdentifier(tableName)}`)
       this.mappedResources.delete(tableName)
-      console.info(`🗑️ Unmapped resource table '${tableName}'`)
+      logger.info(`🗑️ Unmapped resource table '${tableName}'`)
     } catch (error) {
       throw new Error(`Failed to unmap resource '${tableName}': ${error}`)
     }
@@ -361,6 +362,6 @@ export class ResourceMapper {
       await this.unmapResource(tableName)
     }
 
-    console.info('🧹 Cleared all resource mappings')
+    logger.info('🧹 Cleared all resource mappings')
   }
 }

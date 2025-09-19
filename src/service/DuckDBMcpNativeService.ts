@@ -3,6 +3,7 @@ import { MCPClient } from '../client/MCPClient.js'
 import { ResourceMapper } from '../client/ResourceMapper.js'
 import { getDuckDBService } from '../duckdb/service.js'
 import type { ServerConfig, AttachOptions, ServiceStatus } from './types.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Unified service for managing DuckDB MCP servers and clients
@@ -36,7 +37,7 @@ export class DuckDBMcpNativeService {
     }
 
     this.servers.set(name, server)
-    console.error(`MCP server '${name}' started successfully`)
+    logger.error(`MCP server '${name}' started successfully`)
   }
 
   /**
@@ -50,7 +51,7 @@ export class DuckDBMcpNativeService {
 
     // Server cleanup would go here if needed
     this.servers.delete(name)
-    console.error(`MCP server '${name}' stopped`)
+    logger.error(`MCP server '${name}' stopped`)
   }
 
   /**
@@ -77,7 +78,7 @@ export class DuckDBMcpNativeService {
       const cached = this.resourceCache.get(cacheKey)
       if (cached && cached.expires > Date.now()) {
         resources = cached.data
-        console.error(`Using cached resources for ${url}`)
+        logger.error(`Using cached resources for ${url}`)
       }
     }
 
@@ -96,8 +97,8 @@ export class DuckDBMcpNativeService {
     this.clients.set(alias, client)
     this.mappers.set(alias, mapper)
 
-    console.error(`Attached to MCP server at ${url} as '${alias}'`)
-    console.error(`Found ${resources.length} resources`)
+    logger.error(`Attached to MCP server at ${url} as '${alias}'`)
+    logger.error(`Found ${resources.length} resources`)
 
     return resources
   }
@@ -115,7 +116,7 @@ export class DuckDBMcpNativeService {
     this.clients.delete(alias)
     this.mappers.delete(alias)
 
-    console.error(`Detached from MCP server '${alias}'`)
+    logger.error(`Detached from MCP server '${alias}'`)
   }
 
   /**
@@ -133,7 +134,7 @@ export class DuckDBMcpNativeService {
     const resource = await client.readResource(resourceUri, alias)
     const finalTableName = tableName || resourceUri.split('/').pop() || 'resource_table'
     const table = await mapper.mapResource(resourceUri, finalTableName, resource, undefined, alias)
-    console.error(`Created virtual table: ${table.tableName}`)
+    logger.error(`Created virtual table: ${table.tableName}`)
   }
 
   /**
@@ -176,7 +177,7 @@ export class DuckDBMcpNativeService {
    */
   clearCache(): void {
     this.resourceCache.clear()
-    console.error('Resource cache cleared')
+    logger.error('Resource cache cleared')
   }
 
   /**

@@ -7,6 +7,7 @@
  */
 
 import { DuckDBService } from '../duckdb/service.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Configuration for space contexts
@@ -156,7 +157,7 @@ export class SpaceContext {
   private async loadSpaceData(duckdb: DuckDBService, dataPath: string): Promise<void> {
     // Implementation depends on data source
     // Could be S3, local files, etc.
-    console.debug(`Loading data for space ${this.spaceId} from ${dataPath}`)
+    logger.debug(`Loading data for space ${this.spaceId} from ${dataPath}`)
   }
 
   /**

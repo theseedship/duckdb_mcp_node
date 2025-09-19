@@ -1,4 +1,5 @@
 import type { Resource } from '@modelcontextprotocol/sdk/types.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Represents a federated resource with server information
@@ -53,7 +54,7 @@ export class ResourceRegistry {
       this.uriToResourceMap.set(`${serverAlias}:${resource.uri}`, key)
     }
 
-    console.info(`📦 Registered ${resources.length} resources from server '${serverAlias}'`)
+    logger.info(`📦 Registered ${resources.length} resources from server '${serverAlias}'`)
   }
 
   /**

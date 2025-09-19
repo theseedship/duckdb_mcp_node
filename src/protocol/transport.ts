@@ -1,6 +1,7 @@
 import { Readable, Writable } from 'stream'
 import { MCPMessage } from './types.js'
 import { MessageFormatter } from './messages.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Abstract transport interface for MCP communication
@@ -51,7 +52,7 @@ export class StdioTransport extends Transport {
     })
 
     this.input.on('error', (error) => {
-      console.error('Stdio input error:', error)
+      logger.error('Stdio input error:', error)
       this.connected = false
       this.resolveWaitingIterators(true)
     })
@@ -133,7 +134,7 @@ export class StdioTransport extends Transport {
           this.messageQueue.push(message)
           this.resolveWaitingIterators(false)
         } catch (error) {
-          console.error('Failed to parse message:', error)
+          logger.error('Failed to parse message:', error)
         }
       }
     }

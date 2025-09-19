@@ -1,6 +1,7 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
 import { z } from 'zod'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
+import { logger } from '../utils/logger.js'
 
 // Configuration schema for DuckDB
 const DuckDBConfigSchema = z.object({
@@ -66,7 +67,7 @@ export class DuckDBService {
 
       this.isInitialized = true
     } catch (error) {
-      console.error('Failed to initialize DuckDB:', error)
+      logger.error('Failed to initialize DuckDB:', error)
       throw error
     }
   }

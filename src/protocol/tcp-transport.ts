@@ -2,6 +2,7 @@ import { Socket } from 'net'
 import { Transport } from './transport.js'
 import { MCPMessage } from './types.js'
 import { MessageFormatter } from './messages.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * TCP transport implementation for network MCP communication
@@ -66,7 +67,7 @@ export class TCPTransport extends Transport {
           id: 'init',
         })
           .then(() => {
-            console.info(`✅ Connected to TCP MCP server at ${this.host}:${this.port}`)
+            logger.info(`✅ Connected to TCP MCP server at ${this.host}:${this.port}`)
             resolve()
           })
           .catch(reject)
@@ -80,7 +81,7 @@ export class TCPTransport extends Transport {
 
       // Handle errors
       this.socket.on('error', (error: Error) => {
-        console.error('TCP socket error:', error)
+        logger.error('TCP socket error:', error)
         if (!this.connected) {
           clearTimeout(connectTimeout)
           reject(new Error(`Failed to connect: ${error.message}`))
@@ -95,9 +96,9 @@ export class TCPTransport extends Transport {
         clearTimeout(connectTimeout)
 
         if (hadError) {
-          console.error('TCP connection closed with error')
+          logger.error('TCP connection closed with error')
         } else {
-          console.info('TCP connection closed')
+          logger.info('TCP connection closed')
         }
 
         // Attempt reconnection if it was previously connected
@@ -110,12 +111,12 @@ export class TCPTransport extends Transport {
 
       // Handle connection end
       this.socket.on('end', () => {
-        console.info('TCP connection ended by server')
+        logger.info('TCP connection ended by server')
       })
 
       // Handle timeout
       this.socket.on('timeout', () => {
-        console.warn('TCP socket timeout - connection may be stale')
+        logger.warn('TCP socket timeout - connection may be stale')
         // Send a ping to check if connection is still alive
         this.sendPing().catch(() => {
           this.socket?.destroy()
@@ -156,7 +157,7 @@ export class TCPTransport extends Transport {
     }
 
     this.resolveWaitingIterators(true)
-    console.info(`✅ Disconnected from TCP MCP server`)
+    logger.info(`✅ Disconnected from TCP MCP server`)
   }
 
   async send(message: MCPMessage): Promise<void> {
@@ -223,7 +224,7 @@ export class TCPTransport extends Transport {
           this.messageQueue.push(message)
           this.resolveWaitingIterators(false)
         } catch (error) {
-          console.error('Failed to parse TCP message:', error)
+          logger.error('Failed to parse TCP message:', error)
         }
       }
     }
@@ -239,7 +240,7 @@ export class TCPTransport extends Transport {
 
     this.keepAliveInterval = setInterval(() => {
       this.sendPing().catch((error) => {
-        console.error('Keep-alive ping failed:', error)
+        logger.error('Keep-alive ping failed:', error)
       })
     }, intervalMs)
   }
@@ -276,16 +277,16 @@ export class TCPTransport extends Transport {
   private async attemptReconnect(): Promise<void> {
     this.reconnectAttempts++
 
-    console.info(
+    logger.info(
       `Attempting TCP reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms...`
     )
 
     setTimeout(async () => {
       try {
         await this.connect()
-        console.info('✅ TCP reconnected successfully')
+        logger.info('✅ TCP reconnected successfully')
       } catch (error) {
-        console.error('TCP reconnection failed:', error)
+        logger.error('TCP reconnection failed:', error)
 
         // Exponential backoff with max delay of 30 seconds
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000)
@@ -293,7 +294,7 @@ export class TCPTransport extends Transport {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.attemptReconnect()
         } else {
-          console.error('Max TCP reconnection attempts reached')
+          logger.error('Max TCP reconnection attempts reached')
           this.resolveWaitingIterators(true)
         }
       }

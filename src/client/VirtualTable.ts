@@ -2,6 +2,7 @@ import { DuckDBService } from '../duckdb/service.js'
 import { MCPClient } from './MCPClient.js'
 import { ResourceMapper, MappedResource } from './ResourceMapper.js'
 import { escapeIdentifier } from '../utils/sql-escape.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Configuration for virtual tables
@@ -72,7 +73,7 @@ export class VirtualTableManager {
         let limitedData = data
         if (tableConfig.maxRows && Array.isArray(data) && data.length > tableConfig.maxRows) {
           limitedData = data.slice(0, tableConfig.maxRows)
-          console.info(`⚠️ Limited table '${tableName}' to ${tableConfig.maxRows} rows`)
+          logger.info(`⚠️ Limited table '${tableName}' to ${tableConfig.maxRows} rows`)
         }
 
         metadata = await this.resourceMapper.mapResource(
@@ -106,17 +107,17 @@ export class VirtualTableManager {
         tableConfig.refreshInterval > 0
       ) {
         virtualTable.refreshTimer = setInterval(
-          () => this.refreshVirtualTable(tableName).catch(console.error),
+          () => this.refreshVirtualTable(tableName).catch((error) => logger.error(error)),
           tableConfig.refreshInterval
         )
-        console.info(
+        logger.info(
           `🔄 Auto-refresh enabled for table '${tableName}' (every ${tableConfig.refreshInterval}ms)`
         )
       }
 
       this.virtualTables.set(tableName, virtualTable)
 
-      console.info(
+      logger.info(
         `✅ Created virtual table '${tableName}' from '${resourceUri}'` +
           (tableConfig.lazyLoad ? ' (lazy-loaded)' : ` with ${metadata?.rowCount || 0} rows`)
       )
@@ -137,7 +138,7 @@ export class VirtualTableManager {
     }
 
     if (!virtualTable.config.lazyLoad) {
-      console.info(`ℹ️ Table '${tableName}' is already loaded`)
+      logger.info(`ℹ️ Table '${tableName}' is already loaded`)
       return
     }
 
@@ -169,7 +170,7 @@ export class VirtualTableManager {
     // Update config
     virtualTable.config.lazyLoad = false
 
-    console.info(
+    logger.info(
       `📊 Loaded virtual table '${tableName}' with ${virtualTable.metadata.rowCount || 0} rows`
     )
   }
@@ -184,7 +185,7 @@ export class VirtualTableManager {
     }
 
     if (virtualTable.config.lazyLoad) {
-      console.info(`⚠️ Cannot refresh lazy-loaded table '${tableName}'. Load it first.`)
+      logger.info(`⚠️ Cannot refresh lazy-loaded table '${tableName}'. Load it first.`)
       return
     }
 
@@ -210,11 +211,11 @@ export class VirtualTableManager {
       // Refresh the table
       virtualTable.metadata = await this.resourceMapper.refreshResource(tableName, limitedData)
 
-      console.info(
+      logger.info(
         `🔄 Refreshed virtual table '${tableName}' (${virtualTable.metadata.rowCount} rows)`
       )
     } catch (error) {
-      console.error(`Failed to refresh virtual table '${tableName}':`, error)
+      logger.error(`Failed to refresh virtual table '${tableName}':`, error)
       throw error
     }
   }
@@ -240,7 +241,7 @@ export class VirtualTableManager {
 
     this.virtualTables.delete(tableName)
 
-    console.info(`🗑️ Dropped virtual table '${tableName}'`)
+    logger.info(`🗑️ Dropped virtual table '${tableName}'`)
   }
 
   /**
@@ -268,7 +269,7 @@ export class VirtualTableManager {
     for (const tableName of referencedTables) {
       const vTable = this.virtualTables.get(tableName)
       if (vTable?.config.lazyLoad) {
-        console.info(`📊 Auto-loading lazy table '${tableName}' for query`)
+        logger.info(`📊 Auto-loading lazy table '${tableName}' for query`)
         await this.loadVirtualTable(tableName)
       }
     }
@@ -299,7 +300,7 @@ export class VirtualTableManager {
 
     const rowCount = await this.duckdb.getRowCount(materializedName)
 
-    console.info(
+    logger.info(
       `💾 Materialized virtual table '${virtualTableName}' as '${materializedName}' (${rowCount} rows)`
     )
   }
@@ -331,10 +332,10 @@ export class VirtualTableManager {
         virtualTable.config.refreshInterval > 0
       ) {
         virtualTable.refreshTimer = setInterval(
-          () => this.refreshVirtualTable(tableName).catch(console.error),
+          () => this.refreshVirtualTable(tableName).catch((error) => logger.error(error)),
           virtualTable.config.refreshInterval
         )
-        console.info(`🔄 Updated auto-refresh for table '${tableName}'`)
+        logger.info(`🔄 Updated auto-refresh for table '${tableName}'`)
       }
     }
   }
@@ -349,6 +350,6 @@ export class VirtualTableManager {
       await this.dropVirtualTable(tableName)
     }
 
-    console.info('🧹 Cleaned up all virtual tables')
+    logger.info('🧹 Cleaned up all virtual tables')
   }
 }

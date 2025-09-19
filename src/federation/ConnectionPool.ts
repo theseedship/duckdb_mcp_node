@@ -3,6 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { URL } from 'url'
 import { HTTPTransport, WebSocketTransport, TCPTransport } from '../protocol/index.js'
 import { SDKTransportAdapter } from '../protocol/sdk-transport-adapter.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Represents a pooled connection to an MCP server
@@ -88,7 +89,7 @@ export class MCPConnectionPool {
     const connection = await this.createConnection(url, transport)
     this.connections.set(key, connection)
 
-    console.info(`🔗 Created connection to ${url} using ${connection.transport} transport`)
+    logger.info(`🔗 Created connection to ${url} using ${connection.transport} transport`)
     return connection.client
   }
 
@@ -130,7 +131,7 @@ export class MCPConnectionPool {
         }
       } catch (error) {
         lastError = error as Error
-        console.warn(`Connection attempt ${attempt + 1} failed for ${url}: ${error}`)
+        logger.warn(`Connection attempt ${attempt + 1} failed for ${url}: ${error}`)
 
         // Try fallback transports on auto mode
         if (preferredTransport === 'auto' && attempt < this.config.retryAttempts - 1) {
@@ -285,7 +286,7 @@ export class MCPConnectionPool {
 
     if (lruKey) {
       await this.removeConnection(lruKey)
-      console.info(`♻️ Evicted LRU connection: ${lruKey}`)
+      logger.info(`♻️ Evicted LRU connection: ${lruKey}`)
     }
   }
 
@@ -312,7 +313,7 @@ export class MCPConnectionPool {
         const healthy = await this.checkHealth(conn)
         if (!healthy) {
           conn.healthy = false
-          console.warn(`⚠️ Connection unhealthy: ${key}`)
+          logger.warn(`⚠️ Connection unhealthy: ${key}`)
         }
       }
     }, this.config.healthCheckInterval)
@@ -333,7 +334,7 @@ export class MCPConnectionPool {
 
       for (const key of keysToRemove) {
         await this.removeConnection(key)
-        console.info(`🧹 Cleaned up connection: ${key}`)
+        logger.info(`🧹 Cleaned up connection: ${key}`)
       }
     }, this.config.idleTimeout / 2)
   }
@@ -395,6 +396,6 @@ export class MCPConnectionPool {
     }
 
     await Promise.all(closePromises)
-    console.info('🔒 Connection pool closed')
+    logger.info('🔒 Connection pool closed')
   }
 }

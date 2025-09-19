@@ -2,6 +2,7 @@ import WebSocket from 'ws'
 import { Transport } from './transport.js'
 import { MCPMessage } from './types.js'
 import { MessageFormatter } from './messages.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * WebSocket transport implementation for real-time MCP communication
@@ -60,7 +61,7 @@ export class WebSocketTransport extends Transport {
             id: 'init',
           })
             .then(() => {
-              console.info(`✅ Connected to WebSocket MCP server at ${this.url}`)
+              logger.info(`✅ Connected to WebSocket MCP server at ${this.url}`)
               resolve()
             })
             .catch(reject)
@@ -73,12 +74,12 @@ export class WebSocketTransport extends Transport {
             this.messageQueue.push(message)
             this.resolveWaitingIterators(false)
           } catch (error) {
-            console.error('Failed to parse WebSocket message:', error)
+            logger.error('Failed to parse WebSocket message:', error)
           }
         })
 
         this.ws.on('error', (error: Error) => {
-          console.error('WebSocket error:', error)
+          logger.error('WebSocket error:', error)
           if (!this.connected) {
             reject(new Error(`Failed to connect: ${error.message}`))
           }
@@ -89,7 +90,7 @@ export class WebSocketTransport extends Transport {
           this.connected = false
           this.stopPingInterval()
 
-          console.info(`WebSocket closed: ${code} - ${reason.toString()}`)
+          logger.info(`WebSocket closed: ${code} - ${reason.toString()}`)
 
           // Attempt reconnection if it was previously connected
           if (wasConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -144,7 +145,7 @@ export class WebSocketTransport extends Transport {
     }
 
     this.resolveWaitingIterators(true)
-    console.info(`✅ Disconnected from WebSocket MCP server`)
+    logger.info(`✅ Disconnected from WebSocket MCP server`)
   }
 
   async send(message: MCPMessage): Promise<void> {
@@ -204,7 +205,7 @@ export class WebSocketTransport extends Transport {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.ping((error?: Error) => {
           if (error) {
-            console.error('Ping failed:', error)
+            logger.error('Ping failed:', error)
           }
         })
       }
@@ -227,16 +228,16 @@ export class WebSocketTransport extends Transport {
   private async attemptReconnect(): Promise<void> {
     this.reconnectAttempts++
 
-    console.info(
+    logger.info(
       `Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms...`
     )
 
     setTimeout(async () => {
       try {
         await this.connect()
-        console.info('✅ Reconnected successfully')
+        logger.info('✅ Reconnected successfully')
       } catch (error) {
-        console.error('Reconnection failed:', error)
+        logger.error('Reconnection failed:', error)
 
         // Exponential backoff with max delay of 30 seconds
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000)
@@ -244,7 +245,7 @@ export class WebSocketTransport extends Transport {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.attemptReconnect()
         } else {
-          console.error('Max reconnection attempts reached')
+          logger.error('Max reconnection attempts reached')
           this.resolveWaitingIterators(true)
         }
       }

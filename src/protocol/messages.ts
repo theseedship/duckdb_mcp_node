@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js'
 import {
   MCPRequest,
   MCPResponse,
@@ -184,7 +185,7 @@ export class MessageRouter {
 
     if (!handler) {
       // Notifications don't send error responses
-      console.warn(`No handler for notification: ${notification.method}`)
+      logger.warn(`No handler for notification: ${notification.method}`)
       return
     }
 
@@ -192,7 +193,7 @@ export class MessageRouter {
       await handler(notification.params || {})
     } catch (error) {
       // Log error but don't send response for notifications
-      console.error(`Error handling notification ${notification.method}:`, error)
+      logger.error(`Error handling notification ${notification.method}:`, error)
     }
   }
 }
@@ -231,7 +232,7 @@ export class CorrelationTracker {
     const pending = this.pendingRequests.get(response.id)
 
     if (!pending) {
-      console.warn(`No pending request for response ID: ${response.id}`)
+      logger.warn(`No pending request for response ID: ${response.id}`)
       return
     }
 
