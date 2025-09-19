@@ -941,7 +941,6 @@ class DuckDBMCPServer {
 const isMainModule =
   import.meta.url === `file://${process.argv[1]}` || // Direct execution
   process.argv[1]?.includes('mcp-server') || // Script name match
-  process.env.MCP_MODE === 'stdio' || // Explicit MCP mode
   process.argv.includes('--stdio') // CLI flag
 
 if (isMainModule) {

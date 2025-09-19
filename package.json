@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -25,6 +25,11 @@
       "types": "./dist/federation/index.d.ts",
       "import": "./dist/federation/index.js",
       "require": "./dist/federation/index.js"
+    },
+    "./lib": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/lib.js",
+      "require": "./dist/lib.js"
     }
   },
   "files": [

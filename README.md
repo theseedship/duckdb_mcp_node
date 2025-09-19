@@ -68,9 +68,13 @@ npm test
 - `refresh_virtual_table` - Update table data
 - `query_hybrid` - Query across local/remote data
 
-## Usage
+## 🎯 Three Usage Modes
 
-### As MCP Server
+This package supports three distinct usage modes to fit different integration scenarios:
+
+### Mode 1: Standalone Server
+
+Run DuckDB MCP as an independent server that other applications can connect to.
 
 ```bash
 # Configure in .env
@@ -80,49 +84,81 @@ MCP_SECURITY_MODE=development
 
 # Start server
 npm run dev:server
+# Or with npx
+npx @seed-ship/duckdb-mcp-native
 ```
 
-### As Library
+**Use case:** When you need a dedicated DuckDB service that multiple clients can connect to.
+
+### Mode 2: Library Mode (/lib)
+
+Import tool handlers directly into your existing MCP server without any auto-initialization.
 
 ```typescript
-import { getDuckDBService } from '@seed-ship/duckdb-mcp-native'
+// Import from /lib for clean library mode (v0.3.0+)
+import { nativeToolHandlers, nativeToolDefinitions } from '@seed-ship/duckdb-mcp-native/lib'
 
-const duckdb = await getDuckDBService()
-const result = await duckdb.executeQuery('SELECT * FROM table')
+// Register tools in your MCP server
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: [...yourTools, ...nativeToolDefinitions],
+  }
+})
+
+// Handle tool calls
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params
+
+  if (name in nativeToolHandlers) {
+    const handler = nativeToolHandlers[name]
+    return await handler(args)
+  }
+  // ... handle your other tools
+})
 ```
 
-### Embedding in Another MCP Server
+**Use case:** Adding DuckDB capabilities to an existing MCP server (like deposium_MCPs).
 
-The package provides native tool handlers that can be embedded directly into other MCP servers:
+### Mode 3: Embedded Server
+
+Create a server instance with full control over its lifecycle and configuration.
 
 ```typescript
-import { nativeToolHandlers, nativeToolDefinitions } from '@seed-ship/duckdb-mcp-native/native'
+import { createEmbeddedServer } from '@seed-ship/duckdb-mcp-native/lib'
 
-// In your MCP server initialization
-server.registerTools(nativeToolDefinitions)
+// Create embedded server with custom config
+const duckdbServer = createEmbeddedServer({
+  embeddedMode: true, // Prevents stdio transport initialization
+  duckdbService: yourDuckDBInstance, // Optional: use your own DuckDB instance
+})
 
-// Direct handler usage
-const result = await nativeToolHandlers.query_duckdb({
+// Start when ready
+await duckdbServer.start()
+
+// Get handlers bound to this instance
+const handlers = duckdbServer.getNativeHandlers()
+
+// Use in your application
+const result = await handlers.query_duckdb({
   sql: 'SELECT * FROM users',
   limit: 100,
 })
-
-// Or with custom DuckDB instance
-import { DuckDBMCPServer } from '@seed-ship/duckdb-mcp-native/server'
-
-const duckdbServer = new DuckDBMCPServer({
-  embeddedMode: true,
-  duckdbService: yourDuckDBInstance,
-})
-
-// Get handlers bound to your instance
-const handlers = duckdbServer.getNativeHandlers()
-
-// Register in your MCP server
-yourMCPServer.registerTools(duckdbServer.getNativeToolDefinitions())
 ```
 
-This allows you to add DuckDB capabilities to existing MCP servers without running a separate server process.
+**Use case:** Advanced integration scenarios where you need full control over the server lifecycle.
+
+### Quick Integration Example
+
+For most integrations, library mode is the simplest approach:
+
+```typescript
+// In your existing MCP server (e.g., deposium_MCPs)
+import { nativeToolHandlers, nativeToolDefinitions } from '@seed-ship/duckdb-mcp-native/lib'
+
+// That's it! Tools are now available
+console.log('Available DuckDB tools:', Object.keys(nativeToolHandlers))
+// Output: ['query_duckdb', 'list_tables', 'describe_table', 'load_csv', 'load_parquet', 'export_data']
+```
 
 ### Federation Example
 
