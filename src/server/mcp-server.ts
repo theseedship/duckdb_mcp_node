@@ -86,6 +86,19 @@ class DuckDBMCPServer {
               useSSL: process.env.MINIO_USE_SSL === 'true',
             }
           : undefined,
+        // Enable Virtual Filesystem for mcp:// URI support
+        virtualFilesystem: {
+          enabled: true,
+          config: {
+            cacheConfig: {
+              cacheDir: process.env.MCP_CACHE_DIR || '/tmp/mcp-cache',
+              defaultTTL: parseInt(process.env.MCP_CACHE_TTL || '300000'), // 5 minutes default
+              maxSize: parseInt(process.env.MCP_CACHE_SIZE || '104857600'), // 100MB default
+            },
+            autoConnect: true,
+            autoDiscovery: false, // Will be enabled when MCP servers are attached
+          },
+        },
       })
 
     // Initialize MCP client for virtual tables
@@ -510,7 +523,8 @@ class DuckDBMCPServer {
             const safeSql = isSelectQuery && !hasLimit ? `${cleanSql} LIMIT ${limit}` : cleanSql
 
             const startTime = Date.now()
-            const results = await this.duckdb.executeQuery(safeSql)
+            // Use VFS-aware query execution to support mcp:// URIs
+            const results = await this.duckdb.executeQueryWithVFS(safeSql)
             const executionTime = Date.now() - startTime
 
             return {
