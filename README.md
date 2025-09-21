@@ -140,6 +140,8 @@ npm test
 
 ### MotherDuck Cloud Operations
 
+**⚠️ Note**: MotherDuck integration requires DuckDB v1.3.2. Currently using v1.4.0 which MotherDuck doesn't support yet. These tools will become functional once MotherDuck adds support for DuckDB v1.4.0 stable.
+
 - `motherduck.attach` - Connect to MotherDuck cloud with token
 - `motherduck.detach` - Disconnect from MotherDuck
 - `motherduck.status` - Check connection status and usage
