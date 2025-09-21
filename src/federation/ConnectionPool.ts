@@ -4,6 +4,7 @@ import { URL } from 'url'
 import { HTTPTransport, WebSocketTransport, TCPTransport } from '../protocol/index.js'
 import { SDKTransportAdapter } from '../protocol/sdk-transport-adapter.js'
 import { logger } from '../utils/logger.js'
+import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 
 /**
  * Represents a pooled connection to an MCP server
@@ -72,8 +73,23 @@ export class MCPConnectionPool {
     if (existing && existing.healthy) {
       existing.lastUsed = new Date()
       existing.useCount++
+
+      // Record cache hit
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordConnectionPoolAccess(true, {
+        totalConnections: this.connections.size,
+        activeConnections: this.getActiveConnectionCount(),
+      })
+
       return existing.client
     }
+
+    // Record cache miss
+    const metricsCollector = getMetricsCollector()
+    metricsCollector.recordConnectionPoolAccess(false, {
+      totalConnections: this.connections.size,
+      activeConnections: this.getActiveConnectionCount(),
+    })
 
     // Remove unhealthy connection if exists
     if (existing) {
@@ -344,6 +360,18 @@ export class MCPConnectionPool {
    */
   private getConnectionKey(url: string, transport: string): string {
     return `${transport}://${url}`
+  }
+
+  /**
+   * Get count of active connections (those recently used)
+   */
+  private getActiveConnectionCount(): number {
+    const now = Date.now()
+    const activeThreshold = 60000 // Consider active if used within last minute
+
+    return Array.from(this.connections.values()).filter(
+      (conn) => conn.healthy && now - conn.lastUsed.getTime() < activeThreshold
+    ).length
   }
 
   /**

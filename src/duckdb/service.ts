@@ -1,10 +1,12 @@
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
 import { z } from 'zod'
+import { performance } from 'perf_hooks'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
 import { VirtualFilesystem, VirtualFilesystemConfig } from '../filesystem/index.js'
 import { ResourceRegistry } from '../federation/ResourceRegistry.js'
 import { MCPConnectionPool } from '../federation/ConnectionPool.js'
+import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 
 // Configuration schema for DuckDB
 const DuckDBConfigSchema = z.object({
@@ -199,11 +201,30 @@ export class DuckDBService {
       throw new Error('Database not initialized. Call initialize() first.')
     }
 
+    // Start timing
+    const startTime = performance.now()
+
     try {
       const result = await this.connection.run(sql)
       const rows = await result.getRowObjectsJson()
+
+      // Record metrics
+      const executionTimeMs = performance.now() - startTime
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordQuery(
+        sql,
+        executionTimeMs,
+        rows.length,
+        undefined // Will add space ID support later
+      )
+
       return rows as T[]
     } catch (error: any) {
+      // Record failed query metrics
+      const executionTimeMs = performance.now() - startTime
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordQuery(sql, executionTimeMs, 0, undefined)
+
       throw new Error(`Query failed: ${error.message}`)
     }
   }

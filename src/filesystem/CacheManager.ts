@@ -8,6 +8,7 @@ import * as path from 'path'
 import * as os from 'os'
 import { createHash } from 'crypto'
 import { logger } from '../utils/logger.js'
+import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 
 /**
  * Cached resource metadata
@@ -81,12 +82,18 @@ export class CacheManager {
     const cached = this.cache.get(uri)
 
     if (!cached) {
+      // Record cache miss
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordCacheAccess(false, this.cache.size)
       return null
     }
 
     // Check if expired
     if (new Date() > cached.expiresAt) {
       await this.evictResource(uri)
+      // Record cache miss (expired)
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordCacheAccess(false, this.cache.size)
       return null
     }
 
@@ -96,11 +103,18 @@ export class CacheManager {
     } catch {
       // File doesn't exist, remove from cache
       this.cache.delete(uri)
+      // Record cache miss (file not found)
+      const metricsCollector = getMetricsCollector()
+      metricsCollector.recordCacheAccess(false, this.cache.size)
       return null
     }
 
     // Update hit count
     cached.hits++
+
+    // Record cache hit
+    const metricsCollector = getMetricsCollector()
+    metricsCollector.recordCacheAccess(true, this.cache.size)
 
     logger.debug(`📋 Cache hit for ${uri} (${cached.hits} hits)`)
     return cached.localPath

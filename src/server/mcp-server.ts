@@ -24,6 +24,7 @@ import {
 } from '../tools/motherduck-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
+import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -1472,6 +1473,10 @@ Checks to perform: ${args.checks || 'nulls, duplicates, ranges'}
     try {
       await Promise.race([initPromise, timeoutPromise])
       // DuckDB initialized successfully
+
+      // Start metrics collection
+      const metricsCollector = getMetricsCollector()
+      await metricsCollector.start()
     } catch (error) {
       logger.error('Failed to initialize DuckDB:', error)
       throw error

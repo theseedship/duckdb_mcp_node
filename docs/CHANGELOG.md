@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2025-01-21
+
+### Added
+
+- **File-based Monitoring System**: Complete performance monitoring without external dependencies
+  - MetricsCollector with automatic JSON log rotation (7-day retention)
+  - Query performance tracking with slow query detection (>1000ms)
+  - Memory usage monitoring with alerts at 3GB and 3.5GB thresholds
+  - Connection pool hit/miss rate tracking (alert < 80%)
+  - Cache effectiveness monitoring for mcp:// URIs (alert < 60%)
+  - CLI metrics viewer with visual indicators (✅ ⚠️ 🚨)
+  - Performance percentiles (P50, P95, P99) for query analysis
+- **Monitoring Integration**: Hooked into core components
+  - DuckDBService: Query timing and row count tracking
+  - ConnectionPool: Hit/miss statistics collection
+  - CacheManager: Cache effectiveness metrics
+  - MCP Server: Automatic metrics initialization
+- **Monitoring Tests**: Comprehensive test suite (30 tests, 87% coverage)
+
+### Changed
+
+- Enhanced DuckDBService with performance.now() timing
+- ConnectionPool now reports detailed statistics
+- CacheManager tracks hit/miss rates
+
+### Internal
+
+- Added MetricsCollector singleton with configurable flush intervals
+- Metrics stored in `logs/metrics/` with daily rotation
+- Documentation added to `/doc-internal/MONITORING.md`
+
 ## [0.6.3] - 2025-01-21
 
 ### Added
