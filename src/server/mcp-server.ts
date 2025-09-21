@@ -25,6 +25,7 @@ import {
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
+import { FederationManager } from '../federation/index.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -40,6 +41,7 @@ class DuckDBMCPServer {
   private duckdb: DuckDBService
   private mcpClient: MCPClient
   private virtualTables: VirtualTableManager
+  private federation: FederationManager
   private spaceFactory?: SpaceContextFactory
   private currentSpace?: SpaceContext
   private embeddedMode: boolean = false
@@ -113,6 +115,13 @@ class DuckDBMCPServer {
 
     // Initialize virtual table manager
     this.virtualTables = new VirtualTableManager(this.duckdb, this.mcpClient)
+
+    // Initialize federation manager for distributed queries
+    this.federation = new FederationManager({
+      duckdb: this.duckdb,
+      enableCache: true,
+      cacheTTL: 300000, // 5 minutes
+    })
 
     // Initialize DuckLake handlers
     this.ducklakeHandlers = createDuckLakeToolHandlers(this.duckdb, this.spaceFactory)
@@ -369,6 +378,26 @@ class DuckDBMCPServer {
                   type: 'number',
                   description: 'Optional limit for results (default: 1000)',
                   default: 1000,
+                },
+              },
+              required: ['sql'],
+            },
+          },
+          {
+            name: 'federate_query',
+            description: 'Execute federated queries across multiple MCP servers using mcp:// URIs',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sql: {
+                  type: 'string',
+                  description:
+                    'SQL query with mcp:// URIs, e.g. SELECT * FROM "mcp://github/data.json" JOIN local.users',
+                },
+                explain: {
+                  type: 'boolean',
+                  description: 'Return query plan instead of executing (default: false)',
+                  default: false,
                 },
               },
               required: ['sql'],
@@ -663,8 +692,16 @@ class DuckDBMCPServer {
             const alias = args.alias as string
             const transport = (args.transport as 'stdio' | 'http' | 'websocket') || 'stdio'
 
+            // Attach to MCP client for virtual tables
             await this.mcpClient.attachServer(url, alias, transport)
             const server = this.mcpClient.getAttachedServer(alias)
+
+            // Also register with federation for distributed queries
+            await this.federation.registerServer(alias, url, {
+              transport,
+              resources: server?.resources?.length || 0,
+              tools: server?.tools?.length || 0,
+            })
 
             return {
               content: [
@@ -673,9 +710,10 @@ class DuckDBMCPServer {
                   text: JSON.stringify(
                     {
                       success: true,
-                      message: `Attached MCP server '${alias}'`,
+                      message: `Attached MCP server '${alias}' (registered for federation)`,
                       resources: server?.resources?.length || 0,
                       tools: server?.tools?.length || 0,
+                      federationEnabled: true,
                     },
                     null,
                     2
@@ -892,6 +930,88 @@ class DuckDBMCPServer {
                   ),
                 },
               ],
+            }
+          }
+
+          case 'federate_query': {
+            const sql = args.sql as string
+            const explain = (args.explain as boolean) || false
+
+            try {
+              // Track metrics
+              const startTime = Date.now()
+
+              // If explain mode, return query plan
+              if (explain) {
+                const plan = this.federation.analyzeQuery(sql)
+                const explanation = this.federation.explainQuery(sql)
+
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          success: true,
+                          queryPlan: plan,
+                          explanation: explanation,
+                        },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
+                }
+              }
+
+              // Execute federated query
+              const result = await this.federation.federateQuery(sql)
+              const executionTime = Date.now() - startTime
+
+              // Record metrics
+              const metricsCollector = getMetricsCollector()
+              metricsCollector.recordQuery(
+                sql,
+                executionTime,
+                result.data?.length || 0,
+                'federation'
+              )
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: true,
+                        rowCount: result.data?.length || 0,
+                        executionTimeMs: executionTime,
+                        data: result.data,
+                        metadata: result.metadata,
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              }
+            } catch (error) {
+              logger.error('Federation query failed:', error)
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              }
             }
           }
 
