@@ -461,7 +461,6 @@ npm run port:clean 8080
 
 ## 📚 Additional Resources
 
-- [Architecture Federation Patterns](./Architecture-federation-patterns.md)
 - [Transport Documentation](./TRANSPORT_GUIDE.md)
 - [Troubleshooting Guide](./TROUBLESHOOTING.md)
 - [API Reference](./API.md)
