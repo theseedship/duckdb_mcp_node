@@ -160,36 +160,36 @@ Unlike the C++ MCPFS approach, we use direct mapping:
 
 ### vs C++ Implementation
 
-- Missing MCPFS virtual filesystem
-- No TCP transport
-- No persistent cache
+- ✅ Virtual filesystem implemented (v0.6.0+)
+- ✅ TCP transport implemented
+- ✅ Persistent cache (CacheManager with TTL)
 
 ### vs Python Implementation
 
-- No MotherDuck cloud integration
+- ✅ MotherDuck cloud integration (v0.5.0+)
 - No SaaS security mode
 - No read scaling tokens
-- No HTTP/WebSocket transports
+- ✅ HTTP/WebSocket transports implemented
 
 ## Future Roadmap
 
 ### Phase 1: Transport Layer (Priority)
 
-- [ ] Implement HTTP transport
-- [ ] Implement WebSocket transport
-- [ ] Add TCP transport for C++ compatibility
+- [x] Implement HTTP transport
+- [x] Implement WebSocket transport
+- [x] Add TCP transport for C++ compatibility
 
 ### Phase 2: MotherDuck Features
 
-- [ ] Add MotherDuck cloud connection
+- [x] Add MotherDuck cloud connection
 - [ ] Implement SaaS security mode
 - [ ] Add read scaling tokens
 
 ### Phase 3: Advanced Features
 
-- [ ] Virtual filesystem (MCPFS-like)
-- [ ] Persistent caching
-- [ ] Connection pooling
+- [x] Virtual filesystem (MCPFS-like)
+- [x] Persistent caching
+- [x] Connection pooling
 - [ ] Authentication layer
 
 ## Testing Status

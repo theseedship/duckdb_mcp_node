@@ -185,7 +185,7 @@ TestRunner // ✅ Auto server management (scripts/)
 
 **Priority: MEDIUM** 🟡
 
-- [ ] Fix HTTP transport initialization response format
+- [x] Fix HTTP transport initialization response format
 - [ ] Add retry logic with exponential backoff
 - [ ] Implement circuit breaker for failing connections
 - [ ] Add comprehensive error messages with recovery suggestions
