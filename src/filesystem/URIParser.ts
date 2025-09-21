@@ -228,7 +228,7 @@ export class URIParser {
 
   /**
    * Expand a glob pattern to multiple URIs
-   * @param globURI The glob URI pattern (e.g., mcp://*/ logs /*.json)
+   * @param globURI The glob URI pattern with wildcards
    * @param availableResources List of available resources
    * @returns Array of matching URIs
    */

@@ -501,10 +501,13 @@ class DuckDBMCPServer {
             const sql = args.sql as string
             const limit = (args.limit as number) || 1000
 
+            // Remove trailing semicolon if present
+            const cleanSql = sql.trim().replace(/;\s*$/, '')
+
             // Only add LIMIT to SELECT queries for safety
-            const isSelectQuery = sql.trim().toUpperCase().startsWith('SELECT')
-            const hasLimit = sql.match(/LIMIT\s+\d+/i)
-            const safeSql = isSelectQuery && !hasLimit ? `${sql} LIMIT ${limit}` : sql
+            const isSelectQuery = cleanSql.toUpperCase().startsWith('SELECT')
+            const hasLimit = cleanSql.match(/LIMIT\s+\d+/i)
+            const safeSql = isSelectQuery && !hasLimit ? `${cleanSql} LIMIT ${limit}` : cleanSql
 
             const startTime = Date.now()
             const results = await this.duckdb.executeQuery(safeSql)

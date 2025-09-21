@@ -142,8 +142,9 @@ export class VirtualFilesystem {
       // Detect format
       const format = this.detectFormat(parsed, resource)
 
-      // Cache the resource
-      const localPath = await this.cache.cacheResource(uri, resource, format)
+      // Cache the resource - only cache known formats
+      const cacheFormat = format === 'text' || format === 'binary' ? 'unknown' : format
+      const localPath = await this.cache.cacheResource(uri, resource, cacheFormat)
 
       return {
         uri,
@@ -181,8 +182,8 @@ export class VirtualFilesystem {
       // Get client for server
       const client = await this.connectionPool.getClient(`mcp://${parsed.server}`, 'auto')
 
-      // Read the resource
-      const resourceData = await client.readResource(registered.resource.uri)
+      // Read the resource - pass as object with uri property
+      const resourceData = await client.readResource({ uri: registered.resource.uri })
 
       // Convert to appropriate format
       if (typeof resourceData === 'string') {
@@ -193,10 +194,14 @@ export class VirtualFilesystem {
         return JSON.stringify(resourceData)
       } else if (resourceData && typeof resourceData === 'object') {
         // Handle different response formats
-        if ('content' in resourceData) {
-          return resourceData.content
+        if ('content' in resourceData && typeof resourceData.content === 'string') {
+          return resourceData.content as string
         } else if ('data' in resourceData) {
-          return resourceData.data
+          const data = resourceData.data
+          if (typeof data === 'string' || Buffer.isBuffer(data) || Array.isArray(data)) {
+            return data
+          }
+          return JSON.stringify(data)
         } else {
           return JSON.stringify(resourceData)
         }
@@ -327,7 +332,7 @@ export class VirtualFilesystem {
 
   /**
    * Expand glob patterns to matching resources
-   * @param globPattern The glob pattern (e.g., mcp://*/ logs /*.json)
+   * @param globPattern The glob pattern with wildcards
    * @returns Array of matching URIs
    */
   expandGlob(globPattern: string): string[] {

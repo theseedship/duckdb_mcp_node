@@ -45,7 +45,7 @@ export class DuckDBService {
   private config: DuckDBConfig
   private isInitialized = false
   private virtualFs?: VirtualFilesystem
-  private extendedConfig?: DuckDBServiceConfig
+  private extendedConfig?: Partial<DuckDBServiceConfig>
 
   constructor(config?: Partial<DuckDBServiceConfig>) {
     this.config = DuckDBConfigSchema.parse(config || {})

@@ -483,7 +483,8 @@ npm run inspector       # MCP Inspector UI
 npm test               # Run tests
 npm run lint:fix       # Fix linting
 npm run build          # Compile TypeScript
-npm run port:clean     # Clear stuck ports
+npm run port:clean     # Clear stuck ports (ports 5432, 3000, 8080)
+npm run inspector:clean # Kill Inspector on ports 6274/6277
 ```
 
 ## Requirements
