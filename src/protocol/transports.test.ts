@@ -7,6 +7,7 @@ import { EventEmitter } from 'events'
 import * as net from 'net'
 import * as http from 'http'
 import WebSocket from 'ws'
+import { shouldSkipNetworkTests, getTestTimeout, skipIf } from '../test/test-utils'
 
 // Mock modules
 vi.mock('ws')
@@ -15,7 +16,10 @@ vi.mock('http')
 vi.mock('https')
 
 describe('Protocol Transports', () => {
-  describe('WebSocketTransport', () => {
+  // Skip all network tests in CI environment
+  const describeNetwork = skipIf(shouldSkipNetworkTests(), describe)
+
+  describeNetwork('WebSocketTransport', () => {
     let transport: WebSocketTransport
     let mockWs: any
 
@@ -156,7 +160,7 @@ describe('Protocol Transports', () => {
     })
   })
 
-  describe('TCPTransport', () => {
+  describeNetwork('TCPTransport', () => {
     let transport: TCPTransport
     let mockSocket: any
 
@@ -288,7 +292,7 @@ describe('Protocol Transports', () => {
     })
   })
 
-  describe('HTTPTransport', () => {
+  describeNetwork('HTTPTransport', () => {
     let transport: HTTPTransport
     let mockRequest: any
     let mockResponse: any
