@@ -61,6 +61,7 @@
     "port:kill-all": "node scripts/port-manager.js kill-all --force",
     "port:clean": "node scripts/port-manager.js kill-all --force",
     "inspector:clean": "lsof -i :6277 -t | xargs kill -9 2>/dev/null; lsof -i :6274 -t | xargs kill -9 2>/dev/null || true",
+    "inspector:restart": "npm run inspector:clean && sleep 1 && npm run inspector",
     "test:servers": "node scripts/test-with-servers.js",
     "test:integration": "node scripts/test-with-servers.js 'node tests/test-transport-integration.js'",
     "test:federation": "node tests/test-federation.js",

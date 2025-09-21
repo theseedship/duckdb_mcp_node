@@ -486,14 +486,46 @@ Set via: `MCP_SECURITY_MODE=production`
 
 ## Scripts
 
+### Development Scripts
+
 ```bash
 npm run dev:server      # Start MCP server
 npm run inspector       # MCP Inspector UI
 npm test               # Run tests
 npm run lint:fix       # Fix linting
 npm run build          # Compile TypeScript
-npm run port:clean     # Clear stuck ports (ports 5432, 3000, 8080)
-npm run inspector:clean # Kill Inspector on ports 6274/6277
+```
+
+### Port Management
+
+```bash
+# Inspector specific
+npm run inspector:clean   # Kill Inspector processes on ports 6274/6277
+npm run inspector:restart # Clean ports and restart Inspector
+npm run inspector:reset   # Force kill and restart (alternative method)
+
+# General port management
+npm run port:clean       # Clear stuck ports (5432, 3000, 8080)
+npm run port:status     # Check port usage status
+npm run port:kill-all   # Force kill all managed ports
+```
+
+### Common Issues & Solutions
+
+#### Inspector Port Blocked
+
+If you see `❌ Proxy Server PORT IS IN USE at port 6277 ❌`:
+
+```bash
+# Quick fix - clean and restart
+npm run inspector:restart
+
+# Alternative if the above doesn't work
+npm run inspector:reset
+
+# Manual cleanup if needed
+npm run inspector:clean
+npm run inspector
 ```
 
 ## Requirements
