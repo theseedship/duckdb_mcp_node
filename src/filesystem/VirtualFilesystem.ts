@@ -197,7 +197,21 @@ export class VirtualFilesystem {
       // Read the resource - pass as object with uri property
       const resourceData = await client.readResource({ uri: registered.resource.uri })
 
-      // Convert to appropriate format
+      // Handle MCP SDK response format
+      if (resourceData && typeof resourceData === 'object' && 'contents' in resourceData) {
+        const contents = resourceData.contents as any[]
+        if (contents && contents.length > 0) {
+          const content = contents[0]
+          if (content.text !== undefined) {
+            return content.text
+          } else if (content.blob !== undefined) {
+            // Base64 encoded binary data
+            return Buffer.from(content.blob, 'base64')
+          }
+        }
+      }
+
+      // Fallback for other formats
       if (typeof resourceData === 'string') {
         return resourceData
       } else if (Buffer.isBuffer(resourceData)) {
@@ -205,7 +219,7 @@ export class VirtualFilesystem {
       } else if (Array.isArray(resourceData)) {
         return JSON.stringify(resourceData)
       } else if (resourceData && typeof resourceData === 'object') {
-        // Handle different response formats
+        // Handle other response formats
         if ('content' in resourceData && typeof resourceData.content === 'string') {
           return resourceData.content as string
         } else if ('data' in resourceData) {

@@ -77,8 +77,8 @@ export class URIParser {
       queryParams = this.parseQueryString(queryString)
     }
 
-    // Validate server name
-    if (!server || server.includes('/') || server.includes('\\')) {
+    // Validate server name (allow wildcards for glob patterns)
+    if (!server || (server !== '*' && (server.includes('/') || server.includes('\\')))) {
       throw new Error(`Invalid server name in MCP URI: ${server}`)
     }
 
@@ -101,8 +101,13 @@ export class URIParser {
       }
     }
 
-    // Check if it's a glob pattern
-    const isGlob = path.includes('*') || path.includes('?') || path.includes('[')
+    // Check if it's a glob pattern (in server or path)
+    const isGlob =
+      server === '*' ||
+      server.includes('*') ||
+      path.includes('*') ||
+      path.includes('?') ||
+      path.includes('[')
 
     const parsed: ParsedURI = {
       protocol: 'mcp',

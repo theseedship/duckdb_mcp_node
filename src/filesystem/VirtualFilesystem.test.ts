@@ -322,18 +322,25 @@ describe('VirtualFilesystem', () => {
 
   describe('processQuery', () => {
     it('should process queries with MCP URIs', async () => {
-      // Mock registry with a resource
+      // Mock registry with a resource - URI should match exactly what comes after server/
       registry.register('test-server', [
         {
-          uri: '/data.csv',
+          uri: 'data.csv', // Without leading slash to match URI structure
           name: 'Test Data',
           mimeType: 'text/csv',
         },
       ])
 
-      // Mock connection pool
+      // Mock connection pool with MCP SDK format
       const mockClient = {
-        readResource: vi.fn().mockResolvedValue('name,age\nJohn,30'),
+        readResource: vi.fn().mockResolvedValue({
+          contents: [
+            {
+              text: 'name,age\nJohn,30',
+              mimeType: 'text/csv',
+            },
+          ],
+        }),
       }
       vi.spyOn(pool, 'getClient').mockResolvedValue(mockClient as any)
 
@@ -348,18 +355,25 @@ describe('VirtualFilesystem', () => {
 
   describe('resource resolution', () => {
     it('should resolve URIs to local paths', async () => {
-      // Mock registry
+      // Mock registry - URI without leading slash
       registry.register('test-server', [
         {
-          uri: '/data.json',
+          uri: 'data.json',
           name: 'Test Data',
           mimeType: 'application/json',
         },
       ])
 
-      // Mock client
+      // Mock client - MCP SDK expects readResource to return {contents: [{text: ...}]}
       const mockClient = {
-        readResource: vi.fn().mockResolvedValue('{"key": "value"}'),
+        readResource: vi.fn().mockResolvedValue({
+          contents: [
+            {
+              text: '{"key": "value"}',
+              mimeType: 'application/json',
+            },
+          ],
+        }),
       }
       vi.spyOn(pool, 'getClient').mockResolvedValue(mockClient as any)
 
@@ -372,17 +386,24 @@ describe('VirtualFilesystem', () => {
     })
 
     it('should use cache for repeated requests', async () => {
-      // Mock registry and client
+      // Mock registry and client - URI without leading slash
       registry.register('test-server', [
         {
-          uri: '/data.csv',
+          uri: 'data.csv',
           name: 'Test Data',
           mimeType: 'text/csv',
         },
       ])
 
       const mockClient = {
-        readResource: vi.fn().mockResolvedValue('test,data'),
+        readResource: vi.fn().mockResolvedValue({
+          contents: [
+            {
+              text: 'test,data',
+              mimeType: 'text/csv',
+            },
+          ],
+        }),
       }
       vi.spyOn(pool, 'getClient').mockResolvedValue(mockClient as any)
 
