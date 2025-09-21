@@ -84,12 +84,20 @@ export class VirtualFilesystem {
     // Transform the query
     const result = await QueryPreprocessor.transform(sql, async (uri) => {
       const resolution = await this.resolveURI(uri)
+      // If this is an mcp:// URI and we couldn't resolve it, throw an error
+      if (!resolution && uri.startsWith('mcp://')) {
+        throw new Error(`Resource not found: ${uri}`)
+      }
       return resolution?.localPath || null
     })
 
     // Resolve any URIs that need resolution
     for (const uri of result.urisToResolve) {
-      await this.resolveURI(uri)
+      const resolution = await this.resolveURI(uri)
+      // If this is an mcp:// URI and we couldn't resolve it, throw an error
+      if (!resolution && uri.startsWith('mcp://')) {
+        throw new Error(`Resource not found: ${uri}`)
+      }
     }
 
     // Apply all replacements
@@ -97,6 +105,10 @@ export class VirtualFilesystem {
       // Re-transform with all URIs now resolved
       const finalResult = await QueryPreprocessor.transform(result.originalQuery, async (uri) => {
         const resolution = await this.resolveURI(uri)
+        // If this is an mcp:// URI and we couldn't resolve it, throw an error
+        if (!resolution && uri.startsWith('mcp://')) {
+          throw new Error(`Resource not found: ${uri}`)
+        }
         return resolution?.localPath || null
       })
 
