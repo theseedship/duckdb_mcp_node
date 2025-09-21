@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-09-21
+
+### Added
+
+- **MotherDuck Cloud Integration**: Connect to MotherDuck cloud instances for hybrid local/cloud queries
+  - `motherduck.attach` - Connect to MotherDuck with authentication token
+  - `motherduck.detach` - Disconnect from MotherDuck
+  - `motherduck.status` - Check connection status and usage
+  - `motherduck.list_databases` - List available cloud databases
+  - `motherduck.create_database` - Create new cloud database
+  - `motherduck.query` - Execute queries on MotherDuck
+  - `motherduck.share_table` - Share local tables to cloud
+  - `motherduck.import_table` - Import cloud tables to local
+- **Hybrid Query Support**: Seamlessly query across local DuckDB and MotherDuck cloud
+- **Cloud Storage Monitoring**: Track bytes used and limits in MotherDuck
+
+### Infrastructure
+
+- Created `MotherDuckService` class for cloud connection management
+- Added comprehensive test suite for MotherDuck operations
+- Integrated MotherDuck tools into MCP server
+
 ## [0.4.0] - 2025-09-21
 
 ### Added

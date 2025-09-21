@@ -18,6 +18,10 @@ import { VirtualTableManager } from '../client/VirtualTable.js'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { nativeToolHandlers, nativeToolDefinitions } from '../tools/native-tools.js'
 import { createDuckLakeToolHandlers } from '../tools/ducklake-tools.js'
+import {
+  createMotherDuckHandlers,
+  getMotherDuckToolDefinitions,
+} from '../tools/motherduck-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import dotenv from 'dotenv'
@@ -39,6 +43,7 @@ class DuckDBMCPServer {
   private currentSpace?: SpaceContext
   private embeddedMode: boolean = false
   private ducklakeHandlers: ReturnType<typeof createDuckLakeToolHandlers>
+  private motherduckHandlers: ReturnType<typeof createMotherDuckHandlers>
 
   constructor(config?: {
     embeddedMode?: boolean
@@ -97,6 +102,9 @@ class DuckDBMCPServer {
 
     // Initialize DuckLake handlers
     this.ducklakeHandlers = createDuckLakeToolHandlers(this.duckdb, this.spaceFactory)
+
+    // Initialize MotherDuck handlers
+    this.motherduckHandlers = createMotherDuckHandlers(this.duckdb)
 
     this.setupHandlers()
   }
@@ -468,6 +476,8 @@ class DuckDBMCPServer {
               required: ['catalogName', 'tableName', 'query', 'timestamp'],
             },
           },
+          // MotherDuck tools
+          ...getMotherDuckToolDefinitions(),
         ],
       }
     })
@@ -893,6 +903,103 @@ class DuckDBMCPServer {
 
           case 'ducklake.time_travel': {
             const result = await this.ducklakeHandlers['ducklake.time_travel'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          // MotherDuck tools
+          case 'motherduck.attach': {
+            const result = await this.motherduckHandlers['motherduck.attach'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.detach': {
+            const result = await this.motherduckHandlers['motherduck.detach']()
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.status': {
+            const result = await this.motherduckHandlers['motherduck.status']()
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.list_databases': {
+            const result = await this.motherduckHandlers['motherduck.list_databases']()
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.create_database': {
+            const result = await this.motherduckHandlers['motherduck.create_database'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.query': {
+            const result = await this.motherduckHandlers['motherduck.query'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.share_table': {
+            const result = await this.motherduckHandlers['motherduck.share_table'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'motherduck.import_table': {
+            const result = await this.motherduckHandlers['motherduck.import_table'](args)
             return {
               content: [
                 {

@@ -45,6 +45,7 @@ npm install -g @seed-ship/duckdb-mcp-native
 2. **Configure Claude Desktop:**
 
 Edit your Claude configuration file:
+
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
@@ -109,7 +110,7 @@ npm run inspector
 npm test
 ```
 
-## MCP Tools (17 Available)
+## MCP Tools (25 Available)
 
 ### Database Operations
 
@@ -136,6 +137,17 @@ npm test
 - `ducklake.attach` - Attach or create DuckLake catalog for ACID transactions
 - `ducklake.snapshots` - List, view, clone or rollback table snapshots
 - `ducklake.time_travel` - Execute queries on historical data
+
+### MotherDuck Cloud Operations
+
+- `motherduck.attach` - Connect to MotherDuck cloud with token
+- `motherduck.detach` - Disconnect from MotherDuck
+- `motherduck.status` - Check connection status and usage
+- `motherduck.list_databases` - List available cloud databases
+- `motherduck.create_database` - Create new cloud database
+- `motherduck.query` - Execute queries on MotherDuck cloud
+- `motherduck.share_table` - Share local tables to cloud
+- `motherduck.import_table` - Import cloud tables to local
 
 ## 🎯 Three Usage Modes
 
@@ -298,12 +310,62 @@ await handlers['ducklake.snapshots']({
 ```
 
 **DuckLake Features:**
+
 - **ACID Transactions**: Ensures data consistency across operations
 - **Time Travel**: Query historical data at any point in time
 - **Snapshots**: Version control for your data tables
 - **Multi-tenant Isolation**: Space-aware catalogs for tenant separation
 - **Format Support**: Delta Lake and Apache Iceberg formats
 - **Migration Utilities**: Convert existing Parquet/CSV files to DuckLake
+
+### MotherDuck Cloud Example
+
+MotherDuck enables hybrid execution with cloud storage and compute:
+
+```typescript
+// Connect to MotherDuck cloud
+await handlers['motherduck.attach']({
+  token: process.env.MOTHERDUCK_TOKEN,
+  database: 'production',
+  endpoint: 'app.motherduck.com', // Optional, defaults to main endpoint
+})
+
+// List cloud databases
+const databases = await handlers['motherduck.list_databases']()
+
+// Share local table to cloud
+await handlers['motherduck.share_table']({
+  localTable: 'local_sales',
+  cloudTable: 'cloud_sales', // Optional, uses local name if not specified
+})
+
+// Query cloud data
+const cloudResults = await handlers['motherduck.query']({
+  sql: 'SELECT * FROM cloud_sales WHERE region = "US"',
+  limit: 1000,
+})
+
+// Import cloud table to local
+await handlers['motherduck.import_table']({
+  cloudTable: 'cloud_analytics',
+  localTable: 'local_analytics',
+})
+
+// Check connection status
+const status = await handlers['motherduck.status']()
+console.log(`Connected: ${status.connected}, Storage: ${status.bytesUsed}/${status.bytesLimit}`)
+
+// Disconnect when done
+await handlers['motherduck.detach']()
+```
+
+**MotherDuck Features:**
+
+- **Hybrid Execution**: Seamlessly query local and cloud data
+- **Cloud Storage**: Persistent storage in MotherDuck cloud
+- **Collaborative**: Share tables across team members
+- **Zero-Copy Cloning**: Efficient table copies in cloud
+- **Automatic Scaling**: Cloud compute scales with workload
 
 ## Architecture
 
