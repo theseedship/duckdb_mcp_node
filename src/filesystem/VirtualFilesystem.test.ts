@@ -300,10 +300,27 @@ describe('VirtualFilesystem', () => {
   let vfs: VirtualFilesystem
   let registry: ResourceRegistry
   let pool: MCPConnectionPool
+  let mockClient: any
 
   beforeEach(async () => {
     registry = new ResourceRegistry()
     pool = new MCPConnectionPool()
+
+    // Standard mock client for most tests
+    mockClient = {
+      readResource: vi.fn().mockResolvedValue({
+        contents: [
+          {
+            text: 'name,age\nJohn,30',
+            mimeType: 'text/csv',
+          },
+        ],
+      }),
+      listResources: vi.fn().mockResolvedValue({
+        resources: [],
+      }),
+    }
+    vi.spyOn(pool, 'getClient').mockResolvedValue(mockClient)
 
     vfs = new VirtualFilesystem(registry, pool, {
       cacheConfig: {
@@ -318,6 +335,7 @@ describe('VirtualFilesystem', () => {
 
   afterEach(async () => {
     await vfs.destroy()
+    vi.clearAllMocks()
   })
 
   describe('processQuery', () => {
@@ -417,6 +435,279 @@ describe('VirtualFilesystem', () => {
       expect(resolution2?.localPath).toBe(resolution1?.localPath)
 
       // Client should only be called once
+      expect(mockClient.readResource).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('glob patterns', () => {
+    it('should expand glob patterns in queries', async () => {
+      registry.register('server1', [
+        { uri: 'logs/2024-01.json', name: 'Jan Logs' },
+        { uri: 'logs/2024-02.json', name: 'Feb Logs' },
+        { uri: 'data/users.csv', name: 'Users' },
+      ])
+
+      const sql = "SELECT * FROM 'mcp://server1/logs/*.json'"
+      const processed = await vfs.processQuery(sql)
+
+      expect(processed).toContain('2024-01.json')
+      expect(processed).toContain('2024-02.json')
+      expect(processed).not.toContain('users.csv')
+    })
+
+    it('should handle server wildcards', async () => {
+      registry.register('server1', [{ uri: 'data.json', name: 'Data1' }])
+      registry.register('server2', [{ uri: 'data.json', name: 'Data2' }])
+
+      const sql = "SELECT * FROM 'mcp://*/data.json'"
+      const processed = await vfs.processQuery(sql)
+
+      expect(processed).toContain('UNION')
+    })
+  })
+
+  describe('error handling', () => {
+    it('should handle missing resources', async () => {
+      const result = await vfs.resolveURI('mcp://unknown/missing.json')
+      expect(result).toBeNull()
+    })
+
+    it('should handle fetch errors gracefully', async () => {
+      registry.register('error-server', [{ uri: 'data.json', name: 'Data' }])
+      mockClient.readResource.mockRejectedValue(new Error('Network error'))
+
+      const result = await vfs.resolveURI('mcp://error-server/data.json')
+      expect(result).toBeNull()
+    })
+
+    it('should handle invalid content format', async () => {
+      registry.register('bad-server', [{ uri: 'data.bin', name: 'Binary' }])
+      mockClient.readResource.mockResolvedValue({
+        contents: [{ blob: 'invalidbase64!' }],
+      })
+
+      await expect(vfs.resolveURI('mcp://bad-server/data.bin')).resolves.toBeNull()
+    })
+  })
+
+  describe('batch operations', () => {
+    it('should resolve multiple URIs efficiently', async () => {
+      registry.register('batch-server', [
+        { uri: 'file1.json', name: 'File1' },
+        { uri: 'file2.json', name: 'File2' },
+        { uri: 'file3.json', name: 'File3' },
+      ])
+
+      const uris = [
+        'mcp://batch-server/file1.json',
+        'mcp://batch-server/file2.json',
+        'mcp://batch-server/file3.json',
+      ]
+
+      const results = await vfs.resolveMultiple(uris)
+      expect(results).toHaveLength(3)
+      expect(results.every((r) => r !== null)).toBe(true)
+    })
+
+    it('should handle partial failures in batch', async () => {
+      registry.register('mixed-server', [
+        { uri: 'good.json', name: 'Good' },
+        { uri: 'bad.json', name: 'Bad' },
+      ])
+
+      mockClient.readResource.mockImplementation(({ uri }) => {
+        if (uri === 'bad.json') {
+          return Promise.reject(new Error('Failed'))
+        }
+        return Promise.resolve({
+          contents: [{ text: '{}', mimeType: 'application/json' }],
+        })
+      })
+
+      const results = await vfs.resolveMultiple([
+        'mcp://mixed-server/good.json',
+        'mcp://mixed-server/bad.json',
+      ])
+
+      expect(results[0]).not.toBeNull()
+      expect(results[1]).toBeNull()
+    })
+  })
+
+  describe('statistics and monitoring', () => {
+    it('should track VFS statistics', async () => {
+      registry.register('stats-server', [
+        { uri: 'file1.csv', name: 'File1' },
+        { uri: 'file2.csv', name: 'File2' },
+      ])
+
+      await vfs.resolveURI('mcp://stats-server/file1.csv')
+      await vfs.resolveURI('mcp://stats-server/file2.csv')
+      await vfs.resolveURI('mcp://stats-server/file1.csv') // cached
+
+      const stats = vfs.getStats()
+      expect(stats.totalResolutions).toBe(3)
+      expect(stats.cacheHits).toBe(1)
+      expect(stats.cacheMisses).toBe(2)
+      expect(stats.cacheHitRate).toBeCloseTo(0.33, 2)
+    })
+
+    it('should track errors in statistics', async () => {
+      mockClient.readResource.mockRejectedValue(new Error('Failed'))
+      registry.register('error-server', [{ uri: 'fail.json', name: 'Fail' }])
+
+      await vfs.resolveURI('mcp://error-server/fail.json')
+
+      const stats = vfs.getStats()
+      expect(stats.errors).toBe(1)
+    })
+  })
+
+  describe('advanced query transformations', () => {
+    it('should handle CTEs with MCP URIs', async () => {
+      registry.register('cte-server', [{ uri: 'data.json', name: 'Data' }])
+
+      const sql = `
+        WITH remote_data AS (
+          SELECT * FROM 'mcp://cte-server/data.json'
+        )
+        SELECT * FROM remote_data WHERE value > 10
+      `
+
+      const processed = await vfs.processQuery(sql)
+      expect(processed).toContain('WITH remote_data AS')
+      expect(processed).toContain('read_json_auto')
+      expect(processed).not.toContain('mcp://')
+    })
+
+    it('should handle subqueries with MCP URIs', async () => {
+      registry.register('sub-server', [
+        { uri: 'users.json', name: 'Users' },
+        { uri: 'orders.json', name: 'Orders' },
+      ])
+
+      const sql = `
+        SELECT * FROM 'mcp://sub-server/orders.json'
+        WHERE user_id IN (
+          SELECT id FROM 'mcp://sub-server/users.json'
+          WHERE active = true
+        )
+      `
+
+      const processed = await vfs.processQuery(sql)
+      expect(processed).toContain('read_json_auto')
+      expect(processed.match(/read_json_auto/g)).toHaveLength(2)
+    })
+
+    it('should handle UNION queries with MCP URIs', async () => {
+      registry.register('union-server', [
+        { uri: 'data1.csv', name: 'Data1' },
+        { uri: 'data2.csv', name: 'Data2' },
+      ])
+
+      const sql = `
+        SELECT * FROM 'mcp://union-server/data1.csv'
+        UNION ALL
+        SELECT * FROM 'mcp://union-server/data2.csv'
+      `
+
+      const processed = await vfs.processQuery(sql)
+      expect(processed).toContain('UNION ALL')
+      expect(processed).toContain('read_csv_auto')
+    })
+  })
+
+  describe('auto-discovery', () => {
+    it('should auto-discover resources when enabled', async () => {
+      const vfsWithDiscovery = new VirtualFilesystem(registry, pool, {
+        autoDiscovery: true,
+        discoveryInterval: 100,
+      })
+
+      mockClient.listResources.mockResolvedValue({
+        resources: [
+          { uri: 'auto1.json', name: 'Auto1' },
+          { uri: 'auto2.json', name: 'Auto2' },
+        ],
+      })
+
+      await vfsWithDiscovery.initialize()
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
+      const stats = vfsWithDiscovery.getStats()
+      expect(stats.discoveredResources).toBeGreaterThan(0)
+
+      await vfsWithDiscovery.destroy()
+    })
+  })
+
+  describe('format detection', () => {
+    it('should auto-detect format from content when extension unknown', async () => {
+      registry.register('format-server', [{ uri: 'data.unknown', name: 'Data' }])
+
+      mockClient.readResource.mockResolvedValue({
+        contents: [{ text: '{"key":"value"}', mimeType: 'application/octet-stream' }],
+      })
+
+      const result = await vfs.resolveURI('mcp://format-server/data.unknown')
+      expect(result?.format).toBe('json')
+    })
+
+    it('should handle Excel files', async () => {
+      registry.register('excel-server', [{ uri: 'data.xlsx', name: 'Excel' }])
+
+      mockClient.readResource.mockResolvedValue({
+        contents: [{ blob: Buffer.from('excel-data').toString('base64') }],
+      })
+
+      const result = await vfs.resolveURI('mcp://excel-server/data.xlsx')
+      expect(result?.format).toBe('excel')
+    })
+
+    it('should handle Arrow files', async () => {
+      registry.register('arrow-server', [{ uri: 'data.arrow', name: 'Arrow' }])
+
+      mockClient.readResource.mockResolvedValue({
+        contents: [{ blob: Buffer.from('ARROW1').toString('base64') }],
+      })
+
+      const result = await vfs.resolveURI('mcp://arrow-server/data.arrow')
+      expect(result?.format).toBe('arrow')
+    })
+  })
+
+  describe('concurrent operations', () => {
+    it('should handle concurrent resolutions efficiently', async () => {
+      registry.register('concurrent-server', [
+        { uri: 'file1.json', name: 'File1' },
+        { uri: 'file2.json', name: 'File2' },
+        { uri: 'file3.json', name: 'File3' },
+      ])
+
+      const promises = [
+        vfs.resolveURI('mcp://concurrent-server/file1.json'),
+        vfs.resolveURI('mcp://concurrent-server/file2.json'),
+        vfs.resolveURI('mcp://concurrent-server/file3.json'),
+      ]
+
+      const results = await Promise.all(promises)
+      expect(results.every((r) => r !== null)).toBe(true)
+      expect(mockClient.readResource).toHaveBeenCalledTimes(3)
+    })
+
+    it('should deduplicate concurrent requests for same resource', async () => {
+      registry.register('dedup-server', [{ uri: 'data.json', name: 'Data' }])
+
+      // Launch multiple concurrent requests for same resource
+      const promises = Array(5)
+        .fill(null)
+        .map(() => vfs.resolveURI('mcp://dedup-server/data.json'))
+
+      const results = await Promise.all(promises)
+
+      // All should get same result
+      expect(results.every((r) => r?.localPath === results[0]?.localPath)).toBe(true)
+      // But client should only be called once
       expect(mockClient.readResource).toHaveBeenCalledTimes(1)
     })
   })

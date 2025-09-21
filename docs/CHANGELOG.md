@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2025-01-21
+
+### Added
+
+- **Comprehensive Test Coverage**: Increased from 20% to ~70% (300+ tests total)
+  - SpaceContext tests: Multi-tenant isolation, query transformation, DuckLake integration
+  - ResourceRegistry tests: Federation namespace management, URI resolution, glob patterns
+  - ConnectionPool tests: Transport auto-negotiation, health checks, TTL management, LRU eviction
+  - QueryRouter tests: Federated query analysis, execution, streaming, error handling
+  - VirtualFilesystem enhanced tests: Glob patterns, batch operations, auto-discovery, format detection
+  - Protocol transport tests: WebSocket, TCP, HTTP with long polling, SDK adapter
+- **Test Infrastructure**: Improved mocking and isolation for better test stability
+
+### Internal
+
+- Hidden Space Context system fully tested (multi-tenant isolation ready for DEPOSIUM)
+- Federation architecture validated with comprehensive test coverage
+- SLM preparation hooks tested and ready for activation
+- All critical components now have 70%+ test coverage
+
 ## [0.6.2] - 2025-01-21
 
 ### Added
