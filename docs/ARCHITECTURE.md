@@ -27,22 +27,32 @@ This is the **Node.js/TypeScript implementation** of the DuckDB MCP (Model Conte
 - S3/MinIO integration
 - SQL injection prevention
 
-#### MCP Server (14 Working Tools)
+#### MCP Tools Architecture
+
+**6 Native Tools** (Exported for Embedding - `/tools/native-tools.ts`):
 
 1. `query_duckdb` - Execute SQL queries
 2. `list_tables` - List database tables
 3. `describe_table` - Get table structure
 4. `load_csv` - Import CSV files
 5. `load_parquet` - Import Parquet files
-6. `attach_mcp` - Connect to external MCP servers
-7. `detach_mcp` - Disconnect MCP servers
-8. `list_attached_servers` - Show connected servers
-9. `list_mcp_resources` - List available resources
-10. `create_virtual_table` - Map resources to tables
-11. `drop_virtual_table` - Remove virtual tables
-12. `list_virtual_tables` - Show virtual tables
-13. `refresh_virtual_table` - Update table data
-14. `query_hybrid` - Query across local/virtual tables
+6. `export_data` - Export query results to file
+
+**14 Server Tools** (Full MCP Server - `/server/mcp-server.ts`):
+
+- Includes all 6 native tools above, plus:
+
+7. `attach_mcp` - Connect to external MCP servers
+8. `detach_mcp` - Disconnect MCP servers
+9. `list_attached_servers` - Show connected servers
+10. `list_mcp_resources` - List available resources
+11. `create_virtual_table` - Map resources to tables
+12. `drop_virtual_table` - Remove virtual tables
+13. `list_virtual_tables` - Show virtual tables
+14. `refresh_virtual_table` - Update table data
+15. `query_hybrid` - Query across local/virtual tables
+
+**Note**: The 6 native tools are designed for embedding in other MCP servers (like deposium_MCPs), while the full 14-tool suite is available when running as a standalone MCP server.
 
 #### MCP Client
 

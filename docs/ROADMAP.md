@@ -1,28 +1,84 @@
 # DuckDB MCP Node - Development Roadmap & Status
 
-## 📊 Current Status (September 2025)
+## 📊 Current Status (September 2025) - v0.3.2
+
+### 🚀 Package Information
+
+- **NPM Package**: `@seed-ship/duckdb-mcp-native`
+- **Current Version**: v0.3.2
+- **DuckDB Version**: 1.4.0-r.1
+- **Test Coverage**: 111 passing tests, 13% coverage
 
 ### ✅ Completed Features
 
-#### 1. Transport Layer Consolidation
+#### 1. Tool Architecture
 
-**Status: 2/3 FUNCTIONAL** 🔧
+**Two Tool Sets Available:**
 
-Transport protocols implementation status with MCP SDK:
+```typescript
+// 6 Native Tools (for embedding in other MCP servers)
+import { nativeToolHandlers } from '@seed-ship/duckdb-mcp-native/native'
+;-query_duckdb - // Execute SQL queries
+  list_tables - // List database tables
+  describe_table - // Get table structure
+  load_csv - // Import CSV files
+  load_parquet - // Import Parquet files
+  export_data - // Export query results
+  // 14 Server Tools (full MCP server mode)
+  // Includes all 6 native tools plus:
+  attach_mcp - // Connect to external MCP servers
+  detach_mcp - // Disconnect MCP servers
+  list_attached_servers - // Show connected servers
+  list_mcp_resources - // List available resources
+  create_virtual_table - // Map resources to tables
+  drop_virtual_table - // Remove virtual tables
+  list_virtual_tables - // Show virtual tables
+  refresh_virtual_table - // Update table data
+  query_hybrid // Query across local/virtual tables (missing from list)
+```
+
+#### 2. Library Mode Support (v0.3.0+)
+
+**Three Usage Modes:**
+
+```typescript
+// Mode 1: Standalone MCP Server (14 tools)
+const server = new DuckDBMCPServer()
+await server.start()
+
+// Mode 2: Library Mode for deposium_MCPs (6 tools)
+import { nativeToolHandlers } from '@seed-ship/duckdb-mcp-native/native'
+
+// Mode 3: Embedded Mode with shared DuckDB (6 tools, no duplicate instance)
+import { getToolHandlersWithService } from '@seed-ship/duckdb-mcp-native/lib'
+const handlers = getToolHandlersWithService(existingDuckDB)
+```
+
+#### 3. Hidden Space Context System ✅
+
+**Status: FULLY IMPLEMENTED (but undocumented)**
+
+```typescript
+// Available but marked @internal
+;-SpaceContext - // Multi-tenant query transformation
+  SpaceContextFactory - // Manage multiple spaces
+  SpaceManager - // Space switching and execution
+  switchSpace() // Server method for space isolation
+```
+
+#### 4. Transport Layer
+
+**Status: 3/4 FUNCTIONAL** 🔧
+
+Transport protocols implementation status:
 
 ```typescript
 // Transport implementation status
-- stdio: ⏭️ Not tested (requires MCP server binary)
-- HTTP: ❌ Initialization issues (protocol mismatch)
+- stdio: ✅ WORKING (primary transport for MCP)
+- HTTP: ⚠️ Partial (initialization issues)
 - WebSocket: ✅ FULLY WORKING with SDKTransportAdapter
 - TCP: ✅ FULLY WORKING with SDKTransportAdapter
 ```
-
-**Test Results:**
-
-- WebSocket & TCP transports fully operational
-- HTTP needs initialize response format adjustment
-- Score: 2/3 transports confirmed working
 
 **Key Fix:** Created `SDKTransportAdapter` that bridges our transport implementation with SDK's expected interface:
 
@@ -88,11 +144,23 @@ TestRunner // ✅ Auto server management (scripts/)
 
 ## 🚀 Roadmap - Q1 2025
 
+### ✅ Phase 0: Foundation (COMPLETED)
+
+**All foundational work completed in v0.3.x series:**
+
+- [x] 6 native tools exported for embedding
+- [x] 14 server tools in full MCP server mode
+- [x] Library mode without STDIO pollution
+- [x] Space context system (hidden feature)
+- [x] Fixed S3 initialization bug (v0.3.1)
+- [x] Upgraded to DuckDB 1.4.0-r.1 (v0.3.2)
+- [x] Export paths: `/native`, `/server`, `/lib`, `/federation`
+
 ### Phase 1: Production Readiness (Weeks 1-2)
 
 #### 1.1 Fix Remaining Transport Issues
 
-**Priority: HIGH** 🔴
+**Priority: MEDIUM** 🟡
 
 - [ ] Fix HTTP transport initialization response format
 - [ ] Add retry logic with exponential backoff
@@ -154,31 +222,37 @@ interface CacheStrategy {
 }
 ```
 
-### Phase 3: Integration with deposium_MCPs (Weeks 5-6)
+### Phase 3: Integration with deposium_MCPs ✅ READY
 
-#### 3.1 Gateway Pattern Implementation
+#### 3.1 Integration Pattern (AVAILABLE NOW)
 
 ```
 ┌─────────────────┐
-│ deposium_MCPs   │ ← Main MCP server (53 tools)
+│ deposium_MCPs   │ ← Main MCP server (47+ tools)
 │                 │
 └────────┬────────┘
          │
-    ┌────▼────┐
-    │ duckdb_ │ ← Acts as federation gateway
-    │ mcp_node│
-    └────┬────┘
+    Uses 6 native tools from:
          │
-    ┌────┴────────────┬───────────┐
-    ▼                 ▼           ▼
-[GitHub MCP]    [MotherDuck]  [Memory MCP]
+    ┌────▼────────────────────────┐
+    │ @seed-ship/duckdb-mcp-native│ ← v0.3.2 on npm
+    │        /native path          │
+    └──────────────────────────────┘
 ```
 
-**Integration without wrapper:** ✅ Possible
+**Integration Options Available:**
 
-- Direct drop-in replacement
-- Compatible API surface
-- Automatic resource discovery
+```typescript
+// Option 1: Simple native tools
+import { nativeToolHandlers } from '@seed-ship/duckdb-mcp-native/native'
+
+// Option 2: Prevent duplicate DuckDB (RECOMMENDED)
+import { getToolHandlersWithService } from '@seed-ship/duckdb-mcp-native/lib'
+const handlers = getToolHandlersWithService(existingDuckDB)
+
+// Option 3: Full embedded server (future federation)
+import { createEmbeddedServer } from '@seed-ship/duckdb-mcp-native/lib'
+```
 
 #### 3.2 Configuration
 
