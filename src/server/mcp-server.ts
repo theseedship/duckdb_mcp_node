@@ -7,6 +7,8 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js'
@@ -15,6 +17,7 @@ import { MCPClient } from '../client/MCPClient.js'
 import { VirtualTableManager } from '../client/VirtualTable.js'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { nativeToolHandlers, nativeToolDefinitions } from '../tools/native-tools.js'
+import { createDuckLakeToolHandlers } from '../tools/ducklake-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import dotenv from 'dotenv'
@@ -35,6 +38,7 @@ class DuckDBMCPServer {
   private spaceFactory?: SpaceContextFactory
   private currentSpace?: SpaceContext
   private embeddedMode: boolean = false
+  private ducklakeHandlers: ReturnType<typeof createDuckLakeToolHandlers>
 
   constructor(config?: {
     embeddedMode?: boolean
@@ -54,6 +58,7 @@ class DuckDBMCPServer {
         capabilities: {
           tools: {},
           resources: {},
+          prompts: {},
         },
       }
     )
@@ -67,7 +72,9 @@ class DuckDBMCPServer {
         allowUnsignedExtensions: process.env.ALLOW_UNSIGNED_EXTENSIONS === 'true',
         s3Config: process.env.MINIO_ACCESS_KEY
           ? {
-              endpoint: process.env.MINIO_ENDPOINT,
+              // Endpoint will be automatically selected based on context
+              // Leave undefined to let the service choose between public/private
+              endpoint: undefined,
               accessKey: process.env.MINIO_ACCESS_KEY,
               secretKey: process.env.MINIO_SECRET_KEY,
               region: process.env.MINIO_REGION || 'us-east-1',
@@ -87,6 +94,9 @@ class DuckDBMCPServer {
 
     // Initialize virtual table manager
     this.virtualTables = new VirtualTableManager(this.duckdb, this.mcpClient)
+
+    // Initialize DuckLake handlers
+    this.ducklakeHandlers = createDuckLakeToolHandlers(this.duckdb, this.spaceFactory)
 
     this.setupHandlers()
   }
@@ -340,6 +350,122 @@ class DuckDBMCPServer {
                 },
               },
               required: ['sql'],
+            },
+          },
+          {
+            name: 'ducklake.attach',
+            description:
+              'Attach or create a DuckLake catalog for ACID transactions and time travel',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                spaceId: {
+                  type: 'string',
+                  description: 'Space ID to attach DuckLake to (optional)',
+                },
+                catalogName: {
+                  type: 'string',
+                  description: 'Name for the DuckLake catalog',
+                },
+                catalogLocation: {
+                  type: 'string',
+                  description: 'S3/MinIO path for catalog data',
+                },
+                format: {
+                  type: 'string',
+                  enum: ['DELTA', 'ICEBERG'],
+                  description: 'Table format to use (default: DELTA)',
+                  default: 'DELTA',
+                },
+                enableTimeTravel: {
+                  type: 'boolean',
+                  description: 'Enable time travel queries (default: true)',
+                  default: true,
+                },
+                retentionDays: {
+                  type: 'number',
+                  description: 'Days to retain old versions (default: 30)',
+                  default: 30,
+                },
+                compressionType: {
+                  type: 'string',
+                  enum: ['ZSTD', 'SNAPPY', 'LZ4', 'GZIP', 'NONE'],
+                  description: 'Compression for Parquet files (default: ZSTD)',
+                  default: 'ZSTD',
+                },
+              },
+              required: ['catalogName', 'catalogLocation'],
+            },
+          },
+          {
+            name: 'ducklake.snapshots',
+            description: 'List, view, clone or rollback table snapshots with version control',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                spaceId: {
+                  type: 'string',
+                  description: 'Space ID for multi-tenant isolation (optional)',
+                },
+                catalogName: {
+                  type: 'string',
+                  description: 'DuckLake catalog name',
+                },
+                tableName: {
+                  type: 'string',
+                  description: 'Table to get snapshots for',
+                },
+                action: {
+                  type: 'string',
+                  enum: ['list', 'details', 'clone', 'rollback'],
+                  description: 'Action to perform (default: list)',
+                  default: 'list',
+                },
+                version: {
+                  type: ['number', 'string'],
+                  description: 'Version number or timestamp for details/clone/rollback',
+                },
+                targetTableName: {
+                  type: 'string',
+                  description: 'Target table name for clone operation',
+                },
+              },
+              required: ['catalogName', 'tableName'],
+            },
+          },
+          {
+            name: 'ducklake.time_travel',
+            description: 'Execute queries on historical data at a specific point in time',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                spaceId: {
+                  type: 'string',
+                  description: 'Space ID for multi-tenant isolation (optional)',
+                },
+                catalogName: {
+                  type: 'string',
+                  description: 'DuckLake catalog name',
+                },
+                tableName: {
+                  type: 'string',
+                  description: 'Table to query',
+                },
+                query: {
+                  type: 'string',
+                  description: 'SQL query to execute',
+                },
+                timestamp: {
+                  type: ['number', 'string'],
+                  description: 'Version number or ISO timestamp to query at',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum rows to return (default: 100)',
+                  default: 100,
+                },
+              },
+              required: ['catalogName', 'tableName', 'query', 'timestamp'],
             },
           },
         ],
@@ -741,6 +867,42 @@ class DuckDBMCPServer {
             }
           }
 
+          case 'ducklake.attach': {
+            const result = await this.ducklakeHandlers['ducklake.attach'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'ducklake.snapshots': {
+            const result = await this.ducklakeHandlers['ducklake.snapshots'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'ducklake.time_travel': {
+            const result = await this.ducklakeHandlers['ducklake.time_travel'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`)
         }
@@ -764,19 +926,67 @@ class DuckDBMCPServer {
       }
     })
 
-    // List available resources (tables)
+    // List available resources (tables, DuckLake catalogs, spaces)
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       try {
-        const tables = await this.duckdb.getSchema()
+        const resources = []
 
-        return {
-          resources: tables.map((table) => ({
+        // List regular tables
+        const tables = await this.duckdb.getSchema()
+        resources.push(
+          ...tables.map((table) => ({
             uri: `duckdb://table/${table.table_name}`,
             name: table.table_name,
             description: `DuckDB table: ${table.table_name} (${table.table_type})`,
             mimeType: 'application/json',
-          })),
+          }))
+        )
+
+        // List DuckLake catalogs if any exist
+        try {
+          const catalogsResult = await this.duckdb.executeQuery(`
+            SELECT DISTINCT catalog_name, location
+            FROM information_schema.schemata
+            WHERE schema_name LIKE 'ducklake_%'
+          `)
+
+          if (catalogsResult.length > 0) {
+            resources.push(
+              ...catalogsResult.map((catalog: any) => ({
+                uri: `duckdb://ducklake/${catalog.catalog_name}`,
+                name: `DuckLake: ${catalog.catalog_name}`,
+                description: `DuckLake catalog with ACID transactions and time travel`,
+                mimeType: 'application/json',
+              }))
+            )
+          }
+        } catch {
+          // DuckLake not configured, skip
         }
+
+        // List multi-tenant spaces if any exist
+        try {
+          const spacesResult = await this.duckdb.executeQuery(`
+            SELECT DISTINCT schema_name
+            FROM information_schema.schemata
+            WHERE schema_name LIKE 'space_%'
+          `)
+
+          if (spacesResult.length > 0) {
+            resources.push(
+              ...spacesResult.map((space: any) => ({
+                uri: `duckdb://space/${space.schema_name}`,
+                name: `Space: ${space.schema_name}`,
+                description: `Multi-tenant space for isolated data`,
+                mimeType: 'application/json',
+              }))
+            )
+          }
+        } catch {
+          // Spaces not configured, skip
+        }
+
+        return { resources }
       } catch (error) {
         logger.error('Error listing resources:', error)
         return { resources: [] }
@@ -811,6 +1021,223 @@ class DuckDBMCPServer {
         logger.error('Error reading resource:', error)
         throw new McpError(ErrorCode.InternalError, `Failed to read resource: ${error.message}`)
       }
+    })
+
+    // List available prompts
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      return {
+        prompts: [
+          {
+            name: 'analyze_data',
+            description: 'Analyze data in a table with aggregations and statistics',
+            arguments: [
+              {
+                name: 'table_name',
+                description: 'Name of the table to analyze',
+                required: true,
+              },
+              {
+                name: 'columns',
+                description: 'Specific columns to analyze (optional)',
+                required: false,
+              },
+            ],
+          },
+          {
+            name: 'ducklake_time_travel',
+            description: 'Query historical data from DuckLake tables',
+            arguments: [
+              {
+                name: 'catalog_name',
+                description: 'DuckLake catalog name',
+                required: true,
+              },
+              {
+                name: 'table_name',
+                description: 'Table to query',
+                required: true,
+              },
+              {
+                name: 'timestamp',
+                description: 'Point in time to query (ISO format or version number)',
+                required: true,
+              },
+            ],
+          },
+          {
+            name: 'migrate_to_ducklake',
+            description: 'Migrate data from various formats to DuckLake',
+            arguments: [
+              {
+                name: 'source_path',
+                description: 'Path to source file (CSV, Parquet, etc.)',
+                required: true,
+              },
+              {
+                name: 'catalog_name',
+                description: 'Target DuckLake catalog',
+                required: true,
+              },
+              {
+                name: 'table_name',
+                description: 'Name for the new table',
+                required: true,
+              },
+            ],
+          },
+          {
+            name: 'optimize_query',
+            description: 'Get query optimization suggestions',
+            arguments: [
+              {
+                name: 'query',
+                description: 'SQL query to optimize',
+                required: true,
+              },
+            ],
+          },
+          {
+            name: 'data_quality_check',
+            description: 'Check data quality and integrity',
+            arguments: [
+              {
+                name: 'table_name',
+                description: 'Table to check',
+                required: true,
+              },
+              {
+                name: 'checks',
+                description: 'Types of checks to perform (nulls, duplicates, ranges)',
+                required: false,
+              },
+            ],
+          },
+        ],
+      }
+    })
+
+    // Get specific prompt
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const promptName = request.params.name
+      const args = request.params.arguments || {}
+
+      const prompts: Record<string, any> = {
+        analyze_data: {
+          name: 'analyze_data',
+          description: 'Analyze data in a table with aggregations and statistics',
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Please analyze the table ${args.table_name || '[TABLE_NAME]'} and provide:
+1. Row count and basic statistics
+2. Column data types and null counts
+3. ${args.columns ? `Focus on columns: ${args.columns}` : 'Analyze all columns'}
+4. Any data quality issues found
+
+Use these queries:
+- SELECT COUNT(*) FROM ${args.table_name || '[TABLE_NAME]'}
+- SELECT * FROM ${args.table_name || '[TABLE_NAME]'} LIMIT 10
+- DESCRIBE ${args.table_name || '[TABLE_NAME]'}`,
+              },
+            },
+          ],
+        },
+        ducklake_time_travel: {
+          name: 'ducklake_time_travel',
+          description: 'Query historical data from DuckLake tables',
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Using DuckLake time travel to query ${args.table_name || '[TABLE]'} at ${args.timestamp || '[TIMESTAMP]'}:
+
+1. Use the ducklake.time_travel tool with:
+   - catalog_name: ${args.catalog_name || '[CATALOG]'}
+   - table_name: ${args.table_name || '[TABLE]'}
+   - timestamp: ${args.timestamp || '[TIMESTAMP]'}
+
+2. Compare with current data if needed
+3. Show what changed between versions`,
+              },
+            },
+          ],
+        },
+        migrate_to_ducklake: {
+          name: 'migrate_to_ducklake',
+          description: 'Migrate data from various formats to DuckLake',
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Migrate data to DuckLake:
+
+Source: ${args.source_path || '[SOURCE_PATH]'}
+Target Catalog: ${args.catalog_name || '[CATALOG]'}
+Target Table: ${args.table_name || '[TABLE]'}
+
+Steps:
+1. Check if source file exists and is readable
+2. Attach DuckLake catalog if not already attached
+3. Create table with appropriate schema
+4. Load data with ACID transaction
+5. Verify migration success with row counts`,
+              },
+            },
+          ],
+        },
+        optimize_query: {
+          name: 'optimize_query',
+          description: 'Get query optimization suggestions',
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Optimize this query: ${args.query || '[QUERY]'}
+
+Please provide:
+1. EXPLAIN output for the query
+2. Identified performance bottlenecks
+3. Suggested indexes or materialized views
+4. Rewritten optimized query if applicable
+5. Expected performance improvement`,
+              },
+            },
+          ],
+        },
+        data_quality_check: {
+          name: 'data_quality_check',
+          description: 'Check data quality and integrity',
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Perform data quality checks on ${args.table_name || '[TABLE]'}:
+
+Checks to perform: ${args.checks || 'nulls, duplicates, ranges'}
+
+1. Check for null values in each column
+2. Identify duplicate rows
+3. Validate data ranges and types
+4. Check referential integrity if foreign keys exist
+5. Generate data quality report with recommendations`,
+              },
+            },
+          ],
+        },
+      }
+
+      const prompt = prompts[promptName]
+      if (!prompt) {
+        throw new McpError(ErrorCode.InvalidRequest, `Unknown prompt: ${promptName}`)
+      }
+
+      return prompt
     })
   }
 

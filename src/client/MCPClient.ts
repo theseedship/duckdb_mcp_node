@@ -1,10 +1,5 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import {
-  ListResourcesResultSchema,
-  ListToolsResultSchema,
-} from '@modelcontextprotocol/sdk/types.js'
-import { z } from 'zod'
 import { URL } from 'url'
 import { DuckDBService } from '../duckdb/service.js'
 import { HTTPTransport, WebSocketTransport, TCPTransport } from '../protocol/index.js'
@@ -30,8 +25,8 @@ export interface AttachedServer {
   url: string
   transport: 'stdio' | 'http' | 'websocket' | 'tcp'
   client: Client
-  resources?: z.infer<typeof ListResourcesResultSchema>['resources']
-  tools?: z.infer<typeof ListToolsResultSchema>['tools']
+  resources?: any[]
+  tools?: any[]
   lastRefresh?: Date
 }
 

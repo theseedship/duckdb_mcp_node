@@ -25,7 +25,7 @@ export const DeltaLogEntrySchema = z.object({
   version: z.number(),
   timestamp: z.date(),
   operation: z.enum(['CREATE', 'APPEND', 'UPDATE', 'DELETE', 'MERGE', 'OPTIMIZE']),
-  operationParameters: z.record(z.any()).optional(),
+  operationParameters: z.record(z.string(), z.any()).optional(),
   files: z.array(
     z.object({
       path: z.string(),
@@ -35,14 +35,14 @@ export const DeltaLogEntrySchema = z.object({
       stats: z
         .object({
           numRecords: z.number(),
-          minValues: z.record(z.any()).optional(),
-          maxValues: z.record(z.any()).optional(),
-          nullCounts: z.record(z.number()).optional(),
+          minValues: z.record(z.string(), z.any()).optional(),
+          maxValues: z.record(z.string(), z.any()).optional(),
+          nullCounts: z.record(z.string(), z.number()).optional(),
         })
         .optional(),
     })
   ),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export type DeltaLogEntry = z.infer<typeof DeltaLogEntrySchema>
@@ -58,7 +58,7 @@ export class DuckLakeService {
   private catalogs: Map<string, DuckLakeCatalog> = new Map()
 
   constructor(private duckdb: DuckDBService) {
-    logger.info('DuckLake service initialized')
+    logger.debug('DuckLake service initialized')
   }
 
   /**
@@ -109,7 +109,7 @@ export class DuckLakeService {
     const catalog = new DuckLakeCatalog(name, location, config, this.duckdb)
     this.catalogs.set(name, catalog)
 
-    logger.info(`DuckLake catalog '${name}' created at ${location}`)
+    logger.debug(`DuckLake catalog '${name}' created at ${location}`)
     return catalog
   }
 
@@ -188,7 +188,7 @@ export class DuckLakeCatalog {
       },
     })
 
-    logger.info(`DuckLake table '${tableName}' created in catalog '${this.name}'`)
+    logger.debug(`DuckLake table '${tableName}' created in catalog '${this.name}'`)
   }
 
   /**
@@ -259,7 +259,7 @@ export class DuckLakeCatalog {
     tableName: string,
     changes: ChangeSet,
     operation: DeltaLogEntry['operation'] = 'UPDATE'
-  ): Promise<void> {
+  ): Promise<number> {
     const currentVersion = await this.getTableVersion(tableName)
     const newVersion = currentVersion + 1
 
@@ -296,6 +296,8 @@ export class DuckLakeCatalog {
     `)
 
     logger.debug(`Committed transaction for ${tableName} at version ${newVersion}`)
+
+    return newVersion
   }
 
   /**
@@ -345,7 +347,7 @@ export class DuckLakeCatalog {
       'OPTIMIZE'
     )
 
-    logger.info(`Optimized DuckLake table '${tableName}'`)
+    logger.debug(`Optimized DuckLake table '${tableName}'`)
   }
 
   /**
@@ -366,6 +368,6 @@ export class DuckLakeCatalog {
         )
     `)
 
-    logger.info(`Vacuumed old versions of ${tableName} older than ${cutoffDate.toISOString()}`)
+    logger.debug(`Vacuumed old versions of ${tableName} older than ${cutoffDate.toISOString()}`)
   }
 }

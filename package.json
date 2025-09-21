@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -80,9 +80,9 @@
     "prepare": "husky",
     "prepublishOnly": "npm run build",
     "prepublish:full": "npm run check:all && npm run build",
-    "release": "standard-version",
-    "release:minor": "standard-version --release-as minor",
-    "release:major": "standard-version --release-as major"
+    "release": "echo 'Please use GitHub release-please workflow instead'",
+    "release:minor": "echo 'Please use GitHub release-please workflow instead'",
+    "release:major": "echo 'Please use GitHub release-please workflow instead'"
   },
   "keywords": [
     "duckdb",
@@ -109,13 +109,13 @@
   "homepage": "https://github.com/theseedship/duckdb_mcp_node#readme",
   "dependencies": {
     "@duckdb/node-api": "^1.4.0-r.1",
-    "@modelcontextprotocol/sdk": "^1.17.3",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "@types/ws": "^8.18.1",
     "axios": "^1.12.2",
     "dotenv": "^17.2.1",
     "winston": "^3.17.0",
     "ws": "^8.18.3",
-    "zod": "^3.23.4"
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
@@ -134,7 +134,6 @@
     "jest": "^30.0.5",
     "lint-staged": "^16.1.5",
     "prettier": "^3.6.2",
-    "standard-version": "^9.5.0",
     "ts-jest": "^29.4.1",
     "tsx": "^4.20.4",
     "typescript": "^5.7.0",

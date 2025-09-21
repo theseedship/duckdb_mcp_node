@@ -15,7 +15,7 @@ export const JSONRPCErrorSchema = z.object({
 export const MCPRequestSchema = z.object({
   jsonrpc: JSONRPCVersionSchema,
   method: z.string(),
-  params: z.record(z.any()).optional(),
+  params: z.record(z.string(), z.any()).optional(),
   id: JSONRPCIdSchema,
 })
 
@@ -29,7 +29,7 @@ export const MCPResponseSchema = z.object({
 export const MCPNotificationSchema = z.object({
   jsonrpc: JSONRPCVersionSchema,
   method: z.string(),
-  params: z.record(z.any()).optional(),
+  params: z.record(z.string(), z.any()).optional(),
 })
 
 // MCP Resource Types
@@ -38,7 +38,7 @@ export const MCPResourceSchema = z.object({
   name: z.string(),
   mimeType: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 // MCP Tool Types
@@ -47,7 +47,7 @@ export const MCPToolSchema = z.object({
   description: z.string(),
   inputSchema: z.object({
     type: z.literal('object'),
-    properties: z.record(z.any()),
+    properties: z.record(z.string(), z.any()),
     required: z.array(z.string()).optional(),
   }),
 })

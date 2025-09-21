@@ -5,7 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2025-09-21
+
+### Added
+
+- **MCP Prompts Support**: Implemented 5 pre-defined prompts for optimal tool usage
+  - `analyze_data` - Analyze tables with aggregations and statistics
+  - `ducklake_time_travel` - Query historical data from DuckLake tables
+  - `migrate_to_ducklake` - Migrate data from various formats to DuckLake
+  - `optimize_query` - Get query optimization suggestions
+  - `data_quality_check` - Perform data quality and integrity checks
+- **Enhanced MCP Resources**: Extended resource discovery
+  - DuckLake catalogs exposed as resources (`duckdb://ducklake/[catalog]`)
+  - Multi-tenant spaces exposed as resources (`duckdb://space/[space_name]`)
+  - Automatic discovery of available data sources
+- **DuckLake Integration**: ACID transactions and time travel capabilities for DuckDB
+  - Three new MCP tools: `ducklake.attach`, `ducklake.snapshots`, `ducklake.time_travel`
+  - DuckLakeSpaceAdapter for multi-tenant isolation with DuckLake features
+  - Migration utilities for Parquet and CSV files to DuckLake format
+  - Support for Delta and Iceberg table formats
+  - Time travel queries to access historical data
+  - Snapshot management with clone and rollback capabilities
+  - Space-aware DuckLake catalogs for tenant isolation
+- **Migration Utilities**: Comprehensive migration tools for converting data to DuckLake
+  - `DuckLakeMigration` class with Parquet, CSV, and query-based migrations
+  - Batch migration support for multiple tables
+  - Schema validation and migration preview
+  - Partitioning support for migrated tables
+- **GitHub Release Automation**: Added release-please workflow for automated releases
+
+### Changed
+
+- **Dependencies Upgrade**:
+  - Updated `@modelcontextprotocol/sdk` from 1.17.3 to 1.18.1
+  - Migrated from Zod v3 to v4 (breaking change for library users)
+  - Replaced deprecated `standard-version` with `release-please`
+- **MinIO Configuration**: Smart endpoint selection based on environment
+  - Automatically uses `MINIO_PUBLIC_ENDPOINT` for local development
+  - Automatically uses `MINIO_PRIVATE_ENDPOINT` for production/Railway deployments
+  - No more hardcoded endpoints in configuration
+
+### Fixed
+
+- **JSON-RPC Protocol**: Fixed stdout pollution that was corrupting MCP communication
+  - Removed all `logger.info` calls that wrote to stdout
+  - Changed MinIO endpoint selection logging to use `logger.debug`
+  - Ensured clean JSON-RPC protocol for MCP Inspector compatibility
 
 ## [0.3.2] - 2025-09-19
 

@@ -27,11 +27,74 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Installation
 
+### As NPM Package
+
 ```bash
 # Install from npm
 npm install @seed-ship/duckdb-mcp-native
+```
 
-# Or for development
+### As MCP Server for Claude Desktop
+
+1. **Install the package globally:**
+
+```bash
+npm install -g @seed-ship/duckdb-mcp-native
+```
+
+2. **Configure Claude Desktop:**
+
+Edit your Claude configuration file:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+Add the DuckDB MCP server:
+
+```json
+{
+  "mcpServers": {
+    "duckdb": {
+      "command": "npx",
+      "args": ["@seed-ship/duckdb-mcp-native"],
+      "env": {
+        "DUCKDB_MEMORY": "4GB",
+        "DUCKDB_THREADS": "4",
+        "MCP_SECURITY_MODE": "development"
+      }
+    }
+  }
+}
+```
+
+3. **Optional: Configure S3/MinIO for cloud storage:**
+
+```json
+{
+  "mcpServers": {
+    "duckdb": {
+      "command": "npx",
+      "args": ["@seed-ship/duckdb-mcp-native"],
+      "env": {
+        "DUCKDB_MEMORY": "4GB",
+        "DUCKDB_THREADS": "4",
+        "MCP_SECURITY_MODE": "development",
+        "MINIO_PUBLIC_ENDPOINT": "https://s3.example.com",
+        "MINIO_ACCESS_KEY": "your-access-key",
+        "MINIO_SECRET_KEY": "your-secret-key",
+        "MINIO_REGION": "us-east-1",
+        "MINIO_USE_SSL": "true"
+      }
+    }
+  }
+}
+```
+
+4. **Restart Claude Desktop** to load the MCP server.
+
+### For Development
+
+```bash
 git clone https://github.com/theseedship/duckdb_mcp_node
 cd duckdb_mcp_node
 npm install
@@ -46,7 +109,7 @@ npm run inspector
 npm test
 ```
 
-## MCP Tools (14 Available)
+## MCP Tools (17 Available)
 
 ### Database Operations
 
@@ -67,6 +130,12 @@ npm test
 - `list_virtual_tables` - Show virtual tables
 - `refresh_virtual_table` - Update table data
 - `query_hybrid` - Query across local/remote data
+
+### DuckLake Operations (Advanced)
+
+- `ducklake.attach` - Attach or create DuckLake catalog for ACID transactions
+- `ducklake.snapshots` - List, view, clone or rollback table snapshots
+- `ducklake.time_travel` - Execute queries on historical data
 
 ## 🎯 Three Usage Modes
 
@@ -178,6 +247,63 @@ const results = await service.queryHybrid(
   'SELECT * FROM sales JOIN weather_data ON sales.date = weather_data.date'
 )
 ```
+
+### DuckLake Example (Advanced)
+
+DuckLake provides ACID transactions and time travel capabilities on top of Parquet files:
+
+```typescript
+// Attach a DuckLake catalog
+await handlers['ducklake.attach']({
+  catalogName: 'analytics',
+  catalogLocation: 's3://data-lake/analytics',
+  format: 'DELTA',
+  enableTimeTravel: true,
+  retentionDays: 30,
+  compressionType: 'ZSTD',
+})
+
+// List table snapshots
+const snapshots = await handlers['ducklake.snapshots']({
+  catalogName: 'analytics',
+  tableName: 'sales',
+  action: 'list',
+})
+
+// Time travel query - query data as it was yesterday
+const historicalData = await handlers['ducklake.time_travel']({
+  catalogName: 'analytics',
+  tableName: 'sales',
+  query: 'SELECT SUM(revenue) as total FROM sales',
+  timestamp: '2025-01-20T00:00:00Z',
+  limit: 100,
+})
+
+// Clone a table at specific version
+await handlers['ducklake.snapshots']({
+  catalogName: 'analytics',
+  tableName: 'sales',
+  action: 'clone',
+  version: 42,
+  targetTableName: 'sales_backup_v42',
+})
+
+// Rollback to previous version
+await handlers['ducklake.snapshots']({
+  catalogName: 'analytics',
+  tableName: 'sales',
+  action: 'rollback',
+  version: 41,
+})
+```
+
+**DuckLake Features:**
+- **ACID Transactions**: Ensures data consistency across operations
+- **Time Travel**: Query historical data at any point in time
+- **Snapshots**: Version control for your data tables
+- **Multi-tenant Isolation**: Space-aware catalogs for tenant separation
+- **Format Support**: Delta Lake and Apache Iceberg formats
+- **Migration Utilities**: Convert existing Parquet/CSV files to DuckLake
 
 ## Architecture
 

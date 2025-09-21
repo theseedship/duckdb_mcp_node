@@ -67,7 +67,8 @@ export class DuckDBService {
       if (this.config.s3Config?.accessKey && this.config.s3Config?.secretKey) {
         try {
           await this.configureS3()
-          logger.info('S3 configuration applied successfully')
+          // Disabled to prevent JSON-RPC corruption
+          // logger.debug('S3 configuration applied successfully')
         } catch (error) {
           logger.warn('Failed to configure S3, continuing without S3 support:', error)
           // Continue without S3 - database is still functional
@@ -87,11 +88,33 @@ export class DuckDBService {
       return
     }
 
-    const { endpoint, accessKey, secretKey, region, useSSL } = this.config.s3Config
+    let { endpoint } = this.config.s3Config
+    const { accessKey, secretKey, region, useSSL } = this.config.s3Config
 
     // We only call this method when accessKey and secretKey are present
     if (!accessKey || !secretKey) {
       return
+    }
+
+    // Determine which endpoint to use based on execution context
+    // If we're in a Railway/production environment, use private endpoint
+    // Otherwise, use public endpoint for local testing
+    if (!endpoint) {
+      // Check if we're in Railway (production) environment
+      const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_NAME
+      const isProduction = process.env.NODE_ENV === 'production'
+
+      if (isRailway || isProduction) {
+        // Use private endpoint for internal communication
+        endpoint = process.env.MINIO_PRIVATE_ENDPOINT
+        // Logging disabled to prevent JSON-RPC corruption
+        // logger.debug('Using MinIO private endpoint for internal communication')
+      } else {
+        // Use public endpoint for local development
+        endpoint = process.env.MINIO_PUBLIC_ENDPOINT
+        // Logging disabled to prevent JSON-RPC corruption
+        // logger.debug('Using MinIO public endpoint for local development')
+      }
     }
 
     // Escape all S3 parameters to prevent SQL injection

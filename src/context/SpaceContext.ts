@@ -22,6 +22,16 @@ export interface SpaceConfig {
     model?: string
     contextBuilder?: (space: SpaceContext) => any
   }
+  ducklake?: {
+    enabled: boolean
+    format?: 'DELTA' | 'ICEBERG'
+    enableTimeTravel?: boolean
+    retentionDays?: number
+    compressionType?: 'ZSTD' | 'SNAPPY' | 'LZ4' | 'GZIP' | 'NONE'
+    versioning?: boolean
+    multiTenant?: boolean
+    catalogLocation?: string
+  }
 }
 
 /**
@@ -33,8 +43,9 @@ export class SpaceContext {
   private schema: string
   private tablePrefix: string
   private metadata: Map<string, any>
-  private config: SpaceConfig
+  public config: SpaceConfig
   private tableMapping: Map<string, string> = new Map()
+  private ducklakeCatalog?: string
 
   constructor(spaceId: string, config: SpaceConfig = {}) {
     this.spaceId = spaceId
@@ -42,6 +53,11 @@ export class SpaceContext {
     this.tablePrefix = config.tablePrefix || ''
     this.metadata = new Map(Object.entries(config.metadata || {}))
     this.config = config
+
+    // Set DuckLake catalog name if enabled
+    if (config.ducklake?.enabled) {
+      this.ducklakeCatalog = `ducklake_${this.schema}`
+    }
   }
 
   /**
@@ -145,10 +161,89 @@ export class SpaceContext {
     // Create schema for this space
     await duckdb.executeQuery(`CREATE SCHEMA IF NOT EXISTS ${this.schema}`)
 
+    // Initialize DuckLake catalog if enabled
+    if (this.config.ducklake?.enabled && this.ducklakeCatalog) {
+      await this.initializeDuckLake(duckdb)
+    }
+
     // Load space-specific data if configured
     if (this.config.dataPath) {
       await this.loadSpaceData(duckdb, this.config.dataPath)
     }
+  }
+
+  /**
+   * Initialize DuckLake catalog for this space
+   * @internal
+   */
+  private async initializeDuckLake(duckdb: DuckDBService): Promise<void> {
+    const ducklakeConfig = this.config.ducklake!
+    const catalogName = this.ducklakeCatalog!
+
+    // Create DuckLake catalog schema
+    await duckdb.executeQuery(`CREATE SCHEMA IF NOT EXISTS ${catalogName}`)
+
+    // Create metadata tables for DuckLake
+    await duckdb.executeQuery(`
+      CREATE TABLE IF NOT EXISTS ${catalogName}._catalog_metadata (
+        catalog_name VARCHAR,
+        location VARCHAR,
+        format VARCHAR,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        properties JSON
+      )
+    `)
+
+    // Create delta log table
+    await duckdb.executeQuery(`
+      CREATE TABLE IF NOT EXISTS ${catalogName}._delta_log (
+        table_name VARCHAR,
+        version INTEGER,
+        timestamp TIMESTAMP,
+        operation VARCHAR,
+        operation_parameters JSON,
+        files JSON,
+        metadata JSON,
+        PRIMARY KEY (table_name, version)
+      )
+    `)
+
+    // Insert catalog metadata
+    const catalogLocation = ducklakeConfig.catalogLocation || `s3://ducklake/${this.schema}`
+    const properties = {
+      format: ducklakeConfig.format || 'DELTA',
+      enableTimeTravel: ducklakeConfig.enableTimeTravel ?? true,
+      retentionDays: ducklakeConfig.retentionDays || 30,
+      compressionType: ducklakeConfig.compressionType || 'ZSTD',
+      versioning: ducklakeConfig.versioning ?? true,
+      multiTenant: ducklakeConfig.multiTenant ?? false,
+    }
+
+    await duckdb.executeQuery(`
+      INSERT INTO ${catalogName}._catalog_metadata
+      VALUES ('${catalogName}', '${catalogLocation}', '${properties.format}',
+              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, '${JSON.stringify(properties)}')
+      ON CONFLICT DO NOTHING
+    `)
+
+    logger.debug(`Initialized DuckLake catalog for space ${this.spaceId}`)
+  }
+
+  /**
+   * Check if DuckLake is enabled for this space
+   * @internal
+   */
+  isDuckLakeEnabled(): boolean {
+    return this.config.ducklake?.enabled || false
+  }
+
+  /**
+   * Get the DuckLake catalog name for this space
+   * @internal
+   */
+  getDuckLakeCatalog(): string | undefined {
+    return this.ducklakeCatalog
   }
 
   /**
@@ -227,6 +322,13 @@ export class SpaceContextFactory {
     }
 
     return this.contexts.get(spaceId)!
+  }
+
+  /**
+   * Get a space context if it exists
+   */
+  get(spaceId: string): SpaceContext | undefined {
+    return this.contexts.get(spaceId)
   }
 
   /**
