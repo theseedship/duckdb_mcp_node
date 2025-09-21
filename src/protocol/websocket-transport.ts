@@ -61,7 +61,7 @@ export class WebSocketTransport extends Transport {
             id: 'init',
           })
             .then(() => {
-              logger.info(`✅ Connected to WebSocket MCP server at ${this.url}`)
+              // logger.info(`✅ Connected to WebSocket MCP server at ${this.url}`) // Disabled to avoid STDIO interference
               resolve()
             })
             .catch(reject)
@@ -85,12 +85,12 @@ export class WebSocketTransport extends Transport {
           }
         })
 
-        this.ws.on('close', (code: number, reason: Buffer) => {
+        this.ws.on('close', (_code: number, _reason: Buffer) => {
           const wasConnected = this.connected
           this.connected = false
           this.stopPingInterval()
 
-          logger.info(`WebSocket closed: ${code} - ${reason.toString()}`)
+          // logger.info(`WebSocket closed: ${code} - ${reason.toString()}`) // Disabled to avoid STDIO interference
 
           // Attempt reconnection if it was previously connected
           if (wasConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -145,7 +145,7 @@ export class WebSocketTransport extends Transport {
     }
 
     this.resolveWaitingIterators(true)
-    logger.info(`✅ Disconnected from WebSocket MCP server`)
+    // logger.info(`✅ Disconnected from WebSocket MCP server`) // Disabled to avoid STDIO interference
   }
 
   async send(message: MCPMessage): Promise<void> {
@@ -228,14 +228,14 @@ export class WebSocketTransport extends Transport {
   private async attemptReconnect(): Promise<void> {
     this.reconnectAttempts++
 
-    logger.info(
-      `Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms...`
-    )
+    // logger.info(
+    //   `Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms...`
+    // ) // Disabled to avoid STDIO interference
 
     setTimeout(async () => {
       try {
         await this.connect()
-        logger.info('✅ Reconnected successfully')
+        // logger.info('✅ Reconnected successfully') // Disabled to avoid STDIO interference
       } catch (error) {
         logger.error('Reconnection failed:', error)
 

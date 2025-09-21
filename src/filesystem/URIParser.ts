@@ -3,7 +3,7 @@
  * Parses mcp:// URIs into components for resource resolution
  */
 
-import { logger } from '../utils/logger.js'
+// import { logger } from '../utils/logger.js' // Disabled to avoid STDIO interference
 
 /**
  * Represents a parsed MCP URI
@@ -115,7 +115,7 @@ export class URIParser {
       queryParams,
     }
 
-    logger.debug(`Parsed URI: ${uri} → ${JSON.stringify(parsed)}`)
+    // logger.debug(`Parsed URI: ${uri} → ${JSON.stringify(parsed)}`) // Disabled to avoid STDIO interference
     return parsed
   }
 

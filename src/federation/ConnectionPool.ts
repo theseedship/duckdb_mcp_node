@@ -89,7 +89,7 @@ export class MCPConnectionPool {
     const connection = await this.createConnection(url, transport)
     this.connections.set(key, connection)
 
-    logger.info(`🔗 Created connection to ${url} using ${connection.transport} transport`)
+    // logger.info(`🔗 Created connection to ${url} using ${connection.transport} transport`) // Disabled to avoid STDIO interference
     return connection.client
   }
 

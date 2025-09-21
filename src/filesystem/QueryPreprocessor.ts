@@ -55,7 +55,7 @@ export class QueryPreprocessor {
       }
     }
 
-    logger.debug(`Found ${uris.length} MCP URI(s) in query`)
+    // logger.debug(`Found ${uris.length} MCP URI(s) in query`) // Disabled to avoid STDIO interference
 
     // Process each URI
     const replacements: URIReplacement[] = []

@@ -179,9 +179,9 @@ export class MCPClient {
         lastRefresh: new Date(),
       })
 
-      logger.info(
-        `✅ Attached MCP server '${alias}' with ${resources.resources.length} resources and ${tools.tools.length} tools`
-      )
+      // logger.info(
+      //   `✅ Attached MCP server '${alias}' with ${resources.resources.length} resources and ${tools.tools.length} tools`
+      // ) // Disabled to avoid STDIO interference
     } catch (error) {
       await client.close().catch(() => {})
       throw new Error(`Failed to attach server '${alias}': ${error}`)
@@ -207,7 +207,7 @@ export class MCPClient {
       }
     }
 
-    logger.info(`✅ Detached MCP server '${alias}'`)
+    // logger.info(`✅ Detached MCP server '${alias}'`) // Disabled to avoid STDIO interference
   }
 
   /**
@@ -423,10 +423,10 @@ export class MCPClient {
       throw new Error(`Resource '${resourceUri}' contains unsupported data type`)
     }
 
-    const rowCount = Array.isArray(data) ? data.length : 'unknown'
-    logger.info(
-      `✅ Created virtual table '${tableName}' from resource '${resourceUri}' with ${rowCount} rows`
-    )
+    // const rowCount = Array.isArray(data) ? data.length : 'unknown'
+    // logger.info(
+    //   `✅ Created virtual table '${tableName}' from resource '${resourceUri}' with ${rowCount} rows`
+    // ) // Disabled to avoid STDIO interference
   }
 
   /**
@@ -462,7 +462,7 @@ export class MCPClient {
     // Recreate table
     await this.createVirtualTable(tableName, resourceUri, serverAlias)
 
-    logger.info(`🔄 Refreshed virtual table '${tableName}'`)
+    // logger.info(`🔄 Refreshed virtual table '${tableName}'`) // Disabled to avoid STDIO interference
   }
 
   /**
@@ -501,9 +501,9 @@ export class MCPClient {
       this.resourceCache.clear()
     }
 
-    logger.info(
-      `🧹 Cleared cache ${serverAlias ? `for server '${serverAlias}'` : 'for all servers'}`
-    )
+    // logger.info(
+    //   `🧹 Cleared cache ${serverAlias ? `for server '${serverAlias}'` : 'for all servers'}`
+    // ) // Disabled to avoid STDIO interference
   }
 
   /**

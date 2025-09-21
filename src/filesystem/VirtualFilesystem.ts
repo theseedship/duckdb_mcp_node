@@ -248,7 +248,7 @@ export class VirtualFilesystem {
     }
 
     try {
-      logger.info(`🔗 Connecting to MCP server: ${serverName}`)
+      // logger.info(`🔗 Connecting to MCP server: ${serverName}`) // Disabled to avoid STDIO interference
 
       // Try common connection patterns
       const connectionPatterns = [
@@ -269,7 +269,7 @@ export class VirtualFilesystem {
 
           this.connectedServers.add(serverName)
           connected = true
-          logger.info(`✅ Connected to ${serverName} via ${pattern}`)
+          // logger.info(`✅ Connected to ${serverName} via ${pattern}`) // Disabled to avoid STDIO interference
           break
         } catch {
           // Try next pattern
@@ -307,7 +307,7 @@ export class VirtualFilesystem {
       }
     }
 
-    logger.info(`🔍 Discovered ${discovered.length} MCP server(s)`)
+    // logger.info(`🔍 Discovered ${discovered.length} MCP server(s)`) // Disabled to avoid STDIO interference
     return discovered
   }
 
@@ -409,12 +409,11 @@ export class VirtualFilesystem {
   async createLiveView(
     viewName: string,
     uri: string,
-    refreshInterval: number = 60000
+    _refreshInterval: number = 60000
   ): Promise<void> {
     // This would integrate with DuckDB to create a view
     // that automatically refreshes from the MCP resource
-    logger.info(`📊 Creating live view '${viewName}' for ${uri} (refresh: ${refreshInterval}ms)`)
-
+    // logger.info(`📊 Creating live view '${viewName}' for ${uri} (refresh: ${refreshInterval}ms)`) // Disabled to avoid STDIO interference
     // Implementation would involve:
     // 1. Creating a DuckDB view
     // 2. Setting up a timer to refresh the cache
