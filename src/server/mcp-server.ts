@@ -95,7 +95,7 @@ class DuckDBMCPServer {
               defaultTTL: parseInt(process.env.MCP_CACHE_TTL || '300000'), // 5 minutes default
               maxSize: parseInt(process.env.MCP_CACHE_SIZE || '104857600'), // 100MB default
             },
-            autoConnect: true,
+            autoConnect: false, // Disable auto-connection to prevent error spam for non-existent servers
             autoDiscovery: false, // Will be enabled when MCP servers are attached
           },
         },

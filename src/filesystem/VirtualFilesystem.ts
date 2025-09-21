@@ -166,7 +166,7 @@ export class VirtualFilesystem {
         server: parsed.server,
       }
     } catch (error) {
-      logger.error(`Failed to resolve URI ${uri}:`, error)
+      logger.debug(`Failed to resolve URI ${uri}:`, error)
       return null
     }
   }
@@ -221,7 +221,7 @@ export class VirtualFilesystem {
 
       return null
     } catch (error) {
-      logger.error(`Failed to fetch resource from ${parsed.server}:`, error)
+      logger.debug(`Failed to fetch resource from ${parsed.server}:`, error)
       return null
     }
   }
@@ -293,7 +293,7 @@ export class VirtualFilesystem {
         throw new Error(`Failed to connect to server: ${serverName}`)
       }
     } catch (error) {
-      logger.error(`Failed to connect to server ${serverName}:`, error)
+      logger.debug(`Failed to connect to server ${serverName}:`, error)
       throw error
     }
   }
