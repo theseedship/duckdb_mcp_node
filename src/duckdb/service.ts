@@ -2,6 +2,9 @@ import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
 import { z } from 'zod'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
+import { VirtualFilesystem, VirtualFilesystemConfig } from '../filesystem/index.js'
+import { ResourceRegistry } from '../federation/ResourceRegistry.js'
+import { MCPConnectionPool } from '../federation/ConnectionPool.js'
 
 // Configuration schema for DuckDB
 const DuckDBConfigSchema = z.object({
@@ -22,6 +25,18 @@ const DuckDBConfigSchema = z.object({
 export type DuckDBConfig = z.infer<typeof DuckDBConfigSchema>
 
 /**
+ * Extended configuration with Virtual Filesystem support
+ */
+export interface DuckDBServiceConfig extends DuckDBConfig {
+  virtualFilesystem?: {
+    enabled?: boolean
+    config?: VirtualFilesystemConfig
+    resourceRegistry?: ResourceRegistry
+    connectionPool?: MCPConnectionPool
+  }
+}
+
+/**
  * DuckDB service for executing queries and managing connections
  */
 export class DuckDBService {
@@ -29,9 +44,12 @@ export class DuckDBService {
   private connection: DuckDBConnection | null = null
   private config: DuckDBConfig
   private isInitialized = false
+  private virtualFs?: VirtualFilesystem
+  private extendedConfig?: DuckDBServiceConfig
 
-  constructor(config?: Partial<DuckDBConfig>) {
+  constructor(config?: Partial<DuckDBServiceConfig>) {
     this.config = DuckDBConfigSchema.parse(config || {})
+    this.extendedConfig = config
   }
 
   /**
@@ -74,10 +92,50 @@ export class DuckDBService {
           // Continue without S3 - database is still functional
         }
       }
+
+      // Initialize Virtual Filesystem if enabled
+      if (this.extendedConfig?.virtualFilesystem?.enabled) {
+        await this.initializeVirtualFilesystem()
+      }
     } catch (error) {
       logger.error('Failed to initialize DuckDB:', error)
       throw error
     }
+  }
+
+  /**
+   * Initialize Virtual Filesystem for mcp:// URI support
+   */
+  private async initializeVirtualFilesystem(): Promise<void> {
+    const vfsConfig = this.extendedConfig?.virtualFilesystem
+
+    if (!vfsConfig) return
+
+    // Create or use provided resource registry
+    const resourceRegistry = vfsConfig.resourceRegistry || new ResourceRegistry()
+
+    // Create or use provided connection pool
+    const connectionPool = vfsConfig.connectionPool || new MCPConnectionPool()
+
+    // Create Virtual Filesystem
+    this.virtualFs = new VirtualFilesystem(resourceRegistry, connectionPool, vfsConfig.config)
+
+    await this.virtualFs.initialize()
+
+    logger.info('🗂️ Virtual Filesystem enabled for DuckDB')
+  }
+
+  /**
+   * Execute a SQL query with Virtual Filesystem support
+   */
+  async executeQueryWithVFS<T = any>(sql: string, params?: any[]): Promise<T[]> {
+    // If VFS is enabled, preprocess the query
+    if (this.virtualFs) {
+      sql = await this.virtualFs.processQuery(sql)
+    }
+
+    // Execute the transformed query
+    return this.executeQuery(sql, params)
   }
 
   /**
@@ -339,6 +397,34 @@ export class DuckDBService {
    */
   isReady(): boolean {
     return this.isInitialized && this.connection !== null
+  }
+
+  /**
+   * Get Virtual Filesystem instance
+   */
+  getVirtualFilesystem(): VirtualFilesystem | undefined {
+    return this.virtualFs
+  }
+
+  /**
+   * Check if Virtual Filesystem is enabled
+   */
+  hasVirtualFilesystem(): boolean {
+    return this.virtualFs !== undefined
+  }
+
+  /**
+   * List available MCP resources
+   */
+  listMCPResources(): string[] {
+    return this.virtualFs?.listAvailableResources() || []
+  }
+
+  /**
+   * Search for MCP resources by pattern
+   */
+  searchMCPResources(pattern: string): string[] {
+    return this.virtualFs?.searchResources(pattern) || []
   }
 }
 

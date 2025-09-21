@@ -5,7 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-09-21
+## [0.6.0] - 2025-01-21
+
+### Added
+
+- **Virtual Filesystem (mcp:// Protocol)**: Direct SQL access to MCP resources without manual setup
+  - `URIParser` - Parse and validate mcp:// URIs with glob support
+  - `CacheManager` - Intelligent local caching with TTL and LRU eviction
+  - `FormatDetector` - Auto-detect CSV, JSON, Parquet, Arrow, Excel formats
+  - `QueryPreprocessor` - Transform SQL queries with mcp:// URIs
+  - `VirtualFilesystem` - Main orchestrator for transparent resource access
+- **Zero Configuration Access**: Query MCP resources directly in SQL
+  ```sql
+  SELECT * FROM 'mcp://weather-server/forecast.csv'
+  ```
+- **Glob Pattern Support**: Query multiple resources with wildcards
+  ```sql
+  SELECT * FROM 'mcp://*/logs/*.json'
+  ```
+- **DuckDB Integration**: New `executeQueryWithVFS()` method for transparent query execution
+- **Auto-Discovery**: Automatically connect to MCP servers when referenced
+- **Format Detection**: Automatic detection from extension, content-type, or magic numbers
+- **Comprehensive Tests**: Full test coverage for Virtual Filesystem components
+
+### Infrastructure
+
+- Created `filesystem/` module with all VFS components
+- Extended `DuckDBService` with Virtual Filesystem support
+- Added configuration options for enabling VFS
+
+## [0.5.1] - 2025-01-21
+
+### Documentation
+
+- Added compatibility note for MotherDuck (requires DuckDB v1.3.2, currently using v1.4.0)
+
+## [0.5.0] - 2025-01-21
 
 ### Added
 

@@ -7,22 +7,22 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**⚠️ Alpha - Not (yet) production ready** (15% test coverage)
+**⚠️ Alpha - Not (yet) production ready** (20% test coverage)
 
 ### ✅ Working
 
 - **Core**: Native TypeScript, no C++ dependencies
 - **Transports**: stdio ✅ | WebSocket ✅ | TCP ✅ | HTTP ⚠️
 - **Federation**: ResourceRegistry, ConnectionPool, QueryRouter
-- **Tools**: 14 MCP tools for DuckDB operations
+- **Tools**: 25 MCP tools for DuckDB operations
 - **Virtual Tables**: JSON/CSV/Parquet with auto-refresh
+- **Virtual Filesystem**: Direct SQL access via mcp:// URIs
 - **Security**: SQL injection prevention, configurable modes
 
 ### 🚧 In Progress
 
 - HTTP transport initialization issues
-- MotherDuck cloud integration
-- Virtual filesystem (mcp:// URIs)
+- MotherDuck cloud integration (waiting for DuckDB v1.4.0 support)
 - Test coverage (target: 80%)
 
 ## Installation
@@ -369,6 +369,76 @@ await handlers['motherduck.detach']()
 - **Zero-Copy Cloning**: Efficient table copies in cloud
 - **Automatic Scaling**: Cloud compute scales with workload
 
+## 🚀 Virtual Filesystem (v0.6.0)
+
+Query MCP resources directly in SQL with zero configuration:
+
+### Before (Complex)
+
+```sql
+-- Required 3 steps:
+CALL attach_mcp('stdio://weather-server', 'weather');
+CALL create_virtual_table('weather_data', 'weather://forecast');
+SELECT * FROM weather_data;
+```
+
+### Now (Simple)
+
+```sql
+-- Direct access with mcp:// URIs:
+SELECT * FROM 'mcp://weather-server/forecast.csv';
+```
+
+### Features
+
+- **Zero Setup**: No manual connection or table creation needed
+- **Auto-Detection**: Automatically detects CSV, JSON, Parquet, Arrow, Excel formats
+- **Glob Patterns**: Query multiple resources with wildcards
+- **Caching**: Intelligent local caching for performance
+- **Federation**: Join data across multiple MCP servers
+
+### Examples
+
+```sql
+-- Query specific resource
+SELECT * FROM 'mcp://github-server/issues.json'
+WHERE status = 'open';
+
+-- Join across servers
+SELECT g.title, j.priority
+FROM 'mcp://github/issues.json' g
+JOIN 'mcp://jira/tickets.json' j ON g.id = j.github_id;
+
+-- Glob patterns for multiple files
+SELECT COUNT(*) as error_count
+FROM 'mcp://*/logs/2024-*.csv'
+WHERE level = 'ERROR';
+
+-- Automatic format detection
+SELECT * FROM 'mcp://data/users.parquet';  -- Parquet
+SELECT * FROM 'mcp://api/response.json';    -- JSON
+SELECT * FROM 'mcp://reports/sales.csv';    -- CSV
+```
+
+### Configuration
+
+Enable Virtual Filesystem in your DuckDB service:
+
+```typescript
+const duckdb = new DuckDBService({
+  virtualFilesystem: {
+    enabled: true,
+    config: {
+      cacheDir: '/tmp/mcp-cache',
+      defaultTTL: 300000, // 5 minutes
+    },
+  },
+})
+
+// Use VFS-aware query execution
+const results = await duckdb.executeQueryWithVFS("SELECT * FROM 'mcp://server/data.csv'")
+```
+
 ## Architecture
 
 ```
@@ -380,6 +450,12 @@ src/
 │   ├── ResourceRegistry.ts
 │   ├── ConnectionPool.ts
 │   └── QueryRouter.ts
+├── filesystem/      # Virtual Filesystem (v0.6.0)
+│   ├── VirtualFilesystem.ts
+│   ├── URIParser.ts
+│   ├── CacheManager.ts
+│   ├── FormatDetector.ts
+│   └── QueryPreprocessor.ts
 └── protocol/        # Transport implementations
 ```
 
