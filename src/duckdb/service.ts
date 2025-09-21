@@ -122,7 +122,7 @@ export class DuckDBService {
 
     await this.virtualFs.initialize()
 
-    logger.info('🗂️ Virtual Filesystem enabled for DuckDB')
+    // logger.debug('Virtual Filesystem enabled for DuckDB') // Disabled to avoid STDIO interference
   }
 
   /**

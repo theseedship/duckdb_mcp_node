@@ -291,7 +291,7 @@ export class MCPClient {
       if (cached) {
         const age = (Date.now() - cached.timestamp) / 1000
         if (age < this.config.cacheTTL) {
-          logger.info(`📦 Using cached resource: ${cacheKey}`)
+          logger.debug(`Using cached resource: ${cacheKey}`)
           return cached.data
         }
       }

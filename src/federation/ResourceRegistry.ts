@@ -54,7 +54,7 @@ export class ResourceRegistry {
       this.uriToResourceMap.set(`${serverAlias}:${resource.uri}`, key)
     }
 
-    logger.info(`📦 Registered ${resources.length} resources from server '${serverAlias}'`)
+    logger.debug(`Registered ${resources.length} resources from server '${serverAlias}'`)
   }
 
   /**

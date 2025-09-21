@@ -69,7 +69,7 @@ export class CacheManager {
     // Start periodic cleanup
     this.startCleanupTimer()
 
-    logger.info(`📦 Cache initialized at ${this.cacheDir}`)
+    // logger.debug(`Cache initialized at ${this.cacheDir}`) // Disabled to avoid STDIO interference
   }
 
   /**
@@ -479,6 +479,6 @@ export class CacheManager {
     }
 
     await this.saveCacheMetadata()
-    logger.info('📦 Cache manager destroyed')
+    // logger.debug('Cache manager destroyed') // Disabled to avoid STDIO interference
   }
 }

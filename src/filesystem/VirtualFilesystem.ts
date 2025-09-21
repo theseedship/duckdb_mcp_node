@@ -72,7 +72,7 @@ export class VirtualFilesystem {
       await this.discoverServers()
     }
 
-    logger.info('🗂️ Virtual Filesystem initialized')
+    // logger.debug('Virtual Filesystem initialized') // Disabled to avoid STDIO interference
   }
 
   /**
@@ -427,6 +427,6 @@ export class VirtualFilesystem {
   async destroy(): Promise<void> {
     await this.cache.destroy()
     await this.connectionPool.close()
-    logger.info('🗂️ Virtual Filesystem destroyed')
+    // logger.debug('Virtual Filesystem destroyed') // Disabled to avoid STDIO interference
   }
 }
