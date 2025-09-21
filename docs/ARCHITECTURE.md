@@ -62,7 +62,7 @@ This is the **Node.js/TypeScript implementation** of the DuckDB MCP (Model Conte
 - 5-minute TTL resource caching
 - Tool invocation on remote servers
 
-### ✅ Recently Completed (Sept 17, 2025)
+### ✅ Recently Completed (v0.6.1 - January 2025)
 
 #### Transport Layer
 
@@ -71,12 +71,14 @@ This is the **Node.js/TypeScript implementation** of the DuckDB MCP (Model Conte
 - ✅ WebSocket transport (implemented)
 - ✅ TCP transport (implemented)
 
-#### Virtual Filesystem
+#### Virtual Filesystem (NEW in v0.6.0+)
 
-- ❌ MCPFS (C++ has it, we use direct mapping)
-- ⚠️ Parquet virtual tables (bug fixed in Sept 2025)
+- ✅ Virtual Filesystem with mcp:// URI support (v0.6.0)
+- ✅ Glob pattern support for server wildcards (v0.6.1)
+- ✅ Parquet virtual tables (working)
 - ✅ JSON virtual tables (working)
 - ✅ CSV virtual tables (working)
+- ✅ Direct SQL queries on MCP resources via `mcp://` URIs
 
 ### 📊 Feature Comparison
 
@@ -106,6 +108,18 @@ src/
 │   ├── MCPClient.ts     # External server connections
 │   ├── ResourceMapper.ts # Resource → Table mapping
 │   └── VirtualTable.ts  # Virtual table management
+│
+├── filesystem/          # Virtual Filesystem (NEW v0.6.0+)
+│   ├── VirtualFilesystem.ts # Main orchestrator for mcp:// URIs
+│   ├── URIParser.ts     # Parse and validate mcp:// URIs
+│   ├── CacheManager.ts  # Resource caching with TTL
+│   ├── FormatDetector.ts # Auto-detect data formats
+│   └── QueryPreprocessor.ts # Transform SQL with mcp:// URIs
+│
+├── federation/          # Federation Architecture
+│   ├── ResourceRegistry.ts # Namespace management
+│   ├── ConnectionPool.ts # Connection reuse & pooling
+│   └── QueryRouter.ts   # Federated query planning
 │
 ├── service/             # Unified Service Layer
 │   └── DuckDBMcpNativeService.ts # Combined server/client API

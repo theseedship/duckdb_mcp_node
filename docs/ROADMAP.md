@@ -1,13 +1,13 @@
 # DuckDB MCP Node - Development Roadmap & Status
 
-## 📊 Current Status (September 2025) - v0.3.2
+## 📊 Current Status (January 2025) - v0.6.1
 
 ### 🚀 Package Information
 
 - **NPM Package**: `@seed-ship/duckdb-mcp-native`
-- **Current Version**: v0.3.2
+- **Current Version**: v0.6.1
 - **DuckDB Version**: 1.4.0-r.1
-- **Test Coverage**: 111 passing tests, 13% coverage
+- **Test Coverage**: 171 passing tests, 20% coverage
 
 ### ✅ Completed Features
 
@@ -85,6 +85,29 @@ Transport protocols implementation status:
 - Converts `connect()/disconnect()` → `start()/close()`
 - Transforms async iterators → callback-based messaging
 - Handles proper method signatures
+
+#### 5. Virtual Filesystem (NEW in v0.6.0+)
+
+**Status: FULLY IMPLEMENTED** ✅
+
+Virtual Filesystem enables direct SQL queries on MCP resources:
+
+```sql
+-- Query MCP resources directly with mcp:// URIs
+SELECT * FROM 'mcp://weather-server/forecast.csv'
+JOIN 'mcp://database-server/users.json' USING (user_id)
+WHERE temperature > (
+  SELECT avg(temp) FROM 'mcp://*/sensors/*.parquet'
+)
+```
+
+**Components implemented (src/filesystem/):**
+
+- `VirtualFilesystem.ts` - Main orchestrator for mcp:// URI resolution
+- `URIParser.ts` - Parse and validate mcp:// URIs with glob support (v0.6.1)
+- `CacheManager.ts` - TTL-based resource caching
+- `FormatDetector.ts` - Auto-detect CSV, JSON, Parquet, Arrow formats
+- `QueryPreprocessor.ts` - Transform SQL queries with mcp:// URIs
 
 #### 2. Federation Architecture Components
 
