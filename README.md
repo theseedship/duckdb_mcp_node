@@ -61,7 +61,10 @@ Add the DuckDB MCP server:
       "env": {
         "DUCKDB_MEMORY": "4GB",
         "DUCKDB_THREADS": "4",
-        "MCP_SECURITY_MODE": "development"
+        "MCP_SECURITY_MODE": "development",
+        "MCP_CACHE_DIR": "/tmp/mcp-cache",
+        "MCP_CACHE_TTL": "300000",
+        "MCP_CACHE_SIZE": "104857600"
       }
     }
   }
@@ -372,6 +375,12 @@ await handlers['motherduck.detach']()
 ## 🚀 Virtual Filesystem (v0.6.0)
 
 Query MCP resources directly in SQL with zero configuration:
+
+### Environment Variables
+
+- `MCP_CACHE_DIR`: Directory for caching MCP resources (default: `/tmp/mcp-cache`)
+- `MCP_CACHE_TTL`: Cache time-to-live in milliseconds (default: `300000` - 5 minutes)
+- `MCP_CACHE_SIZE`: Maximum cache size in bytes (default: `104857600` - 100MB)
 
 ### Before (Complex)
 
