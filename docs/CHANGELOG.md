@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2025-01-21
+
+### Added
+
+- **Federation Documentation**: Comprehensive federation patterns guide
+- **Roadmap Update**: Strategic roadmap distinguishing DuckDB MCP vs DEPOSIUM features
+- **Hidden Features Discovery**: Documented internally that most advanced features are already implemented
+
+### Changed
+
+- **Documentation Structure**: Updated ARCHITECTURE.md and ROADMAP.md with implementation status
+- **Feature Checkboxes**: Marked completed features (transports, MotherDuck, Virtual Filesystem, etc.)
+
+### Internal
+
+- Space Context System remains hidden but fully functional
+- Federation components (ResourceRegistry, ConnectionPool, QueryRouter) ready for activation
+- SLM integration hooks prepared for Q2 2025
+
 ## [0.6.1] - 2025-01-21
 
 ### Fixed
