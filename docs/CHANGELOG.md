@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] - 2025-01-21
+
+### Added
+
+- **Federation Activation**: Distributed query execution across multiple MCP servers
+  - `FederationManager` class to orchestrate all federation components
+  - `federate_query` MCP tool with full `mcp://` protocol support
+  - Automatic server registration when using `attach_mcp`
+  - Support for cross-source JOINs and aggregations
+  - Query planning and execution with QueryRouter
+  - Resource discovery across all connected servers
+  - Connection pooling with automatic reconnection
+- **Federation Examples**: Comprehensive examples demonstrating:
+  - Single-source federated queries
+  - Multi-source JOINs between local and remote data
+  - Cross-source aggregations with UNION queries
+  - Performance optimization patterns
+- **Federation Integration**: Seamless integration with existing features
+  - Works with Virtual Filesystem for transparent access
+  - Compatible with DuckLake time travel
+  - Supports MotherDuck cloud queries
+
+### Changed
+
+- **Project Status**: Upgraded from Alpha (15% coverage) to Beta
+- Enhanced `attach_mcp` tool to automatically register servers with federation
+- MCP server now initializes FederationManager on startup
+
+### Internal
+
+- Created `src/federation/index.ts` as central federation module
+- Added helper functions for quick federation setup
+- Federation components now fully integrated and activated
+
 ## [0.6.4] - 2025-01-21
 
 ### Added

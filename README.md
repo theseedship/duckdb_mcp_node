@@ -7,23 +7,24 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**⚠️ Alpha - Not (yet) production ready** (20% test coverage)
+**🎯 Beta - Ready for testing** (v0.6.5)
 
 ### ✅ Working
 
 - **Core**: Native TypeScript, no C++ dependencies
 - **Transports**: stdio ✅ | WebSocket ✅ | TCP ✅ | HTTP ⚠️
-- **Federation**: ResourceRegistry, ConnectionPool, QueryRouter
-- **Tools**: 25 MCP tools for DuckDB operations
+- **Federation**: Distributed queries across multiple MCP servers ✨
+- **Tools**: 26 MCP tools including new `federate_query`
 - **Virtual Tables**: JSON/CSV/Parquet with auto-refresh
 - **Virtual Filesystem**: Direct SQL access via mcp:// URIs
+- **Monitoring**: Built-in performance metrics and slow query detection
 - **Security**: SQL injection prevention, configurable modes
 
 ### 🚧 In Progress
 
 - HTTP transport initialization issues
 - MotherDuck cloud integration (waiting for DuckDB v1.4.0 support)
-- Test coverage (target: 80%)
+- Test coverage improvement (current: ~70%, target: 80%)
 
 ## Installation
 
@@ -246,23 +247,50 @@ console.log('Available DuckDB tools:', Object.keys(nativeToolHandlers))
 // Output: ['query_duckdb', 'list_tables', 'describe_table', 'load_csv', 'load_parquet', 'export_data']
 ```
 
-### Federation Example
+### Federation Example (v0.6.5) ✨
+
+Federation enables distributed queries across multiple MCP servers using the `mcp://` protocol:
+
+```sql
+-- Query GitHub issues directly
+SELECT * FROM 'mcp://github/issues.json' WHERE status = 'open'
+
+-- Join local users with remote GitHub data
+SELECT u.name, COUNT(g.id) as issue_count
+FROM local_users u
+JOIN 'mcp://github/issues.json' g ON u.github_username = g.assignee
+GROUP BY u.name
+
+-- Aggregate across multiple sources
+WITH all_issues AS (
+  SELECT 'github' as source, * FROM 'mcp://github/issues.json'
+  UNION ALL
+  SELECT 'jira' as source, * FROM 'mcp://jira/tickets.json'
+)
+SELECT source, COUNT(*) as total_issues FROM all_issues GROUP BY source
+```
+
+#### Using Federation Tool
 
 ```typescript
-import { getDuckDBMcpNativeService } from '@seed-ship/duckdb-mcp-native'
+// Use the new federate_query tool
+const result = await handlers['federate_query']({
+  sql: `
+    SELECT
+      g.title as issue,
+      s.message as last_commit
+    FROM 'mcp://github/issues.json' g
+    JOIN 'mcp://slack/messages.json' s ON g.id = s.issue_id
+  `,
+  explain: false, // Set to true to see query plan
+})
 
-const service = getDuckDBMcpNativeService()
-
-// Attach external MCP server
-await service.attachMCP('stdio://weather-server', 'weather')
-
-// Create virtual table
-await service.createVirtualTable('weather', 'weather://current', 'weather_data')
-
-// Query across local and remote
-const results = await service.queryHybrid(
-  'SELECT * FROM sales JOIN weather_data ON sales.date = weather_data.date'
-)
+// Automatic server registration with attach_mcp
+await handlers['attach_mcp']({
+  connectionString: 'stdio://github-mcp-server',
+  alias: 'github',
+})
+// Server is now automatically registered with federation!
 ```
 
 ### DuckLake Example (Advanced)
