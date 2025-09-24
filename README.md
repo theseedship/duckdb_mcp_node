@@ -7,7 +7,7 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**🎯 Beta - Ready for testing** (v0.6.5)
+**🎯 Beta - Ready for testing** (v0.6.7)
 
 ### ✅ Working
 
