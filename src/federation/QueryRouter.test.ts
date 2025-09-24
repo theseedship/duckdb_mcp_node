@@ -58,11 +58,17 @@ describe('QueryRouter', () => {
       }),
     }
 
-    // Mock ResourceRegistry
+    // Mock ResourceRegistry - only return resources for actual servers, not SQL aliases
     mockResourceRegistry = {
-      getServerResources: vi
-        .fn()
-        .mockReturnValue([{ uri: 'data.json', fullUri: 'mcp://server1/data.json' }]),
+      getServerResources: vi.fn().mockImplementation((serverName: string) => {
+        // Only return resources for known servers, not SQL aliases like 'a' or 'b'
+        if (
+          ['github', 'server1', 'server2', 'remote', 'data', 'csv', 'storage'].includes(serverName)
+        ) {
+          return [{ uri: 'data.json', fullUri: `mcp://${serverName}/data.json` }]
+        }
+        return []
+      }),
       resolve: vi.fn().mockReturnValue({
         server: 'server1',
         resource: { uri: 'data.json' },
@@ -256,7 +262,7 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql)
 
       expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
-        expect.stringMatching(/DROP TABLE IF EXISTS temp_remote_\d+/)
+        expect.stringMatching(/DROP TABLE IF EXISTS "temp_remote_\d+"/)
       )
     })
 
