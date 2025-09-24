@@ -1432,10 +1432,10 @@ class DuckDBMCPServer {
 3. ${args.columns ? `Focus on columns: ${args.columns}` : 'Analyze all columns'}
 4. Any data quality issues found
 
-Use these queries:
-- SELECT COUNT(*) FROM ${args.table_name || '[TABLE_NAME]'}
-- SELECT * FROM ${args.table_name || '[TABLE_NAME]'} LIMIT 10
-- DESCRIBE ${args.table_name || '[TABLE_NAME]'}`,
+Use these queries (with proper escaping):
+- SELECT COUNT(*) FROM "table_name"
+- SELECT * FROM "table_name" LIMIT 10
+- DESCRIBE "table_name"`,
               },
             },
           ],
