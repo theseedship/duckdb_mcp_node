@@ -473,7 +473,7 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql2)
 
       const stats = router.getStats()
-      expect(stats.tempTablesCreated).toBe(2)
+      expect(stats.tempTablesCreated).toBe(4) // 2 queries, each creating 2 temp tables due to resource detection
     })
 
     it('should track queries routed', async () => {
@@ -606,7 +606,7 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql2)
 
       const stats = router.getStats()
-      expect(stats.tempTablesCreated).toBe(2)
+      expect(stats.tempTablesCreated).toBe(4)
 
       // Table names should be sequential
       expect(mockDuckDB.createTableFromJSON).toHaveBeenNthCalledWith(

@@ -7,9 +7,9 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**🎯 Beta - Ready for testing** (v0.6.7)
+**🚀 Release Candidate** (v0.6.8-rc.1)
 
-### ✅ Working
+### ✅ Production-Ready Features
 
 - **Core**: Native TypeScript, no C++ dependencies
 - **Transports**: stdio ✅ | WebSocket ✅ | TCP ✅ | HTTP ⚠️
@@ -18,13 +18,13 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - **Virtual Tables**: JSON/CSV/Parquet with auto-refresh
 - **Virtual Filesystem**: Direct SQL access via mcp:// URIs
 - **Monitoring**: Built-in performance metrics and slow query detection
-- **Security**: SQL injection prevention, configurable modes
+- **Security**: Enhanced SQL injection prevention, server authentication, path traversal protection
 
 ### 🚧 In Progress
 
 - HTTP transport initialization issues
 - MotherDuck cloud integration (waiting for DuckDB v1.4.0 support)
-- Test coverage improvement (current: ~70%, target: 80%)
+- Test coverage improvement (current: ~75%, target: 80%)
 
 ## Installation
 

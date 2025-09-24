@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8-rc.1] - 2025-01-24
+
+### 🛡️ Security
+
+- **SQL Injection Prevention**: Added comprehensive SQL escaping
+  - All dynamic SQL now uses `escapeIdentifier()` and `escapeFilePath()`
+  - Protected temp table creation in QueryRouter
+  - Secured all file path operations
+- **Server Authentication**: New authentication system for MCP server attachments
+  - Added `server-auth.config.ts` with allowlist/blocklist functionality
+  - Environment variable configuration for allowed servers
+  - Protection against malicious server connections
+- **Path Traversal Prevention**: Enhanced security for file operations
+  - Using `crypto.randomBytes()` for unpredictable temp file names
+  - Path validation to prevent directory traversal attacks
+  - Secure file extension validation in CacheManager
+- **Configuration Security**: Removed hardcoded endpoints
+  - VirtualFilesystem now uses environment configuration
+  - Configurable connection patterns via `MCP_CONNECTION_PATTERNS`
+  - Secure defaults (stdio only unless explicitly enabled)
+
+### Added
+
+- **Greptile Integration**: Automated code analysis
+  - GitHub Action for automatic security scanning on PRs
+  - PR template with Greptile instructions
+  - Comprehensive security analysis workflow
+
+### Fixed
+
+- Fixed misleading SQL examples in tool descriptions
+- Updated tests to match new secure SQL escaping format
+- Corrected ResourceRegistry mock to prevent false positives in tests
+
+### Changed
+
+- **Release Candidate**: Moving to RC phase for production testing
+- Enhanced test coverage for security features
+- Improved error messages for authentication failures
+
 ## [0.6.7] - 2025-01-21
 
 ### Testing
