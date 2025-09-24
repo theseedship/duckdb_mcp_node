@@ -1,0 +1,124 @@
+# Greptile Configuration
+# This file configures how Greptile analyzes the codebase
+
+# Analysis Settings
+analysis:
+  # Analyze entire codebase, not just changes
+  scope: full
+
+  # Enable comprehensive review
+  comprehensive: true
+
+  # Check all files matching these patterns
+  include:
+    - 'src/**/*.ts'
+    - 'src/**/*.tsx'
+    - 'examples/**/*.ts'
+    - 'test/**/*.test.ts'
+
+  # Exclude these paths from analysis
+  exclude:
+    - 'dist/**'
+    - 'node_modules/**'
+    - 'coverage/**'
+    - '*.min.js'
+
+# Review Categories
+review:
+  # Enable all review types
+  security: true
+  performance: true
+  best_practices: true
+  code_quality: true
+  documentation: true
+  testing: true
+  architecture: true
+
+# Specific Checks
+checks:
+  # Security
+  - sql_injection
+  - xss_vulnerabilities
+  - auth_issues
+  - secret_exposure
+
+  # Performance
+  - memory_leaks
+  - query_optimization
+  - async_patterns
+  - connection_pooling
+
+  # Code Quality
+  - complexity
+  - duplication
+  - type_safety
+  - error_handling
+
+  # Architecture
+  - coupling
+  - cohesion
+  - separation_of_concerns
+  - solid_principles
+
+# Custom Rules for DuckDB MCP
+custom_rules:
+  - name: 'MCP Protocol Compliance'
+    description: 'Check compliance with Model Context Protocol spec'
+    pattern: '*.ts'
+
+  - name: 'Federation Security'
+    description: 'Verify federation queries are properly sanitized'
+    pattern: 'src/federation/**/*.ts'
+
+  - name: 'Virtual Filesystem Safety'
+    description: "Check VFS doesn't expose sensitive paths"
+    pattern: 'src/filesystem/**/*.ts'
+
+# Report Settings
+report:
+  # Generate detailed report
+  detail_level: high
+
+  # Include code suggestions
+  suggestions: true
+
+  # Show examples for issues
+  examples: true
+
+  # Priority levels to report
+  priorities:
+    - critical
+    - high
+    - medium
+    - low
+
+# Integration Settings
+integration:
+  # Comment on PRs
+  pr_comments: true
+
+  # Add review summary
+  summary: true
+
+  # Create issues for critical problems
+  create_issues: false
+
+  # Auto-approve if no critical issues
+  auto_approve: false
+
+# Trigger Settings
+triggers:
+  # Analyze on PR creation
+  on_pr: true
+
+  # Analyze on push to main
+  on_push: true
+
+  # Periodic full scan
+  scheduled: '0 2 * * *' # Daily at 2 AM
+
+  # Manual trigger via comment
+  comment_triggers:
+    - '@greptile review'
+    - '@greptile full-scan'
+    - '/greptile analyze'

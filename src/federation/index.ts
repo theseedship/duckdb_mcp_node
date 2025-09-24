@@ -3,6 +3,10 @@
  *
  * Provides federated query execution across multiple MCP servers
  * using the mcp:// protocol for transparent data access.
+ *
+ * @greptile-review SECURITY: Review federation query isolation
+ * @greptile-review PERFORMANCE: Check connection pooling efficiency
+ * @greptile-review ARCHITECTURE: Validate separation of concerns
  */
 
 import { DuckDBService } from '../duckdb/service.js'
