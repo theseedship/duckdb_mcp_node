@@ -26,6 +26,7 @@ import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 import { FederationManager } from '../federation/index.js'
+import { isServerAllowed, loadAuthConfig } from './server-auth.config.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -692,6 +693,53 @@ class DuckDBMCPServer {
             const alias = args.alias as string
             const transport = (args.transport as 'stdio' | 'http' | 'websocket') || 'stdio'
 
+            // Load authentication configuration
+            const authConfig = loadAuthConfig()
+
+            // Check if the server is allowed
+            const authCheck = isServerAllowed(url, authConfig)
+            if (!authCheck.allowed) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        error: 'Server attachment blocked',
+                        reason: authCheck.reason,
+                        hint: 'To allow this server, add it to MCP_ALLOWED_SERVERS environment variable or modify server-auth.config.ts',
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              }
+            }
+
+            // Check max attached servers limit
+            const attachedServers = this.mcpClient.listAttachedServers()
+            if (attachedServers.length >= (authConfig.maxAttachedServers || 10)) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        error: 'Maximum attached servers limit reached',
+                        limit: authConfig.maxAttachedServers,
+                        current: attachedServers.length,
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              }
+            }
+
             // Attach to MCP client for virtual tables
             await this.mcpClient.attachServer(url, alias, transport)
             const server = this.mcpClient.getAttachedServer(alias)
@@ -703,6 +751,8 @@ class DuckDBMCPServer {
               tools: server?.tools?.length || 0,
             })
 
+            logger.info(`✅ Attached MCP server '${alias}' at ${url} (authenticated)`)
+
             return {
               content: [
                 {
@@ -710,10 +760,11 @@ class DuckDBMCPServer {
                   text: JSON.stringify(
                     {
                       success: true,
-                      message: `Attached MCP server '${alias}' (registered for federation)`,
+                      message: `Attached MCP server '${alias}' (authenticated and registered for federation)`,
                       resources: server?.resources?.length || 0,
                       tools: server?.tools?.length || 0,
                       federationEnabled: true,
+                      authenticated: true,
                     },
                     null,
                     2

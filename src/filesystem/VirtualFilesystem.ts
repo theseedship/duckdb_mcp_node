@@ -28,6 +28,7 @@ export interface VirtualFilesystemConfig {
   }
   autoConnect?: boolean
   autoDiscovery?: boolean
+  connectionPatterns?: string[]
 }
 
 /**
@@ -265,6 +266,36 @@ export class VirtualFilesystem {
   }
 
   /**
+   * Get connection patterns from configuration or environment
+   */
+  private getConnectionPatterns(serverName: string): string[] {
+    // Use configured patterns if available
+    if (this.config.connectionPatterns && this.config.connectionPatterns.length > 0) {
+      return this.config.connectionPatterns.map((pattern) =>
+        pattern.replace('{serverName}', serverName)
+      )
+    }
+
+    // Use patterns from environment variables if available
+    if (process.env.MCP_CONNECTION_PATTERNS) {
+      const patterns = process.env.MCP_CONNECTION_PATTERNS.split(',').map((p) => p.trim())
+      return patterns.map((pattern) => pattern.replace('{serverName}', serverName))
+    }
+
+    // Default patterns (only stdio for security)
+    return [
+      `stdio://${serverName}`,
+      // Only add network patterns if explicitly enabled
+      ...(process.env.MCP_ALLOW_NETWORK === 'true'
+        ? [
+            `ws://${process.env.MCP_WS_HOST || 'localhost'}:${process.env.MCP_WS_PORT || '3001'}/${serverName}`,
+            `http://${process.env.MCP_HTTP_HOST || 'localhost'}:${process.env.MCP_HTTP_PORT || '3000'}/${serverName}`,
+          ]
+        : []),
+    ]
+  }
+
+  /**
    * Connect to an MCP server
    * @param serverName The server name
    */
@@ -276,13 +307,8 @@ export class VirtualFilesystem {
     try {
       // logger.info(`🔗 Connecting to MCP server: ${serverName}`) // Disabled to avoid STDIO interference
 
-      // Try common connection patterns
-      const connectionPatterns = [
-        `stdio://${serverName}`,
-        `http://localhost:3000/${serverName}`,
-        `ws://localhost:3001/${serverName}`,
-        `tcp://localhost:9999`,
-      ]
+      // Get connection patterns from configuration
+      const connectionPatterns = this.getConnectionPatterns(serverName)
 
       let connected = false
       for (const pattern of connectionPatterns) {

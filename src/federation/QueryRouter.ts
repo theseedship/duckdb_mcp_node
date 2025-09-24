@@ -2,6 +2,7 @@ import { DuckDBService } from '../duckdb/service.js'
 import { MCPConnectionPool } from './ConnectionPool.js'
 import { ResourceRegistry } from './ResourceRegistry.js'
 import { logger } from '../utils/logger.js'
+import { escapeIdentifier, escapeFilePath } from '../utils/sql-escape.js'
 
 /**
  * Represents a federated query plan
@@ -141,27 +142,29 @@ export class QueryRouter {
     const remoteResults = await Promise.all(remoteDataPromises)
 
     // Create temporary tables for remote data
-    const tempTables: string[] = []
+    const tempTables: Map<string, string> = new Map()
 
     for (const [serverAlias, data] of remoteResults) {
       const tempTableName = await this.createTempTable(serverAlias, data)
-      tempTables.push(tempTableName)
+      tempTables.set(serverAlias, tempTableName)
     }
 
     // Execute the local query with temp tables
     let localQuery = plan.localQuery || sql
 
     // Replace references with temp table names
-    for (const [serverAlias] of remoteResults) {
-      const tempTableName = `temp_${serverAlias}_${this.tempTableCounter - remoteResults.length + tempTables.indexOf(`temp_${serverAlias}_${this.tempTableCounter - remoteResults.length}`) + 1}`
+    for (const [serverAlias, tempTableName] of tempTables) {
+      // Replace mcp:// URIs with properly escaped identifier
+      const escapedTableName = escapeIdentifier(tempTableName)
+      localQuery = localQuery.replace(
+        new RegExp(`mcp://${serverAlias}/\\S+`, 'gi'),
+        escapedTableName
+      )
 
-      // Replace mcp:// URIs
-      localQuery = localQuery.replace(new RegExp(`mcp://${serverAlias}/\\S+`, 'gi'), tempTableName)
-
-      // Replace server.table references
+      // Replace server.table references with properly escaped identifier
       localQuery = localQuery.replace(
         new RegExp(`\\b${serverAlias}\\.(\\w+)\\b`, 'gi'),
-        tempTableName
+        escapedTableName
       )
     }
 
@@ -169,7 +172,7 @@ export class QueryRouter {
     const result = await this.duckdb.executeQuery(localQuery)
 
     // Clean up temp tables
-    await this.cleanupTempTables(tempTables)
+    await this.cleanupTempTables(Array.from(tempTables.values()))
 
     return {
       data: result,
@@ -294,12 +297,14 @@ export class QueryRouter {
       await this.duckdb.createTableFromJSON(tempTableName, data)
     } else if (typeof data === 'string') {
       // CSV or text data
-      const tempFile = `/tmp/federation_${Date.now()}_${Math.random().toString(36).slice(2)}.csv`
+      const crypto = await import('crypto')
+      const randomBytes = crypto.randomBytes(16).toString('hex')
+      const tempFile = `/tmp/federation_${Date.now()}_${randomBytes}.csv`
       const fs = await import('fs/promises')
 
       try {
         await fs.writeFile(tempFile, data)
-        const sql = `CREATE TEMP TABLE ${tempTableName} AS SELECT * FROM read_csv_auto('${tempFile}')`
+        const sql = `CREATE TEMP TABLE ${escapeIdentifier(tempTableName)} AS SELECT * FROM read_csv_auto(${escapeFilePath(tempFile)})`
         await this.duckdb.executeQuery(sql)
       } finally {
         try {
@@ -310,12 +315,14 @@ export class QueryRouter {
       }
     } else if (Buffer.isBuffer(data)) {
       // Binary data (e.g., Parquet)
-      const tempFile = `/tmp/federation_${Date.now()}_${Math.random().toString(36).slice(2)}.parquet`
+      const crypto = await import('crypto')
+      const randomBytes = crypto.randomBytes(16).toString('hex')
+      const tempFile = `/tmp/federation_${Date.now()}_${randomBytes}.parquet`
       const fs = await import('fs/promises')
 
       try {
         await fs.writeFile(tempFile, data)
-        const sql = `CREATE TEMP TABLE ${tempTableName} AS SELECT * FROM read_parquet('${tempFile}')`
+        const sql = `CREATE TEMP TABLE ${escapeIdentifier(tempTableName)} AS SELECT * FROM read_parquet(${escapeFilePath(tempFile)})`
         await this.duckdb.executeQuery(sql)
       } finally {
         try {
@@ -338,7 +345,7 @@ export class QueryRouter {
   private async cleanupTempTables(tables: string[]): Promise<void> {
     for (const table of tables) {
       try {
-        await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${table}`)
+        await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${escapeIdentifier(table)}`)
       } catch (error) {
         logger.warn(`Failed to drop temp table '${table}':`, error)
       }

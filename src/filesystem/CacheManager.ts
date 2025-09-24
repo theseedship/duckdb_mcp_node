@@ -137,8 +137,24 @@ export class CacheManager {
     // Generate cache filename
     const hash = createHash('sha256').update(uri).digest('hex')
     const extension = this.getExtensionForFormat(format)
-    const filename = `${hash}.${extension}`
+
+    // Validate extension to prevent path traversal or malicious extensions
+    if (!this.isValidExtension(extension)) {
+      throw new Error(`Invalid file extension: ${extension}`)
+    }
+
+    // Sanitize filename to prevent path traversal
+    const safeHash = hash.replace(/[^a-zA-Z0-9]/g, '')
+    const safeExtension = extension.replace(/[^a-zA-Z0-9]/g, '')
+    const filename = `${safeHash}.${safeExtension}`
     const localPath = path.join(this.cacheDir, filename)
+
+    // Verify the path is within the cache directory
+    const resolvedPath = path.resolve(localPath)
+    const resolvedCacheDir = path.resolve(this.cacheDir)
+    if (!resolvedPath.startsWith(resolvedCacheDir)) {
+      throw new Error('Path traversal attempt detected')
+    }
 
     // Convert data to Buffer if needed
     let buffer: Buffer
@@ -472,6 +488,14 @@ export class CacheManager {
       default:
         return 'data'
     }
+  }
+
+  /**
+   * Validate file extension for security
+   */
+  private isValidExtension(extension: string): boolean {
+    const allowedExtensions = ['csv', 'json', 'parquet', 'arrow', 'xlsx', 'data', 'txt', 'tsv']
+    return allowedExtensions.includes(extension.toLowerCase())
   }
 
   /**
