@@ -121,15 +121,14 @@ jobs:
 
           # Check if tag already exists
           if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
-            echo "Tag ${TAG} already exists, skipping release creation"
-            exit 0
+            echo "✅ Tag ${TAG} already exists, skipping tag creation"
+          else
+            # Create and push tag
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git config --global user.name "github-actions[bot]"
+            git tag -a "${TAG}" -m "Release ${TAG}"
+            git push origin "${TAG}"
           fi
-
-          # Create and push tag
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          git tag -a "${TAG}" -m "Release ${TAG}"
-          git push origin "${TAG}"
 
           # Create release body
           cat > release-notes.md << EOF
@@ -147,12 +146,17 @@ jobs:
           See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for details.
           EOF
 
-          # Create release using GitHub CLI
-          gh release create "${TAG}" \
-            --repo "${{ github.repository }}" \
-            --title "v${VERSION}" \
-            --notes-file release-notes.md \
-            || echo "Release creation failed, but package was published to npm"
+          # Check if release already exists
+          if gh release view "${TAG}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "✅ Release ${TAG} already exists, skipping release creation"
+          else
+            # Create release using GitHub CLI
+            gh release create "${TAG}" \
+              --repo "${{ github.repository }}" \
+              --title "v${VERSION}" \
+              --notes-file release-notes.md \
+              || echo "⚠️ Release creation failed, but package was published to npm"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
