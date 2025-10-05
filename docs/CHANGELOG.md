@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8-rc.2] - 2025-10-05
+
+### 📦 Dependencies
+
+- **@duckdb/node-api**: Updated to 1.4.0-r.2 (CRITICAL SECURITY UPDATE)
+  - Protection against malware in compromised version 1.3.3
+  - LTS support until September 2026
+  - New features: AES-256 database encryption, MERGE INTO, Apache Iceberg support
+  - Performance improvements: k-way merge sorting, materialized CTEs
+
+- **@modelcontextprotocol/sdk**: Updated to 1.19.1
+  - OAuth 2.0 support for enhanced MCP server authentication
+  - Structured JSON tool output for typed responses
+  - User input elicitation during sessions
+  - Security fixes: token binding, PKCE implementation
+
+- **winston**: Updated to 3.18.3
+  - Fixed formatting bugs with logform 2.7.0
+  - Improved log quality and stability
+
+### 🛡️ Security
+
+- **Zero vulnerabilities** confirmed via npm audit
+- All critical security updates applied
+- Following DuckDB r.2 revision nomenclature
+
+### ✅ Validation
+
+- All DuckDB tests passing (9/9)
+- All MCP server tests passing (4/4)
+- Build successful with updated dependencies
+- Security audit clean
+
 ## [0.6.8-rc.1] - 2025-01-24
 
 ### 🛡️ Security
