@@ -1664,11 +1664,11 @@ Checks to perform: ${args.checks || 'nulls, duplicates, ranges'}
 
 // Start the server if run directly
 // Auto-start when this is the main module being executed
-// Works with: node, tsx, ts-node, MCP Inspector
+// IMPORTANT: Only auto-start if THIS EXACT FILE is the entry point
+// Do NOT auto-start when imported as a library by other MCP servers
 const isMainModule =
-  import.meta.url === `file://${process.argv[1]}` || // Direct execution
-  process.argv[1]?.includes('mcp-server') || // Script name match
-  process.argv.includes('--stdio') // CLI flag
+  import.meta.url === `file://${process.argv[1]}` || // Direct execution: node/tsx this-file.ts
+  (import.meta.url.endsWith('mcp-server.ts') && process.argv.includes('--stdio')) // CLI flag for this server specifically
 
 if (isMainModule) {
   const server = new DuckDBMCPServer()
