@@ -13,7 +13,7 @@ export class DuckDBMcpNativeService {
   private servers = new Map<string, DuckDBMCPServer>()
   private clients = new Map<string, MCPClient>()
   private mappers = new Map<string, ResourceMapper>()
-  private resourceCache = new Map<string, { data: any; expires: number }>()
+  private readonly resourceCache = new Map<string, { data: unknown; expires: number }>()
 
   constructor() {}
 
@@ -57,7 +57,7 @@ export class DuckDBMcpNativeService {
   /**
    * Attach to an external MCP server and map its resources
    */
-  async attachMCP(url: string, alias: string, options?: AttachOptions): Promise<any[]> {
+  async attachMCP(url: string, alias: string, options?: AttachOptions): Promise<unknown[]> {
     if (this.clients.has(alias)) {
       throw new Error(`Client '${alias}' already exists`)
     }
@@ -72,7 +72,7 @@ export class DuckDBMcpNativeService {
 
     // List available resources with caching
     const cacheKey = `mcp:resources:${url}`
-    let resources: any[] = []
+    let resources: unknown[] = []
 
     if (!options?.skipCache) {
       const cached = this.resourceCache.get(cacheKey)
@@ -140,7 +140,7 @@ export class DuckDBMcpNativeService {
   /**
    * Call a tool on a connected MCP server
    */
-  async callTool(alias: string, toolName: string, args: any): Promise<any> {
+  async callTool(alias: string, toolName: string, args: unknown): Promise<unknown> {
     const client = this.clients.get(alias)
     if (!client) {
       throw new Error(`Client '${alias}' not found`)
@@ -197,7 +197,7 @@ export class DuckDBMcpNativeService {
   /**
    * Get resources for a specific client
    */
-  async getClientResources(alias: string): Promise<any[]> {
+  async getClientResources(alias: string): Promise<unknown[]> {
     const client = this.clients.get(alias)
     if (!client) {
       throw new Error(`Client '${alias}' not found`)
@@ -209,7 +209,7 @@ export class DuckDBMcpNativeService {
   /**
    * Get tools for a specific client
    */
-  async getClientTools(alias: string): Promise<any[]> {
+  async getClientTools(alias: string): Promise<unknown[]> {
     const client = this.clients.get(alias)
     if (!client) {
       throw new Error(`Client '${alias}' not found`)

@@ -287,13 +287,13 @@ export function createMotherDuckHandlers(duckdb: DuckDBService) {
   const handlers = new MotherDuckToolHandlers(duckdb)
 
   return {
-    'motherduck.attach': (input: any) => handlers.attach(input),
+    'motherduck.attach': (input: unknown) => handlers.attach(input),
     'motherduck.detach': () => handlers.detach(),
     'motherduck.status': () => handlers.status(),
     'motherduck.list_databases': () => handlers.listDatabases(),
-    'motherduck.create_database': (input: any) => handlers.createDatabase(input),
-    'motherduck.query': (input: any) => handlers.query(input),
-    'motherduck.share_table': (input: any) => handlers.shareTable(input),
-    'motherduck.import_table': (input: any) => handlers.importTable(input),
+    'motherduck.create_database': (input: unknown) => handlers.createDatabase(input),
+    'motherduck.query': (input: unknown) => handlers.query(input),
+    'motherduck.share_table': (input: unknown) => handlers.shareTable(input),
+    'motherduck.import_table': (input: unknown) => handlers.importTable(input),
   }
 }

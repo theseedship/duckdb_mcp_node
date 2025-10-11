@@ -227,7 +227,7 @@ export class HTTPTransport extends Transport {
   /**
    * Execute a request-response pattern (convenience method)
    */
-  async request(method: string, params?: any): Promise<any> {
+  async request(method: string, params?: unknown): Promise<unknown> {
     if (!this.connected) {
       throw new Error('Transport not connected')
     }

@@ -1,0 +1,20 @@
+{
+  "project_name": "duckdb_mcp_node",
+  "daddy_version": "1.0.0",
+  "database_file": "daddy-validation.db",
+  "validation_enabled": true,
+  "auto_validate": true,
+  "created_at": "2025-10-11T02:21:10+02:00",
+  "last_validation": null,
+  "settings": {
+    "validation_timeout": 120,
+    "max_validation_attempts": 3,
+    "validation_agents": ["opinion", "artisan", "bugsy"],
+    "require_expected_results": true,
+    "block_on_failed_validation": true
+  },
+  "hooks": {
+    "pre_command": "daddy-validation-gate",
+    "post_validation": "daddy-update-status"
+  }
+}
