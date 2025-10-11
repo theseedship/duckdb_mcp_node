@@ -287,13 +287,28 @@ export function createMotherDuckHandlers(duckdb: DuckDBService) {
   const handlers = new MotherDuckToolHandlers(duckdb)
 
   return {
-    'motherduck.attach': (input: unknown) => handlers.attach(input),
+    'motherduck.attach': (input: unknown) => {
+      const parsed = MotherDuckAttachInputSchema.parse(input)
+      return handlers.attach(parsed)
+    },
     'motherduck.detach': () => handlers.detach(),
     'motherduck.status': () => handlers.status(),
     'motherduck.list_databases': () => handlers.listDatabases(),
-    'motherduck.create_database': (input: unknown) => handlers.createDatabase(input),
-    'motherduck.query': (input: unknown) => handlers.query(input),
-    'motherduck.share_table': (input: unknown) => handlers.shareTable(input),
-    'motherduck.import_table': (input: unknown) => handlers.importTable(input),
+    'motherduck.create_database': (input: unknown) => {
+      const parsed = MotherDuckCreateDatabaseInputSchema.parse(input)
+      return handlers.createDatabase(parsed)
+    },
+    'motherduck.query': (input: unknown) => {
+      const parsed = MotherDuckQueryInputSchema.parse(input)
+      return handlers.query(parsed)
+    },
+    'motherduck.share_table': (input: unknown) => {
+      const parsed = MotherDuckShareInputSchema.parse(input)
+      return handlers.shareTable(parsed)
+    },
+    'motherduck.import_table': (input: unknown) => {
+      const parsed = MotherDuckImportInputSchema.parse(input)
+      return handlers.importTable(parsed)
+    },
   }
 }

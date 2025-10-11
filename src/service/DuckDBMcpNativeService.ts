@@ -77,7 +77,7 @@ export class DuckDBMcpNativeService {
     if (!options?.skipCache) {
       const cached = this.resourceCache.get(cacheKey)
       if (cached && cached.expires > Date.now()) {
-        resources = cached.data
+        resources = cached.data as unknown[]
         logger.error(`Using cached resources for ${url}`)
       }
     }
