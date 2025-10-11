@@ -112,9 +112,9 @@ export const nativeToolHandlers = {
 
     try {
       const result = await service.executeQuery(`
-        SELECT table_name, table_type 
-        FROM information_schema.tables 
-        WHERE table_schema = '${escapeString(schema)}'
+        SELECT table_name, table_type
+        FROM information_schema.tables
+        WHERE table_schema = ${escapeString(schema)}
         ORDER BY table_name
       `)
 
@@ -143,14 +143,14 @@ export const nativeToolHandlers = {
 
     try {
       const result = await service.executeQuery(`
-        SELECT 
+        SELECT
           column_name,
           data_type,
           is_nullable,
           column_default
-        FROM information_schema.columns 
-        WHERE table_schema = '${escapeString(schema)}' 
-          AND table_name = '${escapeString(validated.table_name)}'
+        FROM information_schema.columns
+        WHERE table_schema = ${escapeString(schema)}
+          AND table_name = ${escapeString(validated.table_name)}
         ORDER BY ordinal_position
       `)
 
@@ -190,18 +190,18 @@ export const nativeToolHandlers = {
         optionsParts.push(`header = ${validated.options.header}`)
       }
       if (validated.options?.delimiter) {
-        optionsParts.push(`delim = '${escapeString(validated.options.delimiter)}'`)
+        optionsParts.push(`delim = ${escapeString(validated.options.delimiter)}`)
       }
       if (validated.options?.quote) {
-        optionsParts.push(`quote = '${escapeString(validated.options.quote)}'`)
+        optionsParts.push(`quote = ${escapeString(validated.options.quote)}`)
       }
 
       const optionsStr = optionsParts.length > 0 ? `, ${optionsParts.join(', ')}` : ''
 
       // Create table from CSV
       await service.executeQuery(`
-        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
-        SELECT * FROM read_csv('${escapeString(validated.path)}'${optionsStr})
+        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS
+        SELECT * FROM read_csv(${escapeString(validated.path)}${optionsStr})
       `)
 
       // Get row count
@@ -240,8 +240,8 @@ export const nativeToolHandlers = {
     try {
       // Create table from Parquet
       await service.executeQuery(`
-        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS 
-        SELECT * FROM read_parquet('${escapeString(validated.path)}')
+        CREATE OR REPLACE TABLE ${escapeIdentifier(tableName)} AS
+        SELECT * FROM read_parquet(${escapeString(validated.path)})
       `)
 
       // Get row count
@@ -279,13 +279,13 @@ export const nativeToolHandlers = {
       let exportQuery = ''
       switch (validated.format) {
         case 'csv':
-          exportQuery = `COPY (${query}) TO '${escapeString(validated.path)}' WITH (FORMAT CSV, HEADER)`
+          exportQuery = `COPY (${query}) TO ${escapeString(validated.path)} WITH (FORMAT CSV, HEADER)`
           break
         case 'parquet':
-          exportQuery = `COPY (${query}) TO '${escapeString(validated.path)}' (FORMAT PARQUET)`
+          exportQuery = `COPY (${query}) TO ${escapeString(validated.path)} (FORMAT PARQUET)`
           break
         case 'json':
-          exportQuery = `COPY (${query}) TO '${escapeString(validated.path)}' (FORMAT JSON)`
+          exportQuery = `COPY (${query}) TO ${escapeString(validated.path)} (FORMAT JSON)`
           break
       }
 
