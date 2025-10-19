@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2025-10-19
+
+### ⬆️ Updated
+
+- **@duckdb/node-api**: Upgraded from `1.4.1-r.1` to `1.4.1-r.4` (latest release)
+  - Latest bug fixes and performance improvements from DuckDB team
+  - Published 21 hours ago via GitHub Actions
+
+### 📚 Documentation
+
+- Updated README to reflect Production Ready status (v0.7.1)
+- Changed release status from "Release Candidate v0.6.8-rc.2" to "Production Ready v0.7.1"
+
+### 🔍 Investigation
+
+- HTTP transport client reviewed (distinct from HTTP server transport)
+- Confirmed HTTP client initialization works as designed
+- No breaking changes from DuckPGQ support (v0.7.0)
+
 ## [0.7.0] - 2025-10-19
 
 ### 🎯 Features
