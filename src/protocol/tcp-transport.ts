@@ -82,6 +82,8 @@ export class TCPTransport extends Transport {
       // Handle errors
       this.socket.on('error', (error: Error) => {
         logger.error('TCP socket error:', error)
+        // Emit error event for EventEmitter interface
+        this.emit('error', error)
         if (!this.connected) {
           clearTimeout(connectTimeout)
           reject(new Error(`Failed to connect: ${error.message}`))
@@ -223,8 +225,12 @@ export class TCPTransport extends Transport {
           const message = this.formatter.parseMessage(line)
           this.messageQueue.push(message)
           this.resolveWaitingIterators(false)
+          // Emit message event for EventEmitter interface
+          this.emit('message', message)
         } catch (error) {
           logger.error('Failed to parse TCP message:', error)
+          // Emit error event for EventEmitter interface
+          this.emit('error', error)
         }
       }
     }

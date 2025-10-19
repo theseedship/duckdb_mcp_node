@@ -450,9 +450,14 @@ describe('VirtualFilesystem', () => {
       const sql = "SELECT * FROM 'mcp://server1/logs/*.json'"
       const processed = await vfs.processQuery(sql)
 
-      expect(processed).toContain('2024-01.json')
-      expect(processed).toContain('2024-02.json')
-      expect(processed).not.toContain('users.csv')
+      // Should create UNION with 2 JSON files (not CSV)
+      expect(processed).toContain('UNION ALL')
+      expect(processed).toContain('read_json_auto')
+      // Should have exactly 2 read_json_auto calls
+      const jsonMatches = processed.match(/read_json_auto/g)
+      expect(jsonMatches).toHaveLength(2)
+      // Should not include CSV file
+      expect(processed).not.toContain('read_csv')
     })
 
     it('should handle server wildcards', async () => {

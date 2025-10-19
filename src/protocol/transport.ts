@@ -1,12 +1,14 @@
 import { Readable, Writable } from 'stream'
+import { EventEmitter } from 'events'
 import { MCPMessage } from './types.js'
 import { MessageFormatter } from './messages.js'
 import { logger } from '../utils/logger.js'
 
 /**
  * Abstract transport interface for MCP communication
+ * Extends EventEmitter to support event-based messaging
  */
-export abstract class Transport {
+export abstract class Transport extends EventEmitter {
   protected formatter = new MessageFormatter()
 
   abstract connect(): Promise<void>
@@ -14,6 +16,10 @@ export abstract class Transport {
   abstract send(message: MCPMessage): Promise<void>
   abstract receive(): AsyncIterator<MCPMessage>
   abstract isConnected(): boolean
+
+  constructor() {
+    super()
+  }
 }
 
 /**

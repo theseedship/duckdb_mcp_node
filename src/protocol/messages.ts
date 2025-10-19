@@ -26,7 +26,7 @@ export class MessageFormatter {
   /**
    * Format a request message
    */
-  formatRequest(method: string, params?: Record<string, any>): MCPRequest {
+  formatRequest(method: string, params?: Record<string, unknown>): MCPRequest {
     return {
       jsonrpc: '2.0',
       method,
@@ -38,7 +38,7 @@ export class MessageFormatter {
   /**
    * Format a notification message (no ID, no response expected)
    */
-  formatNotification(method: string, params?: Record<string, any>): MCPNotification {
+  formatNotification(method: string, params?: Record<string, unknown>): MCPNotification {
     return {
       jsonrpc: '2.0',
       method,
@@ -49,7 +49,7 @@ export class MessageFormatter {
   /**
    * Format a success response
    */
-  formatResponse(id: JSONRPCId, result: any): MCPResponse {
+  formatResponse(id: JSONRPCId, result: unknown): MCPResponse {
     return {
       jsonrpc: '2.0',
       result,
@@ -60,7 +60,7 @@ export class MessageFormatter {
   /**
    * Format an error response
    */
-  formatError(id: JSONRPCId, code: ErrorCode, message: string, data?: any): MCPResponse {
+  formatError(id: JSONRPCId, code: ErrorCode, message: string, data?: unknown): MCPResponse {
     return {
       jsonrpc: '2.0',
       error: {
@@ -110,22 +110,29 @@ export class MessageFormatter {
   /**
    * Check if a message is a request
    */
-  isRequest(message: any): message is MCPRequest {
-    return 'method' in message && 'id' in message
+  isRequest(message: unknown): message is MCPRequest {
+    return typeof message === 'object' && message !== null && 'method' in message && 'id' in message
   }
 
   /**
    * Check if a message is a notification
    */
-  isNotification(message: any): message is MCPNotification {
-    return 'method' in message && !('id' in message)
+  isNotification(message: unknown): message is MCPNotification {
+    return (
+      typeof message === 'object' && message !== null && 'method' in message && !('id' in message)
+    )
   }
 
   /**
    * Check if a message is a response
    */
-  isResponse(message: any): message is MCPResponse {
-    return ('result' in message || 'error' in message) && 'id' in message
+  isResponse(message: unknown): message is MCPResponse {
+    return (
+      typeof message === 'object' &&
+      message !== null &&
+      ('result' in message || 'error' in message) &&
+      'id' in message
+    )
   }
 
   /**
@@ -140,13 +147,13 @@ export class MessageFormatter {
  * Message router for handling different message types
  */
 export class MessageRouter {
-  private handlers = new Map<string, (params: any) => Promise<any>>()
+  private handlers = new Map<string, (params: unknown) => Promise<unknown>>()
   private formatter = new MessageFormatter()
 
   /**
    * Register a method handler
    */
-  registerHandler(method: string, handler: (_params: any) => Promise<any>) {
+  registerHandler(method: string, handler: (_params: unknown) => Promise<unknown>) {
     this.handlers.set(method, handler)
   }
 
@@ -167,12 +174,13 @@ export class MessageRouter {
     try {
       const result = await handler(request.params || {})
       return this.formatter.formatResponse(request.id, result)
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { message?: string; stack?: string }
       return this.formatter.formatError(
         request.id,
         ErrorCode.InternalError,
-        error.message || 'Internal error',
-        error.stack
+        err.message || 'Internal error',
+        err.stack
       )
     }
   }

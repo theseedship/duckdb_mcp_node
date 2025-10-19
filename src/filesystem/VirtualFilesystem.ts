@@ -45,12 +45,36 @@ export interface ResourceResolution {
 /**
  * Virtual Filesystem for transparent MCP resource access
  */
+/**
+ * Statistics for Virtual Filesystem
+ */
+export interface VFSStats {
+  totalResolutions: number
+  cacheHits: number
+  cacheMisses: number
+  cacheHitRate: number
+  errors: number
+  discoveredResources?: number
+}
+
 export class VirtualFilesystem {
   private cache: CacheManager
   private connectionPool: MCPConnectionPool
   private resourceRegistry: ResourceRegistry
   private connectedServers = new Set<string>()
   private config: VirtualFilesystemConfig
+
+  // Request deduplication: track pending resolution promises
+  private pendingResolutions = new Map<string, Promise<ResourceResolution | null>>()
+
+  // Statistics tracking
+  private stats = {
+    totalResolutions: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    errors: 0,
+    discoveredResources: 0,
+  }
 
   constructor(
     resourceRegistry: ResourceRegistry,
@@ -82,8 +106,60 @@ export class VirtualFilesystem {
    * @returns Transformed query with local paths
    */
   async processQuery(sql: string): Promise<string> {
-    // Transform the query
-    const result = await QueryPreprocessor.transform(sql, async (uri) => {
+    // First, expand glob patterns to UNION queries
+    const uris = URIParser.extractFromSQL(sql)
+    let processedQuery = sql
+
+    for (const uri of uris) {
+      const parsed = URIParser.parse(uri)
+
+      if (parsed.isGlob) {
+        // Expand glob to matching URIs
+        const availableResources = this.resourceRegistry
+          .getAllResources()
+          .map((r) => ({ server: r.serverAlias, path: r.uri }))
+        const matchingURIs = URIParser.expandGlob(uri, availableResources)
+
+        if (matchingURIs.length === 0) {
+          throw new Error(`No resources match glob pattern: ${uri}`)
+        }
+
+        // Resolve all matching URIs to local paths
+        const resolvedPaths = await Promise.all(
+          matchingURIs.map(async (matchedUri) => {
+            const resolution = await this.resolveURI(matchedUri)
+            return resolution?.localPath
+          })
+        )
+
+        // Filter out null results
+        const validPaths = resolvedPaths.filter((path): path is string => path !== null)
+
+        if (validPaths.length === 0) {
+          throw new Error(`Could not resolve any resources matching: ${uri}`)
+        }
+
+        // Build read queries for each file
+        const readQueries = validPaths.map((path) => {
+          const format = FormatDetector.fromExtension(path)
+          return FormatDetector.buildReadQuery(path, format)
+        })
+
+        // Create UNION query if multiple files, otherwise use single query
+        const replacement =
+          readQueries.length === 1 ? readQueries[0] : `(${readQueries.join(' UNION ALL ')})`
+
+        // Replace the glob URI with the expanded query
+        // Use the replaceURI method from QueryPreprocessor
+        processedQuery = processedQuery.replace(
+          new RegExp(`['"\`]${uri.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'g'),
+          replacement
+        )
+      }
+    }
+
+    // Then transform non-glob URIs
+    const result = await QueryPreprocessor.transform(processedQuery, async (uri) => {
       const resolution = await this.resolveURI(uri)
       // If this is an mcp:// URI and we couldn't resolve it, throw an error
       if (!resolution && uri.startsWith('mcp://')) {
@@ -91,30 +167,6 @@ export class VirtualFilesystem {
       }
       return resolution?.localPath || null
     })
-
-    // Resolve any URIs that need resolution
-    for (const uri of result.urisToResolve) {
-      const resolution = await this.resolveURI(uri)
-      // If this is an mcp:// URI and we couldn't resolve it, throw an error
-      if (!resolution && uri.startsWith('mcp://')) {
-        throw new Error(`Resource not found: ${uri}`)
-      }
-    }
-
-    // Apply all replacements
-    if (result.replacements.length > 0) {
-      // Re-transform with all URIs now resolved
-      const finalResult = await QueryPreprocessor.transform(result.originalQuery, async (uri) => {
-        const resolution = await this.resolveURI(uri)
-        // If this is an mcp:// URI and we couldn't resolve it, throw an error
-        if (!resolution && uri.startsWith('mcp://')) {
-          throw new Error(`Resource not found: ${uri}`)
-        }
-        return resolution?.localPath || null
-      })
-
-      return finalResult.transformedQuery
-    }
 
     return result.transformedQuery
   }
@@ -125,12 +177,36 @@ export class VirtualFilesystem {
    * @returns Resolution result with local path
    */
   async resolveURI(uri: string): Promise<ResourceResolution | null> {
+    // Check if there's already a pending resolution for this URI (deduplication)
+    const pending = this.pendingResolutions.get(uri)
+    if (pending) {
+      return pending
+    }
+
+    // Create the resolution promise
+    const resolutionPromise = this.doResolveURI(uri)
+
+    // Store it in pending resolutions
+    this.pendingResolutions.set(uri, resolutionPromise)
+
+    // Clean up when done (success or failure)
+    resolutionPromise.finally(() => {
+      this.pendingResolutions.delete(uri)
+    })
+
+    return resolutionPromise
+  }
+
+  private async doResolveURI(uri: string): Promise<ResourceResolution | null> {
+    this.stats.totalResolutions++
+
     try {
       const parsed = URIParser.parse(uri)
 
       // Check cache first
       const cachedPath = await this.cache.getCachedPath(uri)
       if (cachedPath) {
+        this.stats.cacheHits++
         return {
           uri,
           localPath: cachedPath,
@@ -139,6 +215,8 @@ export class VirtualFilesystem {
           server: parsed.server,
         }
       }
+
+      this.stats.cacheMisses++
 
       // Auto-connect to server if needed
       if (this.config.autoConnect && !this.connectedServers.has(parsed.server)) {
@@ -149,6 +227,7 @@ export class VirtualFilesystem {
       const resource = await this.fetchResource(parsed)
       if (!resource) {
         logger.warn(`Failed to fetch resource: ${uri}`)
+        this.stats.errors++
         return null
       }
 
@@ -168,6 +247,7 @@ export class VirtualFilesystem {
       }
     } catch (error) {
       logger.debug(`Failed to resolve URI ${uri}:`, error)
+      this.stats.errors++
       return null
     }
   }
@@ -207,7 +287,28 @@ export class VirtualFilesystem {
             return content.text
           } else if (content.blob !== undefined) {
             // Base64 encoded binary data
-            return Buffer.from(content.blob, 'base64')
+            try {
+              // Validate base64 format
+              if (typeof content.blob !== 'string') {
+                logger.warn('Blob content is not a string')
+                return null
+              }
+              // Basic base64 validation: only valid base64 characters
+              if (!/^[A-Za-z0-9+/]*={0,2}$/.test(content.blob)) {
+                logger.warn('Invalid base64 format')
+                return null
+              }
+              const buffer = Buffer.from(content.blob, 'base64')
+              // Additional validation: check if buffer is reasonable size
+              if (buffer.length === 0 && content.blob.length > 0) {
+                logger.warn('Base64 decoded to empty buffer')
+                return null
+              }
+              return buffer
+            } catch {
+              logger.warn('Failed to decode base64 content')
+              return null
+            }
           }
         }
       }
@@ -354,6 +455,10 @@ export class VirtualFilesystem {
       try {
         await this.connectToServer(server)
         discovered.push(server)
+
+        // Count discovered resources
+        const resources = this.resourceRegistry.getAllResources()
+        this.stats.discoveredResources = resources.length
       } catch {
         // Skip failed connections
       }
@@ -470,6 +575,35 @@ export class VirtualFilesystem {
     // 1. Creating a DuckDB view
     // 2. Setting up a timer to refresh the cache
     // 3. Updating the view when cache updates
+  }
+
+  /**
+   * Resolve multiple URIs efficiently
+   * @param uris Array of MCP URIs to resolve
+   * @returns Array of resolution results (null for failures)
+   */
+  async resolveMultiple(uris: string[]): Promise<Array<ResourceResolution | null>> {
+    // Resolve all URIs in parallel
+    const resolutions = await Promise.all(uris.map((uri) => this.resolveURI(uri).catch(() => null)))
+    return resolutions
+  }
+
+  /**
+   * Get VFS statistics
+   * @returns Statistics object
+   */
+  getStats(): VFSStats {
+    const { totalResolutions, cacheHits, cacheMisses, errors, discoveredResources } = this.stats
+    const cacheHitRate = totalResolutions > 0 ? cacheHits / (cacheHits + cacheMisses) : 0
+
+    return {
+      totalResolutions,
+      cacheHits,
+      cacheMisses,
+      cacheHitRate,
+      errors,
+      discoveredResources: discoveredResources > 0 ? discoveredResources : undefined,
+    }
   }
 
   /**

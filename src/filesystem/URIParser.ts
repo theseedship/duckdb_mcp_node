@@ -249,6 +249,9 @@ export class URIParser {
 
     const matchingURIs: string[] = []
 
+    // Normalize pattern path (remove leading slash for comparison)
+    const normalizedPattern = parsed.path.startsWith('/') ? parsed.path.slice(1) : parsed.path
+
     for (const resource of availableResources) {
       // Check if server matches
       const serverMatches =
@@ -258,8 +261,13 @@ export class URIParser {
 
       if (!serverMatches) continue
 
+      // Normalize resource path (remove leading slash for comparison)
+      const normalizedResourcePath = resource.path.startsWith('/')
+        ? resource.path.slice(1)
+        : resource.path
+
       // Check if path matches
-      const pathMatches = this.matchesGlob(parsed.path, resource.path)
+      const pathMatches = this.matchesGlob(normalizedPattern, normalizedResourcePath)
 
       if (pathMatches) {
         matchingURIs.push(

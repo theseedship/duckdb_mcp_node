@@ -455,7 +455,7 @@ describe('MetricsCollector', () => {
     it('should handle cleanup errors gracefully', async () => {
       // Try to cleanup non-existent directory
       const badCollector = new MetricsCollector({
-        metricsDir: '/nonexistent/path',
+        logsDir: '/nonexistent/path',
         retentionDays: 1,
       })
 

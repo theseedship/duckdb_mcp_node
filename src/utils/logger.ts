@@ -22,18 +22,18 @@ const isTestMode = process.env.NODE_ENV === 'test' && !process.env.DEBUG
  * Logger interface matching console methods
  */
 export interface Logger {
-  debug: (...args: any[]) => void
-  info: (...args: any[]) => void
-  warn: (...args: any[]) => void
-  error: (...args: any[]) => void
-  log: (...args: any[]) => void
+  debug: (...args: unknown[]) => void
+  info: (...args: unknown[]) => void
+  warn: (...args: unknown[]) => void
+  error: (...args: unknown[]) => void
+  log: (...args: unknown[]) => void
 }
 
 /**
  * Create a logger function that respects MCP mode
  */
-function createLogFunction(level: string): (...args: any[]) => void {
-  return (...args: any[]) => {
+function createLogFunction(level: string): (...args: unknown[]) => void {
+  return (...args: unknown[]) => {
     // Suppress logs in test mode unless DEBUG is set
     if (isTestMode) {
       return
@@ -53,6 +53,7 @@ function createLogFunction(level: string): (...args: any[]) => void {
       )
     } else {
       // In normal mode, use console methods as usual
+      /* eslint-disable no-console */
       switch (level) {
         case 'debug':
           console.debug(...args)
@@ -69,6 +70,7 @@ function createLogFunction(level: string): (...args: any[]) => void {
         default:
           console.log(...args)
       }
+      /* eslint-enable no-console */
     }
   }
 }
@@ -105,11 +107,11 @@ export function isInMCPMode(): boolean {
  */
 export function createLogger(context: string): Logger {
   return {
-    debug: (...args: any[]) => logger.debug(`[${context}]`, ...args),
-    info: (...args: any[]) => logger.info(`[${context}]`, ...args),
-    warn: (...args: any[]) => logger.warn(`[${context}]`, ...args),
-    error: (...args: any[]) => logger.error(`[${context}]`, ...args),
-    log: (...args: any[]) => logger.log(`[${context}]`, ...args),
+    debug: (...args: unknown[]) => logger.debug(`[${context}]`, ...args),
+    info: (...args: unknown[]) => logger.info(`[${context}]`, ...args),
+    warn: (...args: unknown[]) => logger.warn(`[${context}]`, ...args),
+    error: (...args: unknown[]) => logger.error(`[${context}]`, ...args),
+    log: (...args: unknown[]) => logger.log(`[${context}]`, ...args),
   }
 }
 

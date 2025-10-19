@@ -42,7 +42,10 @@ export class FederationManager {
   private registry: ResourceRegistry
   private connectionPool: MCPConnectionPool
   private duckdb: DuckDBService
-  private servers = new Map<string, { connectionString: string; metadata?: Record<string, any> }>()
+  private servers = new Map<
+    string,
+    { connectionString: string; metadata?: Record<string, unknown> }
+  >()
 
   constructor(config: FederationConfig = {}) {
     this.duckdb = config.duckdb || new DuckDBService()
@@ -59,12 +62,13 @@ export class FederationManager {
    * Execute a federated query
    * Alias for router.executeQuery with better naming
    */
-  async federateQuery(sql: string): Promise<any> {
+  async federateQuery(sql: string): Promise<unknown> {
     logger.debug(`🔄 Federating query: ${sql.substring(0, 100)}...`)
 
     try {
       const result = await this.router.executeQuery(sql)
-      logger.info(`✅ Federated query successful, returned ${result.data?.length || 0} rows`)
+      const data = (result as { data?: unknown[] }).data
+      logger.info(`✅ Federated query successful, returned ${data?.length || 0} rows`)
       return result
     } catch (error) {
       logger.error('❌ Federation query failed:', error)
@@ -78,7 +82,7 @@ export class FederationManager {
   async registerServer(
     alias: string,
     connectionString: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     logger.info(`📝 Registering server: ${alias} -> ${connectionString}`)
 
@@ -128,7 +132,7 @@ export class FederationManager {
   /**
    * Get federation statistics
    */
-  getStats(): Record<string, any> {
+  getStats(): Record<string, unknown> {
     return {
       router: this.router.getStats(),
       registry: {
@@ -168,7 +172,7 @@ export function createFederationRouter(
 /**
  * Quick helper to execute federated queries
  */
-export async function federateQuery(sql: string, duckdb?: DuckDBService): Promise<any> {
+export async function federateQuery(sql: string, duckdb?: DuckDBService): Promise<unknown> {
   const router = createFederationRouter(duckdb)
   try {
     return await router.executeQuery(sql)

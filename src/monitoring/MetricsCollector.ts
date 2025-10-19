@@ -381,17 +381,25 @@ export class MetricsCollector {
    * Clean old log files
    */
   private async cleanOldLogs(): Promise<void> {
-    const files = await fs.readdir(this.config.logsDir)
-    const now = Date.now()
-    const maxAge = this.config.retentionDays * 24 * 60 * 60 * 1000
+    try {
+      const files = await fs.readdir(this.config.logsDir)
+      const now = Date.now()
+      const maxAge = this.config.retentionDays * 24 * 60 * 60 * 1000
 
-    for (const file of files) {
-      const filepath = path.join(this.config.logsDir, file)
-      const stats = await fs.stat(filepath)
+      for (const file of files) {
+        const filepath = path.join(this.config.logsDir, file)
+        const stats = await fs.stat(filepath)
 
-      if (now - stats.mtime.getTime() > maxAge) {
-        await fs.unlink(filepath)
-        logger.info(`🗑️ Deleted old metrics file: ${file}`)
+        if (now - stats.mtime.getTime() > maxAge) {
+          await fs.unlink(filepath)
+          logger.info(`🗑️ Deleted old metrics file: ${file}`)
+        }
+      }
+    } catch (error) {
+      // Gracefully handle errors (e.g., directory doesn't exist)
+      const err = error as { code?: string; message?: string }
+      if (err.code !== 'ENOENT') {
+        logger.debug(`Could not clean old logs: ${err.message}`)
       }
     }
   }

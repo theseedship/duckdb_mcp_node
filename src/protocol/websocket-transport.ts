@@ -73,13 +73,19 @@ export class WebSocketTransport extends Transport {
             const message = this.formatter.parseMessage(text)
             this.messageQueue.push(message)
             this.resolveWaitingIterators(false)
+            // Emit message event for EventEmitter interface
+            this.emit('message', message)
           } catch (error) {
             logger.error('Failed to parse WebSocket message:', error)
+            // Emit error event for EventEmitter interface
+            this.emit('error', error)
           }
         })
 
         this.ws.on('error', (error: Error) => {
           logger.error('WebSocket error:', error)
+          // Emit error event for EventEmitter interface
+          this.emit('error', error)
           if (!this.connected) {
             reject(new Error(`Failed to connect: ${error.message}`))
           }

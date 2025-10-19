@@ -78,6 +78,8 @@ export class HTTPTransport extends Transport {
       logger.info(`✅ Connected to HTTP MCP server at ${this.url}`)
     } catch (error) {
       this.connected = false
+      // Emit error event for EventEmitter interface
+      this.emit('error', error)
       throw new Error(`Failed to connect to HTTP server: ${error}`)
     }
   }
@@ -123,11 +125,16 @@ export class HTTPTransport extends Transport {
       if (response.data && response.data.jsonrpc) {
         this.messageQueue.push(response.data)
         this.resolveWaitingIterators(false)
+        // Emit message event for EventEmitter interface
+        this.emit('message', response.data)
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        // Emit error event for EventEmitter interface
+        this.emit('error', error)
         throw new Error(`HTTP send failed: ${error.message}`)
       }
+      this.emit('error', error)
       throw error
     }
   }
