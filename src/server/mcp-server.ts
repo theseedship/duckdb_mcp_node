@@ -1016,7 +1016,8 @@ class DuckDBMCPServer {
               }
 
               // Execute federated query
-              const result = await this.federation.federateQuery(sql)
+              const resultRaw = await this.federation.federateQuery(sql)
+              const result = resultRaw as { data?: unknown[]; metadata?: unknown }
               const executionTime = Date.now() - startTime
 
               // Record metrics
