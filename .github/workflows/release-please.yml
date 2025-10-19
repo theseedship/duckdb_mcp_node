@@ -18,7 +18,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: node
-          package-name: "@seed-ship/duckdb-mcp-native"
 
       # The logic below handles the npm publication
       - uses: actions/checkout@v4
