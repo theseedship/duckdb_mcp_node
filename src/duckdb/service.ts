@@ -79,9 +79,20 @@ export class DuckDBService {
       // Mark as initialized once connection is ready
       this.isInitialized = true
 
-      // Skip extension loading for now to prevent timeouts
-      // Extensions can be loaded on-demand when needed
-      // TODO: Make extension loading lazy or async
+      // Load DuckPGQ extension for Property Graph queries (SQL:2023 standard)
+      if (this.config.allowUnsignedExtensions) {
+        try {
+          await this.connection.run(`
+            INSTALL duckpgq FROM community;
+            LOAD duckpgq;
+          `)
+          // Extension loaded successfully - Property Graph features available
+          // Supports: Kleene operators (*,+), ANY SHORTEST, bounded quantifiers {n,m}
+        } catch (error) {
+          logger.warn('DuckPGQ extension not available, graph features disabled:', error)
+          // Continue without DuckPGQ - database is still functional for non-graph queries
+        }
+      }
 
       // Configure S3 if credentials provided (optional, non-blocking)
       if (this.config.s3Config?.accessKey && this.config.s3Config?.secretKey) {

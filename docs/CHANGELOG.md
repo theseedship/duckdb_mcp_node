@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-10-19
+
+### 🎯 Features
+
+- **DuckPGQ Extension Support**: Integrated DuckDB Property Graph Query extension
+  - Automatic loading of `duckpgq` extension from community repository
+  - SQL:2023 Property Graphs standard compliance
+  - Enabled when `allowUnsignedExtensions: true` in configuration
+  - Supports Kleene operators (`*`, `+`), bounded quantifiers (`{n,m}`)
+  - `ANY SHORTEST` path queries for optimal graph traversal
+  - Full `GRAPH_TABLE` syntax support for advanced pattern matching
+
+### 🔧 Configuration
+
+- **Graph Features Toggle**: Graph capabilities activated via `allowUnsignedExtensions` config
+  - Graceful degradation if extension unavailable
+  - Non-blocking initialization (continues without graph features if load fails)
+  - Clear logging for extension load status
+
+### 📚 Documentation
+
+- Added inline documentation for DuckPGQ feature support
+- Clarified property graph capabilities in service initialization
+
+### 🛠️ Technical Details
+
+- Extension loaded via: `INSTALL duckpgq FROM community; LOAD duckpgq;`
+- Compatible with DuckDB 1.4.0+ via `@duckdb/node-api ^1.4.1-r.1`
+- Foundation for advanced knowledge graph queries in dependent packages
+
 ## [0.6.8-rc.2] - 2025-10-05
 
 ### 📦 Dependencies
