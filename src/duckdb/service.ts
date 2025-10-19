@@ -80,7 +80,10 @@ export class DuckDBService {
       this.isInitialized = true
 
       // Load DuckPGQ extension for Property Graph queries (SQL:2023 standard)
-      if (this.config.allowUnsignedExtensions) {
+      // NOTE: DuckPGQ is currently available for DuckDB v1.0.0 - v1.2.2
+      // Binaries for DuckDB v1.4.x are in development (as of 2025-10-19)
+      // See: https://github.com/cwida/duckpgq-extension
+      if (this.config.allowUnsignedExtensions && process.env.ENABLE_DUCKPGQ !== 'false') {
         try {
           await this.connection.run(`
             INSTALL duckpgq FROM community;
@@ -88,8 +91,18 @@ export class DuckDBService {
           `)
           // Extension loaded successfully - Property Graph features available
           // Supports: Kleene operators (*,+), ANY SHORTEST, bounded quantifiers {n,m}
-        } catch (error) {
-          logger.warn('DuckPGQ extension not available, graph features disabled:', error)
+        } catch (error: any) {
+          // DuckPGQ binaries not yet available for DuckDB 1.4.x
+          // This is expected and non-fatal - database continues to work for non-graph queries
+          if (error?.message?.includes('HTTP 404') || error?.message?.includes('duckpgq')) {
+            logger.info(
+              'DuckPGQ extension not yet available for DuckDB 1.4.x - awaiting release. ' +
+                'Graph features will be enabled once binaries are published. ' +
+                'Set ENABLE_DUCKPGQ=false to suppress this message.'
+            )
+          } else {
+            logger.warn('DuckPGQ extension load failed:', error)
+          }
           // Continue without DuckPGQ - database is still functional for non-graph queries
         }
       }

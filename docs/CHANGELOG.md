@@ -17,23 +17,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ANY SHORTEST` path queries for optimal graph traversal
   - Full `GRAPH_TABLE` syntax support for advanced pattern matching
 
+### ⚠️ Compatibility Notes
+
+- **DuckPGQ Availability**:
+  - ✅ Fully functional with DuckDB v1.0.0 - v1.2.2
+  - 🚧 Binaries for DuckDB v1.4.x are in active development (as of 2025-10-19)
+  - Infrastructure is ready and will auto-enable when binaries are published
+  - Track progress: [cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension)
+
+- **Current Behavior with DuckDB 1.4.x**:
+  - Extension load attempt returns HTTP 404 (expected)
+  - Informational message logged (not error/warning)
+  - Database continues to function normally for non-graph queries
+  - Set `ENABLE_DUCKPGQ=false` to suppress info messages
+
 ### 🔧 Configuration
 
 - **Graph Features Toggle**: Graph capabilities activated via `allowUnsignedExtensions` config
   - Graceful degradation if extension unavailable
   - Non-blocking initialization (continues without graph features if load fails)
   - Clear logging for extension load status
+  - New env var: `ENABLE_DUCKPGQ=false` to skip load attempt entirely
 
 ### 📚 Documentation
 
-- Added inline documentation for DuckPGQ feature support
+- Added comprehensive DuckPGQ section in README with compatibility matrix
+- Inline documentation for DuckPGQ feature support and version compatibility
+- Example SQL queries for Property Graph operations
 - Clarified property graph capabilities in service initialization
 
 ### 🛠️ Technical Details
 
 - Extension loaded via: `INSTALL duckpgq FROM community; LOAD duckpgq;`
-- Compatible with DuckDB 1.4.0+ via `@duckdb/node-api ^1.4.1-r.1`
+- Uses DuckDB 1.4.1-r.1 via `@duckdb/node-api ^1.4.1-r.1`
 - Foundation for advanced knowledge graph queries in dependent packages
+- Improved error handling with HTTP 404 detection for missing binaries
 
 ## [0.6.8-rc.2] - 2025-10-05
 

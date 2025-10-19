@@ -155,6 +155,63 @@ npm test
 - `motherduck.share_table` - Share local tables to cloud
 - `motherduck.import_table` - Import cloud tables to local
 
+## 📊 DuckPGQ Property Graph Support (v0.7.0)
+
+**🚧 Status**: Infrastructure ready, awaiting DuckPGQ binaries for DuckDB v1.4.x
+
+This version adds automatic loading of the **DuckPGQ extension** for SQL:2023 Property Graph queries when available.
+
+### Current Compatibility
+
+- ✅ **DuckDB v1.0.0 - v1.2.2**: DuckPGQ fully supported
+- 🚧 **DuckDB v1.4.0+**: DuckPGQ binaries in development (as of 2025-10-19)
+
+**What this means:**
+
+- The extension will automatically load when binaries become available for DuckDB 1.4.x
+- Database continues to work normally for non-graph queries
+- Set `ENABLE_DUCKPGQ=false` to suppress the info message
+
+### Features (when available)
+
+- **Kleene operators** (`*`, `+`) for path pattern matching
+- **Bounded quantifiers** (`{n,m}`) for precise path lengths
+- **`ANY SHORTEST` paths** for optimal graph traversal
+- **`GRAPH_TABLE` syntax** per SQL:2023 standard
+
+### Configuration
+
+```bash
+# Enable unsigned extensions (required for community extensions)
+ALLOW_UNSIGNED_EXTENSIONS=true
+
+# Optional: Disable DuckPGQ load attempt
+ENABLE_DUCKPGQ=false  # Set to suppress info messages
+```
+
+### Example Usage (when binaries available)
+
+```sql
+-- Create property graph
+CREATE PROPERTY GRAPH social_network
+VERTEX TABLES (users)
+EDGE TABLES (
+  friendships
+  SOURCE KEY (user_id) REFERENCES users (id)
+  DESTINATION KEY (friend_id) REFERENCES users (id)
+);
+
+-- Find paths with Kleene operators
+FROM GRAPH_TABLE (social_network
+  MATCH (a:users WHERE a.id = 'alice')
+        -[e:friendships]->*{1,3}
+        (b:users WHERE b.city = 'Paris')
+  COLUMNS (a.name, b.name, path_length(e) as hops)
+) SELECT *;
+```
+
+**Tracking**: Follow [cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension) for release updates.
+
 ## 🎯 Three Usage Modes
 
 This package supports three distinct usage modes to fit different integration scenarios:
