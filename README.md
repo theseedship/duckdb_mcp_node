@@ -199,15 +199,27 @@ DUCKPGQ_SOURCE=community  # Complete feature set available
 - **Bounded quantifiers** `{n,m}` with `->{n,m}` syntax (quantifier AFTER arrow)
 - Direct relationship queries (edge variable required: `[e:Label]`)
 
-❌ **What Does NOT Work:**
+⚠️ **Design Decisions (Not Bugs):**
 
-- Standalone Kleene operators (`->*`, `->+`) without ANY SHORTEST
-  - Error: "ALL unbounded with path mode WALK is not possible"
-  - ✅ Workaround: Use with `ANY SHORTEST` or use bounded quantifiers `{n,m}`
-- Patterns without edge variable names (must use `[e:Label]`, not `[:Label]`)
-- Patterns without label binding on bounded quantifiers
+These are intentional safety features and planned roadmap items:
 
-**See detailed findings with test results:** [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md)
+1. **🛡️ Safety Feature**: Standalone Kleene operators (`->*`, `->+`) blocked without ANY SHORTEST
+   - **Why**: Prevents potentially infinite results on cyclic graphs
+   - **Error**: "ALL unbounded with path mode WALK is not possible"
+   - **Workaround**: Use `ANY SHORTEST` or bounded quantifiers `->{n,m}`
+   - **Developer insight**: System protection against runaway queries
+
+2. **🚧 Roadmap Item**: Edge variable names required (temporary)
+   - **Current**: Must use `[e:Label]`, not `[:Label]`
+   - **Future**: Anonymous edge syntax will be supported
+   - **Reason**: Internal query translation needs named references
+
+3. **🚧 Roadmap Item**: Explicit label binding sometimes required
+   - **Status**: Label inference implemented but not yet exposed
+   - **Workaround**: Always specify labels explicitly
+
+**See detailed findings:** [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md)
+**Understand "why":** [`DUCKPGQ_FAILURE_ANALYSIS.md`](DUCKPGQ_FAILURE_ANALYSIS.md) (18 test cases + developer commentary)
 
 ### ⚙️ Configuration Options
 
@@ -269,10 +281,11 @@ FROM GRAPH_TABLE (social_network
   COLUMNS (p1.name AS person, p2.name AS connection)
 );
 
--- ❌ DOES NOT WORK: Standalone Kleene operators (without ANY SHORTEST)
+-- ⚠️ SAFETY FEATURE (by design): Standalone Kleene operators blocked
 -- FROM GRAPH_TABLE (social_network
 --   MATCH (p1:Person)-[k:Knows]->+(p2:Person)
 --   -- Error: "ALL unbounded with path mode WALK is not possible"
+--   -- Why blocked: Prevents infinite results on cyclic graphs (safety feature)
 --   -- Workaround: Use ANY SHORTEST or bounded quantifiers instead
 -- );
 ```
@@ -284,27 +297,38 @@ FROM GRAPH_TABLE (social_network
 
 ### 🚨 Current Status (DuckDB 1.4.x)
 
-**Tested Configuration (Validated 2025-10-20):**
+**Tested Configuration (Validated 2025-10-20 with developer insights):**
 
 - ✅ DuckPGQ 7705c5c available from community repository
 - ✅ Installation automatic with `ALLOW_UNSIGNED_EXTENSIONS=true`
 - ✅ Property graphs and fixed-length queries work
 - ✅ **ANY SHORTEST path queries work** (with `->*` syntax)
 - ✅ **Bounded quantifiers work** (with `->{n,m}` syntax)
-- ❌ Standalone Kleene operators not supported (only work with ANY SHORTEST)
+- 🛡️ **Standalone Kleene operators blocked** (safety feature - prevents infinite results)
 
-**Test Suite:**
-Run `npm run test:duckpgq:syntax` to validate DuckPGQ syntax support on your system.
+**Understanding "Limitations":**
+- **Safety features**: Intentional blocks to prevent runaway queries (e.g., ALL unbounded)
+- **Roadmap items**: Planned features not yet implemented (e.g., anonymous edges, path modes)
+- **What works today**: See compatibility matrix above
+
+**Test Suites:**
+- `npm run test:duckpgq:syntax` - Validate working features (13 tests)
+- `npm run test:duckpgq:failures` - Understand design decisions (18 tests)
 
 **Migration Path:**
 When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration will automatically upgrade. See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for migration examples.
 
 ### 📚 Resources
 
-- **Complete Guide**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md)
+- **Complete Guide**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md) - Full integration guide
+- **What Works**: [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md) - Comprehensive syntax testing results
+- **Why It Works**: [`DUCKPGQ_FAILURE_ANALYSIS.md`](DUCKPGQ_FAILURE_ANALYSIS.md) - 18 test cases + developer insights
+- **Migration**: [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) - Detailed migration examples
 - **DuckPGQ Repository**: [github.com/cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension)
 - **Community Extensions**: [duckdb.org/community_extensions](https://duckdb.org/community_extensions/extensions/duckpgq)
-- **Test Script**: `npm run test:duckpgq` (validates your configuration)
+- **Test Scripts**:
+  - `npm run test:duckpgq:syntax` - Validate working features
+  - `npm run test:duckpgq:failures` - Understand design decisions
 
 ## 🎯 Three Usage Modes
 
