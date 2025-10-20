@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.0...v0.9.1) (2025-10-20)
+
+
+### Bug Fixes
+
+* **npm:** include DuckPGQ documentation files in npm package ([1595cf0](https://github.com/theseedship/duckdb_mcp_node/commit/1595cf0e1804ec573d3be9eb611475463773a22f))
+
 ## [0.9.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.8.1...v0.9.0) (2025-10-20)
 
 
