@@ -35,7 +35,12 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "DUCKPGQ_FINDINGS.md",
+    "DUCKPGQ_FAILURE_ANALYSIS.md",
+    "DUCKPGQ_QUICK_REFERENCE.md",
+    "MIGRATION_GUIDE.md",
+    "docs/**/*.md"
   ],
   "scripts": {
     "clean": "rm -rf dist",
