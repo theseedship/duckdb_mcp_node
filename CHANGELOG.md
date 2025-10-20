@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.8.0...v0.8.1) (2025-10-20)
+
+
+### Bug Fixes
+
+* **build:** resolve TypeScript compilation errors for CI ([a2e0d04](https://github.com/theseedship/duckdb_mcp_node/commit/a2e0d04a1b6d6125426a9a017d0881f72e1dcbe1))
+
 ## [0.8.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.7.2...v0.8.0) (2025-10-20)
 
 
