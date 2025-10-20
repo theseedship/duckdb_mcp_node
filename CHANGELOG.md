@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.8.1...v0.9.0) (2025-10-20)
+
+
+### Features
+
+* **docs:** add comprehensive DuckPGQ documentation suite ([e324d28](https://github.com/theseedship/duckdb_mcp_node/commit/e324d2863e60061f4306df9445deccc635f9b0f1))
+
 ## [0.8.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.8.0...v0.8.1) (2025-10-20)
 
 
