@@ -231,8 +231,11 @@ export class DuckDBService {
       // Success! Log available features
       logger.info(
         `DuckPGQ extension loaded successfully from ${sourceDescription}. ` +
-          'Property Graph features available: Kleene operators (*,+), ANY SHORTEST paths, ' +
-          'bounded quantifiers {n,m}, GRAPH_TABLE syntax (SQL:2023 standard).'
+          'Property Graph features available: GRAPH_TABLE syntax, fixed-length paths, ' +
+          'ANY SHORTEST paths (with ->* syntax), bounded quantifiers (->{n,m}), ' +
+          'Kleene operators when used with ANY SHORTEST. ' +
+          'Note: Standalone Kleene operators (->*, ->+) without ANY SHORTEST may not work in all versions. ' +
+          'Run npm run test:duckpgq:syntax to validate your configuration.'
       )
     } catch (error: any) {
       const errorMessage = error?.message || String(error)

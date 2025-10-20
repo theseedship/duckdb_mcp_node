@@ -8,7 +8,7 @@ _Last Updated: 2025-10-20_
 
 ## Current State (DuckDB 1.4.1 + DuckPGQ 7705c5c)
 
-### What You Have Now
+### What You Have Now (Validated 2025-10-20)
 
 ✅ **Available Features:**
 
@@ -16,50 +16,67 @@ _Last Updated: 2025-10-20_
 - Basic `GRAPH_TABLE` syntax for pattern matching
 - Fixed-length path queries (1-hop, 2-hop, 3-hop, etc.)
 - Direct relationship traversal
+- **ANY SHORTEST path queries** with `->*` syntax (star AFTER arrow)
+- **Bounded quantifiers** with `->{n,m}` syntax (quantifier AFTER arrow)
+- Kleene operators when used WITH ANY SHORTEST
 
-❌ **Missing Features:**
+⚠️ **Limited Features:**
 
-- Kleene operators (`*`, `+`) for variable-length paths
-- Bounded quantifiers (`{n,m}`) syntax
-- `ANY SHORTEST` path queries
-- Advanced pattern matching with quantifiers
+- Standalone Kleene operators (`->*`, `->+`) without ANY SHORTEST
+  - Error: "ALL unbounded with path mode WALK is not possible"
+  - ✅ **Workaround:** Use with ANY SHORTEST or use bounded quantifiers instead
 
-**See detailed findings:** [DUCKPGQ_FINDINGS.md](DUCKPGQ_FINDINGS.md)
+**See detailed findings with test results:** [DUCKPGQ_FINDINGS.md](DUCKPGQ_FINDINGS.md)
 
 ---
 
 ## Future State (Full DuckPGQ Support)
 
-When full DuckPGQ support becomes available for DuckDB 1.4.x or 1.5.x, you will gain access to:
+When full DuckPGQ support becomes available for DuckDB 1.4.x or 1.5.x, the main improvement will be:
 
-### ✨ New Capabilities
+### ✨ Additional Capabilities (Not Yet Available)
 
-1. **Kleene Star (`*`)** - Zero or more repetitions
+1. **Standalone Kleene Star (`->*`)** - Zero or more repetitions WITHOUT ANY SHORTEST
 
    ```sql
-   -- Find all paths of any length
-   MATCH (a:Person)-[:Knows*]->(b:Person)
+   -- ❌ Currently fails: "ALL unbounded with path mode WALK is not possible"
+   -- Future: Find all paths of any length
+   MATCH (a:Person)-[e:Knows]->*(b:Person)
+
+   -- ✅ Current workaround: Use with ANY SHORTEST
+   MATCH p = ANY SHORTEST (a:Person)-[e:Knows]->*(b:Person)
    ```
 
-2. **Kleene Plus (`+`)** - One or more repetitions
+2. **Standalone Kleene Plus (`->+`)** - One or more repetitions WITHOUT ANY SHORTEST
 
    ```sql
-   -- Find all connected people (at least 1 hop)
-   MATCH (a:Person)-[:Knows+]->(b:Person)
+   -- ❌ Currently fails: "ALL unbounded with path mode WALK is not possible"
+   -- Future: Find all connected people (at least 1 hop)
+   MATCH (a:Person)-[e:Knows]->+(b:Person)
+
+   -- ✅ Current workaround: Use bounded quantifiers
+   MATCH (a:Person)-[e:Knows]->{1,10}(b:Person)  -- Max 10 hops
    ```
 
-3. **Bounded Quantifiers (`{n,m}`)** - Precise path length control
+### ✅ Already Available in 7705c5c
+
+3. **Bounded Quantifiers (`{n,m}`)** - **WORKS NOW with correct syntax!**
 
    ```sql
-   -- Find paths between 2 and 5 hops
-   MATCH (a:Person)-[:Knows{2,5}]->(b:Person)
+   -- ✅ Find paths between 2 and 5 hops (note: ->{n,m} AFTER arrow)
+   FROM GRAPH_TABLE (social_network
+     MATCH (a:Person)-[e:Knows]->{2,5}(b:Person)
+     COLUMNS (a.name, b.name)
+   )
    ```
 
-4. **ANY SHORTEST Paths** - Efficient shortest path queries
+4. **ANY SHORTEST Paths** - **WORKS NOW with correct syntax!**
    ```sql
-   -- Find shortest path between two people
-   MATCH ANY SHORTEST (a:Person)-[:Knows*]->(b:Person)
-   WHERE a.name = 'Alice' AND b.name = 'Bob'
+   -- ✅ Find shortest path between two people (note: ->* AFTER arrow)
+   FROM GRAPH_TABLE (social_network
+     MATCH p = ANY SHORTEST (a:Person WHERE a.name = 'Alice')-[e:Knows]->*(b:Person WHERE b.name = 'Bob')
+     COLUMNS (a.name, b.name, path_length(p) AS hops)
+   )
    ```
 
 ---
@@ -97,17 +114,19 @@ SELECT * FROM (
 )
 ```
 
-**Simulate shortest path:**
+**✅ Use ANY SHORTEST (Now Available!):**
 
 ```sql
--- Get paths ordered by length, take first
-WITH hop1 AS (SELECT... MATCH (a)-[e]->(b) ...),
-     hop2 AS (SELECT... MATCH (a)-[e1]->(x)-[e2]->(b) ...),
-     hop3 AS (SELECT... MATCH (a)-[e1]->(x)-[e2]->(y)-[e3]->(b) ...)
-SELECT * FROM hop1
-UNION ALL (SELECT * FROM hop2 WHERE NOT EXISTS (SELECT 1 FROM hop1))
-UNION ALL (SELECT * FROM hop3 WHERE NOT EXISTS (SELECT 1 FROM hop1 UNION ALL SELECT 1 FROM hop2))
-LIMIT 1
+-- ✅ ANY SHORTEST works in 7705c5c!
+FROM GRAPH_TABLE (social_network
+  MATCH p = ANY SHORTEST (a:Person WHERE a.id = 1)-[e:Knows]->*(b:Person WHERE b.id = 10)
+  COLUMNS (a.name AS from_person, b.name AS to_person, path_length(p) AS hops)
+)
+
+-- ❌ Old workaround (no longer needed):
+-- WITH hop1 AS (...), hop2 AS (...), hop3 AS (...)
+-- SELECT * FROM hop1
+-- UNION ALL (SELECT * FROM hop2 WHERE NOT EXISTS ...)
 ```
 
 ### Phase 2: Preparation for Migration
@@ -134,37 +153,39 @@ LIMIT 1
      graphName: string,
      minHops: number,
      maxHops: number,
-     useKleene: boolean = false // Toggle when available
+     useBoundedQuantifiers: boolean = true // Already available in 7705c5c!
    ): string {
-     if (useKleene) {
-       // Future: Use Kleene operators
+     if (useBoundedQuantifiers) {
+       // ✅ WORKS NOW: Bounded quantifiers with correct syntax
        return `
          FROM GRAPH_TABLE (${graphName}
-           MATCH (a)-[e:Knows{${minHops},${maxHops}}]->(b)
-           COLUMNS (...)
+           MATCH (a:Person)-[e:Knows]->{${minHops},${maxHops}}(b:Person)
+           COLUMNS (a.name, b.name, ${maxHops} as max_hops)
          )
        `
      } else {
-       // Current: Use UNION approach
+       // Fallback: Use UNION approach (for very old versions)
        return buildUnionPathQuery(graphName, minHops, maxHops)
      }
    }
    ```
 
-3. **Document Your Workarounds**
+3. **Document Your Query Patterns**
 
-   Add comments indicating temporary workarounds:
+   Use available features with correct syntax:
 
    ```sql
-   -- TODO: Replace with Kleene operators when available
-   -- Target syntax: MATCH (a)-[:Knows{1,5}]->(b)
-   -- Current workaround: UNION of fixed-length paths
-   SELECT * FROM (
-     SELECT * FROM GRAPH_TABLE (g MATCH (a)-[e1]->(b) ...)
-     UNION ALL
-     SELECT * FROM GRAPH_TABLE (g MATCH (a)-[e1]->(x)-[e2]->(b) ...)
-     -- ... etc
+   -- ✅ Bounded quantifiers WORK in 7705c5c (use ->{n,m} after arrow)
+   FROM GRAPH_TABLE (g
+     MATCH (a:Person)-[e:Knows]->{1,5}(b:Person)
+     COLUMNS (a.name, b.name)
    )
+
+   -- ❌ Only if you need standalone Kleene (not available):
+   -- Workaround: Use bounded quantifiers with max limit
+   -- SELECT * FROM (
+   --   SELECT * FROM GRAPH_TABLE (g MATCH (a)-[e]->{1,10}(b) ...)
+   -- ) WHERE hops BETWEEN 1 AND 5
    ```
 
 4. **Test Compatibility Mode**
@@ -200,11 +221,13 @@ npm run test:duckpgq
 npm run test:graph:migration
 ```
 
-#### Step 3: Replace Workarounds
+#### Step 3: Adopt Available Features
 
-Systematically replace UNION-based patterns with Kleene operators:
+**✅ You can use bounded quantifiers TODAY in 7705c5c!**
 
-**Before (Workaround):**
+Replace UNION-based patterns with bounded quantifiers (already works):
+
+**Before (Old Workaround - No Longer Needed):**
 
 ```sql
 SELECT * FROM (
@@ -216,28 +239,38 @@ SELECT * FROM (
 )
 ```
 
-**After (Kleene):**
+**After (Bounded Quantifiers - Available NOW in 7705c5c):**
 
 ```sql
+-- ✅ Works in 7705c5c! Note: ->{n,m} AFTER arrow
 FROM GRAPH_TABLE (g
-  MATCH (a)-[e:Knows{1,3}]->(b)
-  COLUMNS (a.id, b.id, path_length(e) as hops)
+  MATCH (a:Person)-[e:Knows]->{1,3}(b:Person)
+  COLUMNS (a.id, b.id)
 )
 ```
 
-#### Step 4: Optimize Queries
-
-Take advantage of new features for better performance:
+**Future improvement (standalone Kleene when available):**
 
 ```sql
--- Before: Manual path filtering
-SELECT * FROM paths WHERE hops <= 5 ORDER BY hops LIMIT 1
+-- Not yet available: Standalone Kleene without bounds
+-- MATCH (a)-[e:Knows]->+(b)  -- Will work in future versions
+```
 
--- After: Native shortest path
+#### Step 4: Use ANY SHORTEST (Available NOW!)
+
+**✅ ANY SHORTEST already works in 7705c5c!**
+
+Take advantage of this feature today:
+
+```sql
+-- ❌ Old workaround (no longer needed)
+-- SELECT * FROM paths WHERE hops <= 5 ORDER BY hops LIMIT 1
+
+-- ✅ Use ANY SHORTEST (works NOW in 7705c5c!)
+-- Note: ->* AFTER arrow, WITH path variable
 FROM GRAPH_TABLE (g
-  MATCH ANY SHORTEST (a)-[e:Knows*]->(b)
-  WHERE a.id = 'alice' AND b.id = 'bob'
-  COLUMNS (path_length(e) as hops)
+  MATCH p = ANY SHORTEST (a:Person WHERE a.id = 'alice')-[e:Knows]->*(b:Person WHERE b.id = 'bob')
+  COLUMNS (a.name, b.name, path_length(p) as hops)
 )
 ```
 

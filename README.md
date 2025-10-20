@@ -180,31 +180,34 @@ DUCKPGQ_SOURCE=community  # Complete feature set available
 
 ### 📋 Real Compatibility Matrix
 
-| DuckDB Version      | DuckPGQ Version | Fixed Paths | Kleene (+,\*) | ANY SHORTEST | Status               |
-| ------------------- | --------------- | ----------- | ------------- | ------------ | -------------------- |
-| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | **Production Ready** |
-| **1.4.1** (current) | **7705c5c**     | **✅**      | **❌**        | **❌**       | **Limited Support**  |
-| 1.5.x+              | TBD             | ?           | ?             | ?            | Planned              |
+| DuckDB Version      | DuckPGQ Version | Fixed Paths | Bounded {n,m} | ANY SHORTEST | Kleene (alone) | Status               |
+| ------------------- | --------------- | ----------- | ------------- | ------------ | -------------- | -------------------- |
+| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | ✅             | **Production Ready** |
+| **1.4.1** (current) | **7705c5c**     | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**       |
+| 1.5.x+              | TBD             | ?           | ?             | ?            | ?              | Planned              |
 
-### ⚠️ IMPORTANT: DuckPGQ 7705c5c Limitations
+### ⚠️ IMPORTANT: DuckPGQ 7705c5c Capabilities (Validated via Automated Testing)
 
-**Version 7705c5c (current for DuckDB 1.4.x) supports ONLY:**
+**Version 7705c5c (current for DuckDB 1.4.x) - Tested 2025-10-20**
 
 ✅ **What Works:**
 
 - Property graph creation (VERTEX/EDGE TABLES)
 - Basic pattern matching with `GRAPH_TABLE`
-- Fixed-length paths (explicit hops: 2-hop, 3-hop, etc.)
-- Direct relationship queries
+- Fixed-length paths (explicit hops: 1-hop, 2-hop, 3-hop, etc.)
+- **ANY SHORTEST path queries** with `->*` syntax (star AFTER arrow)
+- **Bounded quantifiers** `{n,m}` with `->{n,m}` syntax (quantifier AFTER arrow)
+- Direct relationship queries (edge variable required: `[e:Label]`)
 
 ❌ **What Does NOT Work:**
 
-- Kleene operators (`*`, `+`) for variable-length paths
-- Bounded quantifiers (`{n,m}`) syntax
-- `ANY SHORTEST` path queries
-- Pattern quantifiers in general
+- Standalone Kleene operators (`->*`, `->+`) without ANY SHORTEST
+  - Error: "ALL unbounded with path mode WALK is not possible"
+  - ✅ Workaround: Use with `ANY SHORTEST` or use bounded quantifiers `{n,m}`
+- Patterns without edge variable names (must use `[e:Label]`, not `[:Label]`)
+- Patterns without label binding on bounded quantifiers
 
-**See detailed findings:** [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md)
+**See detailed findings with test results:** [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md)
 
 ### ⚙️ Configuration Options
 
@@ -229,7 +232,7 @@ DUCKPGQ_VERSION=             # Specific version (optional)
 
 **See full documentation**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md)
 
-### 📝 Example Usage (Compatible with 7705c5c)
+### 📝 Example Usage (Validated Syntax for 7705c5c)
 
 ```sql
 -- Create property graph from existing tables
@@ -241,7 +244,7 @@ CREATE PROPERTY GRAPH social_network
       DESTINATION KEY (to_id) REFERENCES Person (id)
   );
 
--- ✅ WORKS: Direct connections (1-hop) - note edge variable required
+-- ✅ WORKS: Direct connections (1-hop) - edge variable required
 FROM GRAPH_TABLE (social_network
   MATCH (p1:Person)-[k:Knows]->(p2:Person)
   COLUMNS (p1.name AS person, p2.name AS friend)
@@ -254,31 +257,47 @@ FROM GRAPH_TABLE (social_network
   COLUMNS (p1.name AS person, p3.name AS friend_of_friend)
 );
 
--- ❌ DOES NOT WORK: Kleene operators not supported
--- FROM GRAPH_TABLE (social_network
---   MATCH (p1:Person)-[:Knows+]->(p2:Person)  -- Syntax error!
--- );
+-- ✅ WORKS: ANY SHORTEST path query (note: ->* AFTER arrow, WITH path variable)
+FROM GRAPH_TABLE (social_network
+  MATCH p = ANY SHORTEST (start:Person WHERE start.id = 1)-[k:Knows]->*(end:Person WHERE end.id = 10)
+  COLUMNS (start.name AS from_person, end.name AS to_person, path_length(p) AS hops)
+);
 
--- ❌ DOES NOT WORK: ANY SHORTEST not supported
+-- ✅ WORKS: Bounded quantifiers (1 to 3 hops, note: ->{n,m} AFTER arrow)
+FROM GRAPH_TABLE (social_network
+  MATCH (p1:Person)-[k:Knows]->{1,3}(p2:Person)
+  COLUMNS (p1.name AS person, p2.name AS connection)
+);
+
+-- ❌ DOES NOT WORK: Standalone Kleene operators (without ANY SHORTEST)
 -- FROM GRAPH_TABLE (social_network
---   MATCH ANY SHORTEST (p1:Person)-[:Knows]*->(p2:Person)  -- Syntax error!
+--   MATCH (p1:Person)-[k:Knows]->+(p2:Person)
+--   -- Error: "ALL unbounded with path mode WALK is not possible"
+--   -- Workaround: Use ANY SHORTEST or bounded quantifiers instead
 -- );
 ```
 
-**Workarounds for variable-length paths:**
-See [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md#-workarounds-pratiques) for UNION-based patterns.
+**Migration notes:**
+- ✅ ANY SHORTEST and bounded quantifiers now work in 7705c5c!
+- See [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md) for comprehensive syntax validation results
+- See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for detailed migration examples
 
 ### 🚨 Current Status (DuckDB 1.4.x)
 
-**Tested Configuration:**
+**Tested Configuration (Validated 2025-10-20):**
 
 - ✅ DuckPGQ 7705c5c available from community repository
 - ✅ Installation automatic with `ALLOW_UNSIGNED_EXTENSIONS=true`
 - ✅ Property graphs and fixed-length queries work
-- ⚠️ Advanced features (Kleene, quantifiers) not supported yet
+- ✅ **ANY SHORTEST path queries work** (with `->*` syntax)
+- ✅ **Bounded quantifiers work** (with `->{n,m}` syntax)
+- ❌ Standalone Kleene operators not supported (only work with ANY SHORTEST)
+
+**Test Suite:**
+Run `npm run test:duckpgq:syntax` to validate DuckPGQ syntax support on your system.
 
 **Migration Path:**
-When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration will automatically upgrade. See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) (coming soon) for planning.
+When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration will automatically upgrade. See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for migration examples.
 
 ### 📚 Resources
 

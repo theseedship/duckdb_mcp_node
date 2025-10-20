@@ -72,6 +72,7 @@
     "test:ui": "vitest --ui",
     "test:jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:duckpgq": "tsx scripts/test-duckpgq.ts",
+    "test:duckpgq:syntax": "tsx scripts/test-duckpgq-syntax.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx,js,jsx,json,md}'",

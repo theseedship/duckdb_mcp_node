@@ -19,13 +19,15 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 
 **DuckPGQ** is a DuckDB extension that adds support for **SQL:2023 Property Graph** queries, enabling powerful graph analytics directly within DuckDB.
 
-### Key Features
+### Key Features (Validated 2025-10-20)
 
 - ✅ **SQL:2023 Standard Compliance** - Uses official Property Graph syntax
-- ✅ **Kleene Operators** - Pattern matching with `*` (zero or more) and `+` (one or more)
-- ✅ **ANY SHORTEST Paths** - Efficient shortest path algorithms
-- ✅ **Bounded Quantifiers** - Control repetition with `{n,m}` syntax
+- ✅ **ANY SHORTEST Paths** - Efficient shortest path algorithms (works in 7705c5c)
+- ✅ **Bounded Quantifiers** - Control repetition with `->{n,m}` syntax (works in 7705c5c)
+- ⚠️ **Kleene Operators** - Pattern matching with `->*` and `->+` (only with ANY SHORTEST in 7705c5c)
 - ✅ **GRAPH_TABLE Syntax** - Advanced pattern matching and traversal
+
+**Note**: Feature availability varies by version. See [Compatibility Matrix](#compatibility-matrix) for details.
 
 ### Project Links
 
@@ -37,23 +39,28 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 
 ## Compatibility Matrix
 
-| DuckDB Version      | DuckPGQ Status     | Recommended Source | Stability     |
-| ------------------- | ------------------ | ------------------ | ------------- |
-| 1.0.0 - 1.2.2       | ✅ Fully Supported | `community`        | Stable        |
-| 1.3.x               | ⚠️ Limited Support | `community`        | Mostly Stable |
-| **1.4.x** (current) | 🚧 In Development  | `edge` or `custom` | Experimental  |
-| 1.5.x+              | 📅 Planned         | TBD                | TBD           |
+| DuckDB Version      | DuckPGQ Version | Fixed Paths | ANY SHORTEST | Bounded {n,m} | Standalone Kleene | Status               |
+| ------------------- | --------------- | ----------- | ------------ | ------------- | ----------------- | -------------------- |
+| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅           | ✅            | ✅                | **Fully Supported**  |
+| 1.3.x               | Partial         | ✅          | ⚠️           | ⚠️            | ⚠️                | **Limited**          |
+| **1.4.x** (current) | **7705c5c**     | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**       |
+| 1.5.x+              | TBD             | ?           | ?            | ?             | ?                 | Planned              |
 
 **Current Package**: This project uses `@duckdb/node-api ^1.4.1-r.4` (DuckDB 1.4.1)
 
 ### Version-Specific Notes
 
-#### DuckDB 1.4.x (Current)
+#### DuckDB 1.4.x (Current) - Validated 2025-10-20
 
-- **Status**: Community binaries not yet published (as of 2025-10-20)
-- **Workaround**: Use `DUCKPGQ_SOURCE=custom` with a compatible build
-- **Tracking**: [Issue #276](https://github.com/cwida/duckpgq-extension/issues/276)
-- **Impact**: Graceful degradation - database works normally without graph features
+- **Status**: DuckPGQ 7705c5c IS available from community repository ✅
+- **Installation**: Automatic with `ALLOW_UNSIGNED_EXTENSIONS=true`
+- **Features Available**:
+  - ✅ Fixed-length paths (1-hop, 2-hop, N-hop)
+  - ✅ ANY SHORTEST path queries (with `->*` syntax)
+  - ✅ Bounded quantifiers (with `->{n,m}` syntax)
+  - ❌ Standalone Kleene operators without ANY SHORTEST
+- **Testing**: Run `npm run test:duckpgq:syntax` to validate your setup
+- **See**: [DUCKPGQ_FINDINGS.md](../DUCKPGQ_FINDINGS.md) for comprehensive test results
 
 ---
 
@@ -233,56 +240,68 @@ CREATE TABLE Knows (
 INSERT INTO Person VALUES (1, 'Alice', 30), (2, 'Bob', 35), (3, 'Carol', 28);
 INSERT INTO Knows VALUES (1, 2, '2020-01-01'), (2, 3, '2021-06-15');
 
--- Create property graph
+-- Create property graph (7705c5c syntax)
 CREATE PROPERTY GRAPH social_network
   VERTEX TABLES (Person)
   EDGE TABLES (
-    Knows SOURCE Person(from_id) DESTINATION Person(to_id)
+    Knows
+      SOURCE KEY (from_id) REFERENCES Person (id)
+      DESTINATION KEY (to_id) REFERENCES Person (id)
   );
 ```
 
-### Graph Queries
+### Graph Queries (7705c5c Validated Syntax)
 
-**Find Friends of Friends**:
+**Find Friends of Friends (Fixed 2-hop)**:
 
 ```sql
+-- ✅ Works in 7705c5c - note edge variables required
 FROM GRAPH_TABLE (social_network
-  MATCH (p1:Person)-[:Knows]->(p2:Person)-[:Knows]->(p3:Person)
+  MATCH (p1:Person)-[e1:Knows]->(p2:Person)-[e2:Knows]->(p3:Person)
   COLUMNS (p1.name AS person, p3.name AS friend_of_friend)
 );
 ```
 
-**Shortest Path**:
+**Shortest Path (ANY SHORTEST)**:
 
 ```sql
+-- ✅ Works in 7705c5c! Note: ->* AFTER arrow, WITH path variable
 FROM GRAPH_TABLE (social_network
-  MATCH ANY SHORTEST (p1:Person)-[:Knows]*->(p2:Person)
-  WHERE p1.name = 'Alice' AND p2.name = 'Carol'
-  COLUMNS (p1.name AS start, p2.name AS end, path_length)
+  MATCH p = ANY SHORTEST (p1:Person WHERE p1.name = 'Alice')-[e:Knows]->*(p2:Person WHERE p2.name = 'Carol')
+  COLUMNS (p1.name AS start, p2.name AS end, path_length(p) AS hops)
 );
 ```
 
-**Variable-Length Paths**:
+**Variable-Length Paths (Bounded Quantifiers)**:
 
 ```sql
--- Find connections within 1-3 hops
+-- ✅ Works in 7705c5c! Note: ->{n,m} AFTER arrow
 FROM GRAPH_TABLE (social_network
-  MATCH (p1:Person)-[:Knows]{1,3}->(p2:Person)
-  WHERE p1.name = 'Alice'
-  COLUMNS (p1.name AS from, p2.name AS to, path_length)
+  MATCH (p1:Person WHERE p1.name = 'Alice')-[e:Knows]->{1,3}(p2:Person)
+  COLUMNS (p1.name AS from, p2.name AS to)
 );
 ```
 
 ### Advanced Patterns
 
-**Kleene Operators**:
+**Kleene Operators (Limited Support in 7705c5c)**:
 
 ```sql
--- Zero or more: -[:Knows*]->
--- One or more: -[:Knows+]->
-
+-- ✅ Works WITH ANY SHORTEST:
 FROM GRAPH_TABLE (social_network
-  MATCH (p1:Person)-[:Knows+]->(p2:Person)
+  MATCH p = ANY SHORTEST (p1:Person)-[e:Knows]->*(p2:Person)
+  WHERE p1.name = 'Alice'
+  COLUMNS (p1.name AS start, p2.name AS reachable, path_length(p) AS hops)
+);
+
+-- ❌ Does NOT work standalone (without ANY SHORTEST):
+-- FROM GRAPH_TABLE (social_network
+--   MATCH (p1:Person)-[e:Knows]->+(p2:Person)  -- Error: ALL unbounded not possible
+-- )
+
+-- ✅ Workaround: Use bounded quantifiers instead
+FROM GRAPH_TABLE (social_network
+  MATCH (p1:Person)-[e:Knows]->{1,10}(p2:Person)  -- Max 10 hops
   WHERE p1.name = 'Alice'
   COLUMNS (p1.name AS start, p2.name AS reachable)
 );
