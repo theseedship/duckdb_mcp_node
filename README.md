@@ -7,7 +7,7 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**🚀 Production Ready** (v0.7.1)
+**🚀 Production Ready** (v0.8.1+)
 
 ### ✅ Production-Ready Features
 
@@ -19,6 +19,7 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - **Virtual Filesystem**: Direct SQL access via mcp:// URIs
 - **Monitoring**: Built-in performance metrics and slow query detection
 - **Security**: Enhanced SQL injection prevention, server authentication, path traversal protection
+- **DuckPGQ Documentation**: Comprehensive guides with developer insights, syntax validation, and migration examples
 
 ### 🚧 In Progress
 
@@ -291,6 +292,7 @@ FROM GRAPH_TABLE (social_network
 ```
 
 **Migration notes:**
+
 - ✅ ANY SHORTEST and bounded quantifiers now work in 7705c5c!
 - See [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md) for comprehensive syntax validation results
 - See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) for detailed migration examples
@@ -307,11 +309,13 @@ FROM GRAPH_TABLE (social_network
 - 🛡️ **Standalone Kleene operators blocked** (safety feature - prevents infinite results)
 
 **Understanding "Limitations":**
+
 - **Safety features**: Intentional blocks to prevent runaway queries (e.g., ALL unbounded)
 - **Roadmap items**: Planned features not yet implemented (e.g., anonymous edges, path modes)
 - **What works today**: See compatibility matrix above
 
 **Test Suites:**
+
 - `npm run test:duckpgq:syntax` - Validate working features (13 tests)
 - `npm run test:duckpgq:failures` - Understand design decisions (18 tests)
 
