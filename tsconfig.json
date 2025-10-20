@@ -20,6 +20,14 @@
     "isolatedModules": true,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "scripts/**/*", "examples/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "test-*.js", "test-*.mjs"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "test-*.js",
+    "test-*.mjs",
+    "scripts/**/*",
+    "examples/**/*"
+  ]
 }

@@ -169,7 +169,7 @@ export class DuckDBService {
     const strictMode = process.env.DUCKPGQ_STRICT_MODE === 'true'
 
     let installCommand: string
-    let sourceDescription: string
+    let sourceDescription: string = 'unknown source'
 
     try {
       // Build install command based on source
