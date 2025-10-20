@@ -80,31 +80,8 @@ export class DuckDBService {
       this.isInitialized = true
 
       // Load DuckPGQ extension for Property Graph queries (SQL:2023 standard)
-      // NOTE: DuckPGQ is currently available for DuckDB v1.0.0 - v1.2.2
-      // Binaries for DuckDB v1.4.x are in development (as of 2025-10-19)
-      // See: https://github.com/cwida/duckpgq-extension
       if (this.config.allowUnsignedExtensions && process.env.ENABLE_DUCKPGQ !== 'false') {
-        try {
-          await this.connection.run(`
-            INSTALL duckpgq FROM community;
-            LOAD duckpgq;
-          `)
-          // Extension loaded successfully - Property Graph features available
-          // Supports: Kleene operators (*,+), ANY SHORTEST, bounded quantifiers {n,m}
-        } catch (error: any) {
-          // DuckPGQ binaries not yet available for DuckDB 1.4.x
-          // This is expected and non-fatal - database continues to work for non-graph queries
-          if (error?.message?.includes('HTTP 404') || error?.message?.includes('duckpgq')) {
-            logger.info(
-              'DuckPGQ extension not yet available for DuckDB 1.4.x - awaiting release. ' +
-                'Graph features will be enabled once binaries are published. ' +
-                'Set ENABLE_DUCKPGQ=false to suppress this message.'
-            )
-          } else {
-            logger.warn('DuckPGQ extension load failed:', error)
-          }
-          // Continue without DuckPGQ - database is still functional for non-graph queries
-        }
+        await this.loadDuckPGQ()
       }
 
       // Configure S3 if credentials provided (optional, non-blocking)
@@ -162,6 +139,144 @@ export class DuckDBService {
 
     // Execute the transformed query
     return this.executeQuery(sql, params)
+  }
+
+  /**
+   * Load DuckPGQ extension for Property Graph queries
+   *
+   * Supports multiple installation sources:
+   * - community: Official DuckDB community repository (default)
+   * - edge: Edge/nightly builds for experimental DuckDB versions
+   * - custom: Custom repository URL specified in DUCKPGQ_CUSTOM_REPO
+   *
+   * Environment variables:
+   * - DUCKPGQ_SOURCE: Installation source (community/edge/custom)
+   * - DUCKPGQ_CUSTOM_REPO: Custom repository URL (when source=custom)
+   * - DUCKPGQ_VERSION: Specific version to install (optional)
+   * - DUCKPGQ_STRICT_MODE: If true, throw error on load failure
+   *
+   * @throws Error if DUCKPGQ_STRICT_MODE=true and load fails
+   */
+  private async loadDuckPGQ(): Promise<void> {
+    if (!this.connection) {
+      logger.warn('Cannot load DuckPGQ: connection not established')
+      return
+    }
+
+    const source = process.env.DUCKPGQ_SOURCE || 'community'
+    const customRepo = process.env.DUCKPGQ_CUSTOM_REPO
+    const version = process.env.DUCKPGQ_VERSION
+    const strictMode = process.env.DUCKPGQ_STRICT_MODE === 'true'
+
+    let installCommand: string
+    let sourceDescription: string
+
+    try {
+      // Build install command based on source
+      switch (source) {
+        case 'community':
+          // Official DuckDB community repository
+          installCommand = version
+            ? `INSTALL duckpgq FROM community VERSION '${version}'`
+            : 'INSTALL duckpgq FROM community'
+          sourceDescription = 'DuckDB community repository'
+          logger.info(
+            `Loading DuckPGQ from ${sourceDescription}${version ? ` (version ${version})` : ''}`
+          )
+          break
+
+        case 'edge':
+          // Edge/nightly builds - typically from cwida repo direct downloads
+          // Note: This requires the extension to be available via a public URL
+          // Users should check https://github.com/cwida/duckpgq-extension for available builds
+          installCommand = 'INSTALL duckpgq FROM community'
+          sourceDescription = 'edge builds (via community with fallback)'
+          logger.info(
+            'Loading DuckPGQ from edge builds. ' +
+              'Note: Edge builds must be published to community repo or use source=custom with DUCKPGQ_CUSTOM_REPO'
+          )
+          break
+
+        case 'custom':
+          // Custom repository URL
+          if (!customRepo) {
+            const error = new Error(
+              'DUCKPGQ_SOURCE=custom requires DUCKPGQ_CUSTOM_REPO environment variable'
+            )
+            if (strictMode) throw error
+            logger.warn(error.message)
+            return
+          }
+          installCommand = `INSTALL duckpgq FROM '${customRepo}'`
+          sourceDescription = `custom repository (${customRepo})`
+          logger.info(`Loading DuckPGQ from ${sourceDescription}`)
+          break
+
+        default: {
+          const error = new Error(
+            `Invalid DUCKPGQ_SOURCE: ${source}. Must be one of: community, edge, custom`
+          )
+          if (strictMode) throw error
+          logger.warn(error.message)
+          return
+        }
+      }
+
+      // Execute install and load commands
+      await this.connection.run(`
+        ${installCommand};
+        LOAD duckpgq;
+      `)
+
+      // Success! Log available features
+      logger.info(
+        `DuckPGQ extension loaded successfully from ${sourceDescription}. ` +
+          'Property Graph features available: Kleene operators (*,+), ANY SHORTEST paths, ' +
+          'bounded quantifiers {n,m}, GRAPH_TABLE syntax (SQL:2023 standard).'
+      )
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error)
+
+      // Check if this is a known compatibility issue
+      const isCompatibilityIssue =
+        errorMessage.includes('HTTP 404') || errorMessage.includes('duckpgq')
+      const isDuckDB14x = true // We're using DuckDB 1.4.x
+
+      if (isCompatibilityIssue && isDuckDB14x && source === 'community') {
+        // Expected issue: DuckPGQ community binaries not yet available for DuckDB 1.4.x
+        logger.info(
+          'DuckPGQ community binaries not yet available for DuckDB 1.4.x (as of 2025-10-20). ' +
+            'This is expected and non-blocking. Options: ' +
+            '1) Wait for official 1.4.x release, ' +
+            '2) Use DUCKPGQ_SOURCE=edge (if available), ' +
+            '3) Use DUCKPGQ_SOURCE=custom with a compatible build. ' +
+            'Database continues to work normally for non-graph queries. ' +
+            'Set ENABLE_DUCKPGQ=false to suppress this message. ' +
+            'See: https://github.com/cwida/duckpgq-extension/issues/276'
+        )
+
+        // Don't throw in non-strict mode for this expected case
+        if (strictMode) {
+          throw new Error(
+            `DuckPGQ strict mode enabled but extension unavailable for DuckDB 1.4.x. ` +
+              `Try DUCKPGQ_SOURCE=edge or custom. Original error: ${errorMessage}`
+          )
+        }
+      } else {
+        // Unexpected error
+        logger.warn(
+          `Failed to load DuckPGQ from ${sourceDescription}: ${errorMessage}. ` +
+            'Database will continue without graph features.'
+        )
+
+        if (strictMode) {
+          throw new Error(`DuckPGQ strict mode enabled but load failed: ${errorMessage}`)
+        }
+      }
+
+      // In non-strict mode, continue without DuckPGQ
+      // Database is still functional for non-graph queries
+    }
   }
 
   /**

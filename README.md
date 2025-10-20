@@ -155,62 +155,137 @@ npm test
 - `motherduck.share_table` - Share local tables to cloud
 - `motherduck.import_table` - Import cloud tables to local
 
-## 📊 DuckPGQ Property Graph Support (v0.7.0)
+## 📊 DuckPGQ Property Graph Support (v0.7.2+)
 
-**🚧 Status**: Infrastructure ready, awaiting DuckPGQ binaries for DuckDB v1.4.x
+**SQL:2023 Property Graph queries - Limited support with automatic installation**
 
-This version adds automatic loading of the **DuckPGQ extension** for SQL:2023 Property Graph queries when available.
+This package supports **DuckPGQ extension version 7705c5c** from the community repository for basic graph analytics.
 
-### Current Compatibility
+### 🎯 Quick Start
 
-- ✅ **DuckDB v1.0.0 - v1.2.2**: DuckPGQ fully supported
-- 🚧 **DuckDB v1.4.0+**: DuckPGQ binaries in development (as of 2025-10-19)
-
-**What this means:**
-
-- The extension will automatically load when binaries become available for DuckDB 1.4.x
-- Database continues to work normally for non-graph queries
-- Set `ENABLE_DUCKPGQ=false` to suppress the info message
-
-### Features (when available)
-
-- **Kleene operators** (`*`, `+`) for path pattern matching
-- **Bounded quantifiers** (`{n,m}`) for precise path lengths
-- **`ANY SHORTEST` paths** for optimal graph traversal
-- **`GRAPH_TABLE` syntax** per SQL:2023 standard
-
-### Configuration
+**For DuckDB 1.4.x (Current)**:
 
 ```bash
-# Enable unsigned extensions (required for community extensions)
+# Enable DuckPGQ (installs automatically from community repository)
+ENABLE_DUCKPGQ=true
+ALLOW_UNSIGNED_EXTENSIONS=true
+DUCKPGQ_SOURCE=community  # Default, no custom URL needed
+```
+
+**For DuckDB 1.0-1.2.2** (full DuckPGQ support):
+
+```bash
+DUCKPGQ_SOURCE=community  # Complete feature set available
+```
+
+### 📋 Real Compatibility Matrix
+
+| DuckDB Version      | DuckPGQ Version | Fixed Paths | Kleene (+,\*) | ANY SHORTEST | Status               |
+| ------------------- | --------------- | ----------- | ------------- | ------------ | -------------------- |
+| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | **Production Ready** |
+| **1.4.1** (current) | **7705c5c**     | **✅**      | **❌**        | **❌**       | **Limited Support**  |
+| 1.5.x+              | TBD             | ?           | ?             | ?            | Planned              |
+
+### ⚠️ IMPORTANT: DuckPGQ 7705c5c Limitations
+
+**Version 7705c5c (current for DuckDB 1.4.x) supports ONLY:**
+
+✅ **What Works:**
+
+- Property graph creation (VERTEX/EDGE TABLES)
+- Basic pattern matching with `GRAPH_TABLE`
+- Fixed-length paths (explicit hops: 2-hop, 3-hop, etc.)
+- Direct relationship queries
+
+❌ **What Does NOT Work:**
+
+- Kleene operators (`*`, `+`) for variable-length paths
+- Bounded quantifiers (`{n,m}`) syntax
+- `ANY SHORTEST` path queries
+- Pattern quantifiers in general
+
+**See detailed findings:** [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md)
+
+### ⚙️ Configuration Options
+
+**Minimal configuration** (add to `.env`):
+
+```bash
+# Required for DuckPGQ 7705c5c
+ENABLE_DUCKPGQ=true
 ALLOW_UNSIGNED_EXTENSIONS=true
 
-# Optional: Disable DuckPGQ load attempt
-ENABLE_DUCKPGQ=false  # Set to suppress info messages
+# Optional: Graceful degradation (default)
+DUCKPGQ_STRICT_MODE=false  # Continue without graph if load fails
 ```
 
-### Example Usage (when binaries available)
+**Full configuration options:**
+
+```bash
+DUCKPGQ_SOURCE=community     # community, edge, custom
+DUCKPGQ_CUSTOM_REPO=         # URL for custom builds
+DUCKPGQ_VERSION=             # Specific version (optional)
+```
+
+**See full documentation**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md)
+
+### 📝 Example Usage (Compatible with 7705c5c)
 
 ```sql
--- Create property graph
+-- Create property graph from existing tables
 CREATE PROPERTY GRAPH social_network
-VERTEX TABLES (users)
-EDGE TABLES (
-  friendships
-  SOURCE KEY (user_id) REFERENCES users (id)
-  DESTINATION KEY (friend_id) REFERENCES users (id)
+  VERTEX TABLES (Person)
+  EDGE TABLES (
+    Knows
+      SOURCE KEY (from_id) REFERENCES Person (id)
+      DESTINATION KEY (to_id) REFERENCES Person (id)
+  );
+
+-- ✅ WORKS: Direct connections (1-hop) - note edge variable required
+FROM GRAPH_TABLE (social_network
+  MATCH (p1:Person)-[k:Knows]->(p2:Person)
+  COLUMNS (p1.name AS person, p2.name AS friend)
 );
 
--- Find paths with Kleene operators
+-- ✅ WORKS: Friends of friends (fixed 2-hop)
 FROM GRAPH_TABLE (social_network
-  MATCH (a:users WHERE a.id = 'alice')
-        -[e:friendships]->*{1,3}
-        (b:users WHERE b.city = 'Paris')
-  COLUMNS (a.name, b.name, path_length(e) as hops)
-) SELECT *;
+  MATCH (p1:Person)-[k1:Knows]->(p2:Person)-[k2:Knows]->(p3:Person)
+  WHERE p1.id != p3.id
+  COLUMNS (p1.name AS person, p3.name AS friend_of_friend)
+);
+
+-- ❌ DOES NOT WORK: Kleene operators not supported
+-- FROM GRAPH_TABLE (social_network
+--   MATCH (p1:Person)-[:Knows+]->(p2:Person)  -- Syntax error!
+-- );
+
+-- ❌ DOES NOT WORK: ANY SHORTEST not supported
+-- FROM GRAPH_TABLE (social_network
+--   MATCH ANY SHORTEST (p1:Person)-[:Knows]*->(p2:Person)  -- Syntax error!
+-- );
 ```
 
-**Tracking**: Follow [cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension) for release updates.
+**Workarounds for variable-length paths:**
+See [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md#-workarounds-pratiques) for UNION-based patterns.
+
+### 🚨 Current Status (DuckDB 1.4.x)
+
+**Tested Configuration:**
+
+- ✅ DuckPGQ 7705c5c available from community repository
+- ✅ Installation automatic with `ALLOW_UNSIGNED_EXTENSIONS=true`
+- ✅ Property graphs and fixed-length queries work
+- ⚠️ Advanced features (Kleene, quantifiers) not supported yet
+
+**Migration Path:**
+When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration will automatically upgrade. See [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) (coming soon) for planning.
+
+### 📚 Resources
+
+- **Complete Guide**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md)
+- **DuckPGQ Repository**: [github.com/cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension)
+- **Community Extensions**: [duckdb.org/community_extensions](https://duckdb.org/community_extensions/extensions/duckpgq)
+- **Test Script**: `npm run test:duckpgq` (validates your configuration)
 
 ## 🎯 Three Usage Modes
 

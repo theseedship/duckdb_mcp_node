@@ -71,6 +71,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:jest": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test:duckpgq": "tsx scripts/test-duckpgq.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx,js,jsx,json,md}'",
