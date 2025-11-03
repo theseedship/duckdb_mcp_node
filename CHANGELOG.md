@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.2...v0.9.3) (2025-11-03)
+
+
+### Bug Fixes
+
+* **ci:** remove vitest config files from tsconfig include ([dd5f2fc](https://github.com/theseedship/duckdb_mcp_node/commit/dd5f2fc2717744e629a35e9b9b9e0a38e830e13a))
+
 ## [0.9.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.0...v0.9.1) (2025-10-20)
 
 
