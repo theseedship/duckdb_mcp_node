@@ -20,7 +20,7 @@
     "isolatedModules": true,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "vitest.config.ts", "vitest.setup.ts"],
+  "include": ["src/**/*"],
   "exclude": [
     "node_modules",
     "dist",
