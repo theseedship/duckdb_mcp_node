@@ -13,6 +13,7 @@ export default defineConfig({
     exclude: ['node_modules', 'dist', 'build'],
     coverage: {
       enabled: true,
+      include: ['src/**/*.ts'], // Required in Vitest v4
       reporter: ['text', 'lcov', 'html'],
       provider: 'v8',
       exclude: [
@@ -37,11 +38,8 @@ export default defineConfig({
     restoreMocks: true,
     clearMocks: true,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1, // Vitest v4: replaces poolOptions.forks.singleFork
+    isolate: false, // Vitest v4: equivalent to singleFork: true
     testTimeout: 10000,
     hookTimeout: 10000,
   },
