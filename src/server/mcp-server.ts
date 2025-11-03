@@ -22,6 +22,8 @@ import {
   createMotherDuckHandlers,
   getMotherDuckToolDefinitions,
 } from '../tools/motherduck-tools.js'
+import { processToolDefinitions, processToolHandlers } from '../tools/process-tools.js'
+import { dataHelperToolDefinitions, dataHelperToolHandlers } from '../tools/data-helper-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
@@ -522,6 +524,10 @@ class DuckDBMCPServer {
           },
           // MotherDuck tools
           ...getMotherDuckToolDefinitions(),
+          // Process mining tools
+          ...processToolDefinitions,
+          // Data helper tools
+          ...dataHelperToolDefinitions,
         ],
       }
     })
@@ -1190,6 +1196,80 @@ class DuckDBMCPServer {
 
           case 'motherduck.import_table': {
             const result = await this.motherduckHandlers['motherduck.import_table'](args)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          // Process mining tools
+          case 'process.describe': {
+            const result = await processToolHandlers['process.describe'](args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'process.similar': {
+            const result = await processToolHandlers['process.similar'](args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'process.compose': {
+            const result = await processToolHandlers['process.compose'](args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          // Data helper tools
+          case 'json_to_parquet': {
+            const result = await dataHelperToolHandlers.json_to_parquet(args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'profile_parquet': {
+            const result = await dataHelperToolHandlers.profile_parquet(args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          case 'sample_parquet': {
+            const result = await dataHelperToolHandlers.sample_parquet(args, this.duckdb)
             return {
               content: [
                 {
