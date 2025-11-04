@@ -55,6 +55,11 @@
       "types": "./dist/tools/motherduck-tools.d.ts",
       "import": "./dist/tools/motherduck-tools.js",
       "require": "./dist/tools/motherduck-tools.js"
+    },
+    "./mastra": {
+      "types": "./dist/adapters/mastra-adapter.d.ts",
+      "import": "./dist/adapters/mastra-adapter.js",
+      "require": "./dist/adapters/mastra-adapter.js"
     }
   },
   "files": [

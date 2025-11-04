@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Mastra AI Integration Phase 0**: Preparation for AI agents powered by DuckDB (Q1 2026)
+  - Export path `/mastra` for Mastra adapter module
+  - Adapter skeleton (`src/adapters/mastra-adapter.ts`) with comprehensive JSDoc
+  - Complete integration roadmap (`docs/MASTRA_INTEGRATION.md`) - 498 lines documenting Phase 1-3
+  - API stability guarantees documented in main entry point
+  - README.md Mastra section with use cases and timeline
+  - **Breaking Changes**: NONE - All functions throw "Not yet implemented" errors directing to roadmap
+  - **Related**: PR #16, Issue #17 (Epic tracking)
+
 ## [0.10.4] - 2025-11-04
 
 ### Fixed
