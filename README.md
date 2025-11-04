@@ -327,12 +327,203 @@ When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration wil
 - **Complete Guide**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md) - Full integration guide
 - **What Works**: [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md) - Comprehensive syntax testing results
 - **Why It Works**: [`DUCKPGQ_FAILURE_ANALYSIS.md`](DUCKPGQ_FAILURE_ANALYSIS.md) - 18 test cases + developer insights
-- **Migration**: [`MIGRATION_GUIDE.md`](MIGRATION_GUIDE.md) - Detailed migration examples
-- **DuckPGQ Repository**: [github.com/cwida/duckpgq-extension](https://github.com/cwida/duckpgq-extension)
-- **Community Extensions**: [duckdb.org/community_extensions](https://duckdb.org/community_extensions/extensions/duckpgq)
-- **Test Scripts**:
-  - `npm run test:duckpgq:syntax` - Validate working features
-  - `npm run test:duckpgq:failures` - Understand design decisions
+
+---
+
+## 🔄 Process Mining Tools (v0.9.4+)
+
+**NEW**: Enhanced process mining capabilities with embeddings standardization and robust composition
+
+### 🎯 Overview
+
+Three specialized tools for analyzing workflow processes stored in Parquet files:
+
+- `process.describe` - List and filter process summaries with confidence scores
+- `process.similar` - Find similar processes using vector embeddings (FLOAT[384])
+- `process.compose` - Merge multiple processes into unified workflow with QA checks
+
+### ✨ What's New in v0.9.4
+
+#### P2.8: Embeddings Standardization
+
+**Problem Solved**: Inconsistent embedding dimensions and no fallback when vector search fails
+
+**Features**:
+
+- ✅ **Dimension Validation**: Enforces FLOAT[384] embeddings (catches errors early)
+- ✅ **Fallback Mechanism**: Automatic TypeScript L2 distance when DuckDB VSS unavailable
+- ✅ **Transparency**: Results include `distance_source` field (`duckdb_vss` or `typescript_l2`)
+
+**Example**:
+
+```typescript
+// Search for similar processes
+const results = await handlers['process.similar']({
+  signature_emb: [0.1, 0.2, ...], // 384-dimensional embedding
+  k: 5,
+  parquet_url: 's3://bucket/signatures.parquet'
+})
+
+// Results include distance_source for observability
+// {
+//   matches: [
+//     { doc_id: 'doc1', distance: 0.45, distance_source: 'duckdb_vss' }
+//   ]
+// }
+```
+
+**Benefits**:
+
+- 🛡️ **Type Safety**: Prevents dimension mismatch errors at runtime
+- 🔄 **Reliability**: Graceful degradation when VSS extension unavailable
+- 📊 **Observability**: Know which distance computation method was used
+
+#### P2.9: Process Composition Robustification
+
+**Problem Solved**: Simple deduplication without conflict resolution or quality checks
+
+**Features**:
+
+- ✅ **Step Normalization**: Lowercase + trim step keys (handles "Login" vs "login")
+- ✅ **Conflict Resolution**: Uses median order when multiple processes have same step
+- ✅ **Edge Remapping**: Updates edge references after step deduplication
+- ✅ **QA Checks**: Detects orphan steps, cycles, and duplicate edges
+
+**Example**:
+
+```typescript
+// Compose workflows from multiple documents
+const composed = await handlers['process.compose']({
+  doc_ids: ['doc1', 'doc2', 'doc3'],
+  steps_url: 's3://bucket/steps.parquet',
+  edges_url: 's3://bucket/edges.parquet',
+})
+
+// Result includes QA report
+// {
+//   success: true,
+//   steps: [...],           // Deduplicated and normalized steps
+//   edges: [...],           // Remapped edges
+//   merged_count: 5,        // Number of steps merged
+//   qa: {
+//     orphan_steps: [],     // Steps with no edges
+//     cycles: [],           // Detected cycles
+//     duplicate_edges: [],  // Duplicate connections
+//     warnings: []          // Human-readable issues
+//   }
+// }
+```
+
+**Benefits**:
+
+- 🔀 **Smart Merging**: Handles variations in step naming across documents
+- ⚖️ **Fair Ordering**: Median order prevents bias from any single process
+- 🔗 **Edge Consistency**: Automatically updates all edge references after merging
+- 🔍 **Quality Assurance**: Immediate feedback on workflow structural issues
+
+### 📋 Use Cases
+
+**1. Process Discovery**: Find similar workflows across document corpus
+
+```typescript
+// Generate signature embedding for a new process
+const signature = await embedWorkflow(process)
+
+// Find top 10 similar processes
+const similar = await handlers['process.similar']({
+  signature_emb: signature,
+  k: 10,
+})
+```
+
+**2. Workflow Consolidation**: Merge related processes into master workflow
+
+```typescript
+// Compose processes from multiple sources
+const master = await handlers['process.compose']({
+  doc_ids: ['onboarding_v1', 'onboarding_v2', 'onboarding_v3'],
+})
+
+// Check for quality issues
+if (master.qa.warnings.length > 0) {
+  console.warn('Workflow issues detected:', master.qa.warnings)
+}
+```
+
+**3. Process Validation**: Verify workflow structural integrity
+
+```typescript
+// Compose and validate
+const workflow = await handlers['process.compose']({ doc_ids: [...] })
+
+// QA checks automatically run
+console.log('Orphan steps:', workflow.qa.orphan_steps)
+console.log('Cycles detected:', workflow.qa.cycles)
+console.log('Duplicate edges:', workflow.qa.duplicate_edges)
+```
+
+### 🔧 Configuration
+
+Set Parquet URLs via environment variables:
+
+```bash
+# Process mining Parquet locations
+PROCESS_SUMMARY_URL=s3://bucket/process_summary.parquet
+PROCESS_STEPS_URL=s3://bucket/process_steps.parquet
+PROCESS_EDGES_URL=s3://bucket/process_edges.parquet
+PROCESS_SIGNATURE_URL=s3://bucket/process_signatures.parquet
+
+# Enable DuckDB VSS for fast similarity (optional)
+# Falls back to TypeScript L2 distance if unavailable
+```
+
+### 📊 Data Schema
+
+**Process Steps** (FLOAT[384] embeddings):
+
+```sql
+CREATE TABLE process_steps (
+  doc_id VARCHAR,
+  process_id VARCHAR,
+  step_id VARCHAR,
+  order INTEGER,
+  step_key VARCHAR,      -- Normalized to lowercase+trim in v0.9.4
+  label VARCHAR,
+  evidence VARCHAR,
+  embedding FLOAT[384]   -- Validated dimension in v0.9.4
+)
+```
+
+**Process Edges**:
+
+```sql
+CREATE TABLE process_edges (
+  doc_id VARCHAR,
+  process_id VARCHAR,
+  from_step_id VARCHAR,  -- Automatically remapped in v0.9.4
+  to_step_id VARCHAR,    -- Automatically remapped in v0.9.4
+  relation VARCHAR,
+  evidence VARCHAR
+)
+```
+
+### 🚀 Migration from v0.9.3 → v0.9.4
+
+**Breaking Changes**: None
+
+**New Features** (backwards compatible):
+
+- `process.similar` now validates embedding dimensions (rejects ≠ 384)
+- `process.similar` returns `distance_source` field
+- `process.compose` returns `qa` field with quality report
+
+**Recommended Actions**:
+
+1. ✅ Re-embed processes with 384-dimensional model if using different size
+2. ✅ Review `qa.warnings` after composition to identify workflow issues
+3. ✅ Monitor `distance_source` to track VSS availability
+
+---
 
 ## 🎯 Three Usage Modes
 
