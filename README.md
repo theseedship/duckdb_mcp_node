@@ -350,7 +350,7 @@ Three specialized tools for analyzing workflow processes stored in Parquet files
 
 **Features**:
 
-- ✅ **Dimension Validation**: Enforces FLOAT[384] embeddings (catches errors early)
+- ✅ **Dimension Validation**: Validates embedding dimensions (configurable via `PROCESS_EMBEDDING_DIM`, defaults to 384)
 - ✅ **Fallback Mechanism**: Automatic TypeScript L2 distance when DuckDB VSS unavailable
 - ✅ **Transparency**: Results include `distance_source` field (`duckdb_vss` or `typescript_l2`)
 
@@ -473,13 +473,17 @@ PROCESS_STEPS_URL=s3://bucket/process_steps.parquet
 PROCESS_EDGES_URL=s3://bucket/process_edges.parquet
 PROCESS_SIGNATURE_URL=s3://bucket/process_signatures.parquet
 
+# Embedding dimension (defaults to 384)
+# Set to match your embedding model (e.g., 1024 for text-embedding-3-large)
+PROCESS_EMBEDDING_DIM=1024
+
 # Enable DuckDB VSS for fast similarity (optional)
 # Falls back to TypeScript L2 distance if unavailable
 ```
 
 ### 📊 Data Schema
 
-**Process Steps** (FLOAT[384] embeddings):
+**Process Steps** (configurable embedding dimension):
 
 ```sql
 CREATE TABLE process_steps (
@@ -490,7 +494,7 @@ CREATE TABLE process_steps (
   step_key VARCHAR,      -- Normalized to lowercase+trim in v0.9.4
   label VARCHAR,
   evidence VARCHAR,
-  embedding FLOAT[384]   -- Validated dimension in v0.9.4
+  embedding FLOAT[N]     -- Dimension validated via PROCESS_EMBEDDING_DIM (default: 384)
 )
 ```
 
@@ -513,13 +517,13 @@ CREATE TABLE process_edges (
 
 **New Features** (backwards compatible):
 
-- `process.similar` now validates embedding dimensions (rejects ≠ 384)
+- `process.similar` now validates embedding dimensions (configurable via `PROCESS_EMBEDDING_DIM`)
 - `process.similar` returns `distance_source` field
 - `process.compose` returns `qa` field with quality report
 
 **Recommended Actions**:
 
-1. ✅ Re-embed processes with 384-dimensional model if using different size
+1. ✅ Set `PROCESS_EMBEDDING_DIM` to match your embedding model (e.g., `1024` for text-embedding-3-large)
 2. ✅ Review `qa.warnings` after composition to identify workflow issues
 3. ✅ Monitor `distance_source` to track VSS availability
 

@@ -31,9 +31,11 @@ import {
 import { logger } from '../utils/logger.js'
 
 /**
- * Expected embedding dimension for process mining (FLOAT[384])
+ * Expected embedding dimension for process mining
+ * Configurable via PROCESS_EMBEDDING_DIM environment variable
+ * Defaults to 384 if not set
  */
-const EXPECTED_EMBEDDING_DIM = 384
+const EXPECTED_EMBEDDING_DIM = parseInt(process.env.PROCESS_EMBEDDING_DIM || '384', 10)
 
 /**
  * Calculate L2 (Euclidean) distance between two vectors
@@ -125,7 +127,8 @@ export async function handleProcessSimilar(
       throw new Error(
         `Invalid embedding dimension: expected ${EXPECTED_EMBEDDING_DIM}, got ${signature_emb.length}. ` +
           `Process mining requires FLOAT[${EXPECTED_EMBEDDING_DIM}] embeddings. ` +
-          `Please re-embed with a ${EXPECTED_EMBEDDING_DIM}-dimensional model.`
+          `Please re-embed with a ${EXPECTED_EMBEDDING_DIM}-dimensional model, ` +
+          `or set PROCESS_EMBEDDING_DIM=${signature_emb.length} to use ${signature_emb.length}-dimensional embeddings.`
       )
     }
 
