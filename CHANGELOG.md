@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [0.10.5] - 2025-11-04
+
+### Changed
+
+- **docs(mastra)**: Removed deposium-specific documentation, clarified generic scope
+  - Deleted `docs/WORK_DISTRIBUTION.md` (internal team coordination)
+  - Deleted `docs/MASTRA_QUICKSTART.md` (internal implementation guide)
+  - Updated `docs/MASTRA_INTEGRATION.md` with experimental warning and scope clarification
+  - Updated `README.md` Mastra section with experimental badge
+  - Clarified CHANGELOG entry for Phase 0
+  - **Result**: Clear that Mastra adapter is generic (for any DuckDB+Mastra project), NOT deposium-specific
+
+### Removed
+
+- Obsolete git branches: `feature/mastra-phase-0`, `feature/mastra-phase-1-adapter`
+
+### Note
+
+**Mastra Integration Status**: Phase 0 (skeleton only) remains experimental and community-driven. deposium project implements Mastra agents separately in `deposium_edge_runtime` repository using MCP client-server architecture (no adapter needed).
+
+## [0.10.4] - 2025-11-04
+
 ### Added
 
 - **Mastra AI Integration Phase 0**: Generic adapter preparation (Q1 2026, community-driven)
