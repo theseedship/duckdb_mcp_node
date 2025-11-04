@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.10.0...v0.10.1) (2025-11-04)
+
+
+### Bug Fixes
+
+* **pkg:** include test utilities, scripts, and validation docs in npm package ([4f7a604](https://github.com/theseedship/duckdb_mcp_node/commit/4f7a6042db6a358c9ac4b52d115d6b5e8fe79d6d))
+
 ## [0.10.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.5...v0.10.0) (2025-11-04)
 
 
