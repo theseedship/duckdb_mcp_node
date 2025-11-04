@@ -529,6 +529,76 @@ CREATE TABLE process_edges (
 
 ---
 
+## 🤖 Mastra AI Integration (Coming Q1 2026)
+
+**Status**: Phase 0 - Preparation (November 2025)
+
+### Overview
+
+[Mastra AI Framework](https://mastra.ai) integration is in development to enable powerful AI agents powered by DuckDB's analytical capabilities.
+
+**Why Mastra?**
+
+- **TypeScript-Native**: Seamless integration with existing codebase
+- **MCP First-Class Support**: `@mastra/mcp` provides bidirectional MCP integration
+- **Production-Ready**: Batteries included (workflows, HITL, observability, state management)
+- **Rapid Growth**: Y Combinator W25 backed, 7.5K+ GitHub stars
+
+### Planned Capabilities
+
+**Phase 1 (December 2025 - January 2026)**: Proof-of-Concept
+
+- Convert DuckDB MCP tools to Mastra-compatible format
+- Example SQL Analytics Agent (natural language → SQL)
+- Basic agent examples and validation
+
+**Phase 2 (February - April 2026)**: Production-Ready
+
+- Full MCPServer integration for external Mastra agents
+- Process mining agents (workflow discovery, similarity search, composition)
+- Multi-agent orchestration patterns
+
+**Phase 3 (May - September 2026)**: Advanced Features
+
+- Small Language Models (SLM) for space-aware NL-to-SQL
+- Human-in-the-Loop (HITL) workflows with suspend/resume
+- Vector store integration for semantic search
+
+### Use Case Preview
+
+```typescript
+// Example: SQL Analytics Agent (Phase 1)
+import { Agent } from '@mastra/core'
+import { convertToMastraTools } from '@seed-ship/duckdb-mcp-native/mastra'
+
+const analyticsAgent = new Agent({
+  name: 'Business Intelligence Agent',
+  tools: convertToMastraTools({ duckdb: myDuckDBInstance }),
+  instructions: `You are a SQL expert. Convert natural language questions into SQL queries...`,
+  model: { provider: 'ANTHROPIC', name: 'claude-3-5-sonnet' },
+})
+
+await analyticsAgent.generate({
+  messages: [{ role: 'user', content: 'What were our top selling products last quarter?' }],
+})
+```
+
+### Current Status
+
+**Phase 0 (November 2025)** - Infrastructure preparation:
+
+- ✅ Export path `/mastra` in package.json
+- ✅ Adapter skeleton `src/adapters/mastra-adapter.ts`
+- ✅ Comprehensive integration roadmap
+
+**Next Steps**: Phase 1 implementation begins December 2025
+
+📚 **Complete Roadmap**: [`docs/MASTRA_INTEGRATION.md`](docs/MASTRA_INTEGRATION.md)
+
+💡 **Community Interest**: Mastra integration contributions welcome! See roadmap for details.
+
+---
+
 ## 🎯 Three Usage Modes
 
 This package supports three distinct usage modes to fit different integration scenarios:
