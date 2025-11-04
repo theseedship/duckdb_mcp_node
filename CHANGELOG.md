@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.4...v0.9.5) (2025-11-04)
+
+
+### Bug Fixes
+
+* **process:** make embedding dimension configurable ([88cfb2f](https://github.com/theseedship/duckdb_mcp_node/commit/88cfb2fb653b98b4775424ceb57bc09270554fdb))
+
 ## [0.9.3](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.2...v0.9.3) (2025-11-03)
 
 
