@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -35,6 +35,26 @@
       "types": "./dist/test/test-utils.d.ts",
       "import": "./dist/test/test-utils.js",
       "require": "./dist/test/test-utils.js"
+    },
+    "./process": {
+      "types": "./dist/tools/process-tools.d.ts",
+      "import": "./dist/tools/process-tools.js",
+      "require": "./dist/tools/process-tools.js"
+    },
+    "./data-helpers": {
+      "types": "./dist/tools/data-helper-tools.d.ts",
+      "import": "./dist/tools/data-helper-tools.js",
+      "require": "./dist/tools/data-helper-tools.js"
+    },
+    "./ducklake": {
+      "types": "./dist/tools/ducklake-tools.d.ts",
+      "import": "./dist/tools/ducklake-tools.js",
+      "require": "./dist/tools/ducklake-tools.js"
+    },
+    "./motherduck": {
+      "types": "./dist/tools/motherduck-tools.d.ts",
+      "import": "./dist/tools/motherduck-tools.js",
+      "require": "./dist/tools/motherduck-tools.js"
     }
   },
   "files": [

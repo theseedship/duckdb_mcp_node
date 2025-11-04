@@ -62,6 +62,31 @@ export type {
   ExportDataInput,
 } from './tools/native-tools.js'
 
+// Process mining tools exports (P2.8/P2.9 validated)
+export { processToolHandlers, processToolDefinitions } from './tools/process-tools.js'
+
+// Export process types for TypeScript users
+export type {
+  ProcessDescribeResult,
+  ProcessSimilarResult,
+  ProcessComposeResult,
+  ProcessSummary,
+  ProcessStep,
+  ProcessEdge,
+} from './types/process-types.js'
+
+// Data helper tools exports (json_to_parquet, profile_parquet, sample_parquet)
+export { dataHelperToolHandlers, dataHelperToolDefinitions } from './tools/data-helper-tools.js'
+
+// DuckLake tools exports (ACID transactions, time travel, snapshots)
+export {
+  createDuckLakeToolDefinitions,
+  createDuckLakeToolHandlers,
+} from './tools/ducklake-tools.js'
+
+// MotherDuck tools exports (cloud integration)
+export { getMotherDuckToolDefinitions, createMotherDuckHandlers } from './tools/motherduck-tools.js'
+
 // Federation exports
 export * from './federation/ResourceRegistry.js'
 export * from './federation/ConnectionPool.js'
