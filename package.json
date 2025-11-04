@@ -30,16 +30,24 @@
       "types": "./dist/lib.d.ts",
       "import": "./dist/lib.js",
       "require": "./dist/lib.js"
+    },
+    "./test": {
+      "types": "./dist/test/test-utils.d.ts",
+      "import": "./dist/test/test-utils.js",
+      "require": "./dist/test/test-utils.js"
     }
   },
   "files": [
     "dist",
+    "scripts",
+    "test-data",
     "README.md",
     "LICENSE",
     "DUCKPGQ_FINDINGS.md",
     "DUCKPGQ_FAILURE_ANALYSIS.md",
     "DUCKPGQ_QUICK_REFERENCE.md",
     "MIGRATION_GUIDE.md",
+    "VALIDATION_P2.8_P2.9.md",
     "docs/**/*.md"
   ],
   "scripts": {
