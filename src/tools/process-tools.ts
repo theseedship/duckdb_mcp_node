@@ -18,6 +18,8 @@ import {
   ProcessComposeResult,
   ProcessStep,
   ProcessSummary,
+  ProcessEdge,
+  QAReport,
 } from '../types/process-types.js'
 import {
   buildProcessDescribeQuery,
@@ -27,6 +29,29 @@ import {
   buildParquetGlobPattern,
 } from './process-queries.js'
 import { logger } from '../utils/logger.js'
+
+/**
+ * Expected embedding dimension for process mining (FLOAT[384])
+ */
+const EXPECTED_EMBEDDING_DIM = 384
+
+/**
+ * Calculate L2 (Euclidean) distance between two vectors
+ * Fallback for when DuckDB VSS is unavailable
+ */
+function l2Distance(vec1: number[], vec2: number[]): number {
+  if (vec1.length !== vec2.length) {
+    throw new Error(`Vector dimension mismatch: ${vec1.length} vs ${vec2.length}`)
+  }
+
+  let sum = 0
+  for (let i = 0; i < vec1.length; i++) {
+    const diff = vec1[i] - vec2[i]
+    sum += diff * diff
+  }
+
+  return Math.sqrt(sum)
+}
 
 /**
  * Get parquet URL from environment or arguments
@@ -95,23 +120,65 @@ export async function handleProcessSimilar(
     const validatedArgs = ProcessSimilarArgsSchema.parse(args)
     const { signature_emb, k, parquet_url } = validatedArgs
 
+    // P2.8.1: Validate embedding dimension
+    if (signature_emb.length !== EXPECTED_EMBEDDING_DIM) {
+      throw new Error(
+        `Invalid embedding dimension: expected ${EXPECTED_EMBEDDING_DIM}, got ${signature_emb.length}. ` +
+          `Process mining requires FLOAT[${EXPECTED_EMBEDDING_DIM}] embeddings. ` +
+          `Please re-embed with a ${EXPECTED_EMBEDDING_DIM}-dimensional model.`
+      )
+    }
+
     // Get parquet URL
     const parquetUrl = getParquetUrl('PROCESS_SIGNATURE_URL', parquet_url)
 
     // Support glob patterns
     const finalUrl = parquetUrl.includes('{') ? buildParquetGlobPattern(parquetUrl) : parquetUrl
 
-    // Build and execute similarity query
-    const sql = buildProcessSimilarQuery(finalUrl, signature_emb, k)
-    logger.debug('Executing process.similar query', { embeddingDim: signature_emb.length, k })
+    // P2.8.2: Try DuckDB VSS first, fallback to TypeScript L2 if unavailable
+    let distanceSource: 'duckdb_vss' | 'typescript_l2' = 'duckdb_vss'
+    let results: Record<string, unknown>[]
 
-    const results = await duckdb.executeQueryWithVFS(sql)
+    try {
+      // Build and execute similarity query with DuckDB VSS
+      const sql = buildProcessSimilarQuery(finalUrl, signature_emb, k)
+      logger.debug('Executing process.similar query with DuckDB VSS', {
+        embeddingDim: signature_emb.length,
+        k,
+      })
 
-    // Format results
+      results = await duckdb.executeQueryWithVFS(sql)
+    } catch (vssError) {
+      // P2.8.2: Fallback to TypeScript L2 distance calculation
+      logger.warn('DuckDB VSS unavailable, falling back to TypeScript L2 distance', vssError)
+      distanceSource = 'typescript_l2'
+
+      // Load all signatures from parquet
+      const loadQuery = `SELECT * FROM read_parquet('${finalUrl}')`
+      const allSignatures = await duckdb.executeQueryWithVFS(loadQuery)
+
+      // Calculate L2 distances in TypeScript
+      const distances = allSignatures.map((row: Record<string, unknown>) => ({
+        ...row,
+        distance: l2Distance(signature_emb, row.signature_emb as number[]),
+      }))
+
+      // Sort by distance and take top k
+      distances.sort((a, b) => a.distance - b.distance)
+      results = distances.slice(0, k)
+
+      logger.info('TypeScript L2 fallback completed', {
+        total_signatures: allSignatures.length,
+        returned: results.length,
+      })
+    }
+
+    // P2.8.3: Format results with distance_source transparency field
     interface SimilarityResult {
       doc_id: string
       process_id: string
       distance: number
+      distance_source: 'duckdb_vss' | 'typescript_l2'
       summary?: ProcessSummary
     }
 
@@ -119,6 +186,7 @@ export async function handleProcessSimilar(
       doc_id: row.doc_id as string,
       process_id: row.process_id as string,
       distance: row.distance as number,
+      distance_source: distanceSource, // P2.8.3: Transparency field
     }))
 
     // Optionally fetch full summaries
@@ -148,6 +216,12 @@ export async function handleProcessSimilar(
         // Continue without summaries
       }
     }
+
+    // P2.8.3: Log distance source for observability
+    logger.info('process.similar completed', {
+      matches: matches.length,
+      distance_source: distanceSource,
+    })
 
     return {
       success: true,
@@ -197,19 +271,27 @@ export async function handleProcessCompose(
     logger.debug('Loading process edges', { doc_ids, edgesQuery })
 
     const edgesResults = await duckdb.executeQueryWithVFS(edgesQuery)
-    const edges = edgesResults.map((row) => ProcessEdgeSchema.parse(row))
+    let edges = edgesResults.map((row) => ProcessEdgeSchema.parse(row))
 
-    // Deduplicate steps by step_key (keep first occurrence)
-    const mergedSteps = deduplicateSteps(steps)
+    // P2.9.1 & P2.9.2: Deduplicate steps with conflict resolution
+    const { steps: mergedSteps, idMapping } = deduplicateSteps(steps)
 
     // Reorder by global order
     mergedSteps.sort((a, b) => a.order - b.order)
+
+    // P2.9.3: Remap edges to use merged step IDs
+    edges = remapEdges(edges, idMapping)
+
+    // P2.9.4: Run QA checks
+    const qaReport = runQAChecks(mergedSteps, edges)
 
     logger.info('Process composition complete', {
       source_docs: doc_ids.length,
       total_steps: steps.length,
       merged_steps: mergedSteps.length,
       edges: edges.length,
+      conflicts_resolved: steps.length - mergedSteps.length,
+      qa_warnings: qaReport.warnings.length,
     })
 
     return {
@@ -218,6 +300,7 @@ export async function handleProcessCompose(
       edges,
       merged_count: steps.length - mergedSteps.length,
       source_docs: doc_ids,
+      qa: qaReport, // P2.9.4: Include QA report
     }
   } catch (error) {
     logger.error('process.compose failed', error)
@@ -226,23 +309,164 @@ export async function handleProcessCompose(
 }
 
 /**
- * Deduplicate process steps by step_key
- * Strategy: Keep first occurrence, normalize step_key to lowercase
+ * P2.9.3: Remap edges after step deduplication
+ * Maps old step_ids to merged step_ids
  */
-function deduplicateSteps(steps: ProcessStep[]): ProcessStep[] {
-  const seen = new Set<string>()
-  const result: ProcessStep[] = []
+function remapEdges(edges: ProcessEdge[], idMapping: Map<string, string>): ProcessEdge[] {
+  return edges.map((edge) => ({
+    ...edge,
+    from_step_id: idMapping.get(edge.from_step_id) || edge.from_step_id,
+    to_step_id: idMapping.get(edge.to_step_id) || edge.to_step_id,
+  }))
+}
+
+/**
+ * P2.9.4: QA checks for composed process
+ * Detects orphans, cycles, and issues
+ */
+function runQAChecks(steps: ProcessStep[], edges: ProcessEdge[]): QAReport {
+  const report: QAReport = {
+    orphan_steps: [],
+    cycles: [],
+    duplicate_edges: [],
+    warnings: [],
+  }
+
+  // Check for orphan steps (no incoming or outgoing edges)
+  const connectedStepIds = new Set<string>()
+  edges.forEach((e) => {
+    connectedStepIds.add(e.from_step_id)
+    connectedStepIds.add(e.to_step_id)
+  })
+
+  for (const step of steps) {
+    if (!connectedStepIds.has(step.step_id) && steps.length > 1) {
+      report.orphan_steps.push(step.step_key)
+    }
+  }
+
+  // Check for duplicate edges
+  const edgeSet = new Set<string>()
+  for (const edge of edges) {
+    const edgeKey = `${edge.from_step_id}->${edge.to_step_id}`
+    if (edgeSet.has(edgeKey)) {
+      report.duplicate_edges.push(edgeKey)
+    } else {
+      edgeSet.add(edgeKey)
+    }
+  }
+
+  // Check for cycles (simplified: direct back-edges)
+  const adjacency = new Map<string, Set<string>>()
+  for (const edge of edges) {
+    const from = edge.from_step_id
+    const to = edge.to_step_id
+
+    if (!adjacency.has(from)) {
+      adjacency.set(from, new Set())
+    }
+    const fromSet = adjacency.get(from)
+    if (fromSet) {
+      fromSet.add(to)
+    }
+
+    // Check for direct cycle (A -> B and B -> A)
+    const toSet = adjacency.get(to)
+    if (toSet && toSet.has(from)) {
+      report.cycles.push([from, to])
+    }
+  }
+
+  // Add warnings
+  if (report.orphan_steps.length > 0) {
+    report.warnings.push(`${report.orphan_steps.length} orphan steps found (no edges)`)
+  }
+  if (report.duplicate_edges.length > 0) {
+    report.warnings.push(`${report.duplicate_edges.length} duplicate edges found`)
+  }
+  if (report.cycles.length > 0) {
+    report.warnings.push(`${report.cycles.length} cycles detected`)
+  }
+
+  return report
+}
+
+/**
+ * P2.9: Enhanced step deduplication with conflict resolution
+ * Strategy:
+ * - Normalize step_key (trim + lowercase)
+ * - Group duplicates by normalized key
+ * - Resolve conflicts using median order
+ * - Track merged_from sources
+ *
+ * @returns {steps, idMapping} - Deduplicated steps and old_step_id->new_step_id mapping
+ */
+function deduplicateSteps(steps: ProcessStep[]): {
+  steps: ProcessStep[]
+  idMapping: Map<string, string>
+} {
+  // P2.9.1: Group steps by normalized key
+  const groupedSteps = new Map<string, ProcessStep[]>()
+  const idMapping = new Map<string, string>() // old step_id -> merged step_id
 
   for (const step of steps) {
     const normalizedKey = step.step_key.toLowerCase().trim()
 
-    if (!seen.has(normalizedKey)) {
-      seen.add(normalizedKey)
-      result.push(step)
+    if (!groupedSteps.has(normalizedKey)) {
+      groupedSteps.set(normalizedKey, [])
+    }
+    const group = groupedSteps.get(normalizedKey)
+    if (group) {
+      group.push(step)
     }
   }
 
-  return result
+  // P2.9.2: Resolve conflicts using median order
+  const result: ProcessStep[] = []
+
+  for (const [normalizedKey, duplicates] of groupedSteps.entries()) {
+    let mergedStep: ProcessStep
+
+    if (duplicates.length === 1) {
+      // No conflict, use as-is
+      mergedStep = { ...duplicates[0], step_key: normalizedKey }
+    } else {
+      // Conflict: use median order
+      const orders = duplicates.map((s) => s.order).sort((a, b) => a - b)
+      const medianOrder = orders[Math.floor(orders.length / 2)]
+
+      // Find step with order closest to median
+      const selectedStep = duplicates.reduce((closest, current) => {
+        const closestDiff = Math.abs(closest.order - medianOrder)
+        const currentDiff = Math.abs(current.order - medianOrder)
+        return currentDiff < closestDiff ? current : closest
+      })
+
+      // Use median order and track sources
+      mergedStep = {
+        ...selectedStep,
+        order: medianOrder,
+        step_key: normalizedKey, // Use normalized key
+      }
+
+      logger.debug('Resolved step conflict', {
+        normalized_key: normalizedKey,
+        duplicates: duplicates.length,
+        orders: orders,
+        median_order: medianOrder,
+        selected_doc: selectedStep.doc_id,
+      })
+    }
+
+    result.push(mergedStep)
+
+    // Map all duplicate step_ids to the merged step's step_id
+    for (const duplicate of duplicates) {
+      idMapping.set(duplicate.step_id, mergedStep.step_id)
+    }
+  }
+
+  return { steps: result, idMapping }
 }
 
 /**

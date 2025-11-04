@@ -117,6 +117,17 @@ export interface ProcessSimilarResult {
 }
 
 /**
+ * QA report for composed process
+ * P2.9.4: Quality assurance checks
+ */
+export interface QAReport {
+  orphan_steps: string[] // Steps with no incoming or outgoing edges
+  cycles: string[][] // Detected cycles (pairs of mutually connected steps)
+  duplicate_edges: string[] // Duplicate edge connections
+  warnings: string[] // Human-readable warnings
+}
+
+/**
  * Result from process.compose tool
  */
 export interface ProcessComposeResult {
@@ -125,6 +136,7 @@ export interface ProcessComposeResult {
   edges: ProcessEdge[]
   merged_count: number
   source_docs: string[]
+  qa: QAReport // P2.9.4: Quality assurance report
 }
 
 /**
