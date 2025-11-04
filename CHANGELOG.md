@@ -9,15 +9,39 @@
 
 ## [Unreleased]
 
+## [0.10.5] - 2025-11-04
+
+### Changed
+
+- **docs(mastra)**: Removed deposium-specific documentation, clarified generic scope
+  - Deleted `docs/WORK_DISTRIBUTION.md` (internal team coordination)
+  - Deleted `docs/MASTRA_QUICKSTART.md` (internal implementation guide)
+  - Updated `docs/MASTRA_INTEGRATION.md` with experimental warning and scope clarification
+  - Updated `README.md` Mastra section with experimental badge
+  - Clarified CHANGELOG entry for Phase 0
+  - **Result**: Clear that Mastra adapter is generic (for any DuckDB+Mastra project), NOT deposium-specific
+
+### Removed
+
+- Obsolete git branches: `feature/mastra-phase-0`, `feature/mastra-phase-1-adapter`
+
+### Note
+
+**Mastra Integration Status**: Phase 0 (skeleton only) remains experimental and community-driven. deposium project implements Mastra agents separately in `deposium_edge_runtime` repository using MCP client-server architecture (no adapter needed).
+
+## [0.10.4] - 2025-11-04
+
 ### Added
 
-- **Mastra AI Integration Phase 0**: Preparation for AI agents powered by DuckDB (Q1 2026)
-  - Export path `/mastra` for Mastra adapter module
+- **Mastra AI Integration Phase 0**: Generic adapter preparation (Q1 2026, community-driven)
+  - Export path `/mastra` for Mastra adapter module (generic tool conversion)
   - Adapter skeleton (`src/adapters/mastra-adapter.ts`) with comprehensive JSDoc
-  - Complete integration roadmap (`docs/MASTRA_INTEGRATION.md`) - 498 lines documenting Phase 1-3
+  - Complete integration roadmap (`docs/MASTRA_INTEGRATION.md`) documenting Phase 1-3
   - API stability guarantees documented in main entry point
-  - README.md Mastra section with use cases and timeline
-  - **Breaking Changes**: NONE - All functions throw "Not yet implemented" errors directing to roadmap
+  - README.md Mastra section with use cases and experimental warning
+  - **Scope**: Generic adapter only (NOT deposium-specific agents)
+  - **Status**: EXPERIMENTAL - Skeleton only, Phase 1 implementation community-driven
+  - **Breaking Changes**: NONE - All functions throw "Not yet implemented" errors
   - **Related**: PR #16, Issue #17 (Epic tracking)
 
 ## [0.10.4] - 2025-11-04
