@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.5...v0.10.0) (2025-11-04)
+
+
+### Features
+
+* **test:** expose process mining validation scripts as npm package feature ([f461700](https://github.com/theseedship/duckdb_mcp_node/commit/f461700c54f7e4921f61dd034d878dcb714e70df))
+
 ## [0.9.5](https://github.com/theseedship/duckdb_mcp_node/compare/v0.9.4...v0.9.5) (2025-11-04)
 
 
