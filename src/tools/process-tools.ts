@@ -285,6 +285,26 @@ export async function handleProcessCompose(
     // P2.9.3: Remap edges to use merged step IDs
     edges = remapEdges(edges, idMapping)
 
+    // P2.9.3b: Deduplicate edges created by remapping
+    const edgeSet = new Set<string>()
+    const edgesBefore = edges.length
+    edges = edges.filter((edge) => {
+      const key = `${edge.from_step_id}→${edge.to_step_id}`
+      if (edgeSet.has(key)) {
+        return false // Skip duplicate edge
+      }
+      edgeSet.add(key)
+      return true
+    })
+    const duplicatesRemoved = edgesBefore - edges.length
+    if (duplicatesRemoved > 0) {
+      logger.debug('Removed duplicate edges after remapping', {
+        before: edgesBefore,
+        after: edges.length,
+        removed: duplicatesRemoved,
+      })
+    }
+
     // P2.9.4: Run QA checks
     const qaReport = runQAChecks(mergedSteps, edges)
 
@@ -434,9 +454,12 @@ function deduplicateSteps(steps: ProcessStep[]): {
       // No conflict, use as-is
       mergedStep = { ...duplicates[0], step_key: normalizedKey }
     } else {
-      // Conflict: use median order
+      // Conflict: use median order (average of middle two for even counts)
       const orders = duplicates.map((s) => s.order).sort((a, b) => a - b)
-      const medianOrder = orders[Math.floor(orders.length / 2)]
+      const medianOrder =
+        orders.length % 2 === 0
+          ? (orders[orders.length / 2 - 1] + orders[orders.length / 2]) / 2
+          : orders[Math.floor(orders.length / 2)]
 
       // Find step with order closest to median
       const selectedStep = duplicates.reduce((closest, current) => {
