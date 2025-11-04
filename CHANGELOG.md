@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/theseedship/duckdb_mcp_node/compare/v0.10.1...v0.10.2) (2025-11-04)
+
+
+### Bug Fixes
+
+* **ci:** add .npmrc to ensure consistent npm registry and access settings ([d2e2dd0](https://github.com/theseedship/duckdb_mcp_node/commit/d2e2dd096a82b2ad693915babc315fcf9b9f69f2))
+
 ## [0.10.1](https://github.com/theseedship/duckdb_mcp_node/compare/v0.10.0...v0.10.1) (2025-11-04)
 
 
