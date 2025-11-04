@@ -529,13 +529,15 @@ CREATE TABLE process_edges (
 
 ---
 
-## 🤖 Mastra AI Integration (Coming Q1 2026)
+## 🤖 Mastra AI Integration ⚠️ EXPERIMENTAL
 
-**Status**: Phase 0 - Preparation (November 2025)
+**Status**: Phase 0 - Preparation (November 2025) | **Stability**: EXPERIMENTAL - API may change
+
+> **Note**: This is a **generic adapter only**. It provides tool conversion for Mastra agents but does NOT include pre-built agents or business logic. Community contributions welcome for Phase 1 implementation!
 
 ### Overview
 
-[Mastra AI Framework](https://mastra.ai) integration is in development to enable powerful AI agents powered by DuckDB's analytical capabilities.
+[Mastra AI Framework](https://mastra.ai) integration provides an adapter to convert DuckDB tools to Mastra-compatible format, enabling AI agents powered by DuckDB's analytical capabilities.
 
 **Why Mastra?**
 
@@ -560,7 +562,7 @@ CREATE TABLE process_edges (
 
 **Phase 3 (May - September 2026)**: Advanced Features
 
-- Small Language Models (SLM) for space-aware NL-to-SQL
+- Small Language Models (SLM) for context-aware NL-to-SQL
 - Human-in-the-Loop (HITL) workflows with suspend/resume
 - Vector store integration for semantic search
 

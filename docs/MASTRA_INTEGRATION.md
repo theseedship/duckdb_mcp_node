@@ -1,8 +1,42 @@
 # Mastra AI Framework Integration
 
+> ⚠️ **EXPERIMENTAL FEATURE**
+>
+> This integration is currently in **Phase 0 (Preparation)** and is not yet functional. The adapter is a skeleton that throws "not yet implemented" errors. Phase 1 implementation is planned for Q1 2026 and is **community-driven**.
+>
+> - **Current Status**: Skeleton only (functions throw errors)
+> - **Stability**: EXPERIMENTAL - API may change
+> - **For Production**: Wait for v1.0.0 (Q2 2026)
+> - **Who Can Help**: Community contributions welcome! See [Contributing](#contributing)
+
 **Status**: Phase 0 - Preparation (November 2025)
 **Timeline**: Q1 2026 (Phase 1), Q2 2026 (Phase 2), Q3 2026 (Phase 3)
 **Integration Type**: Progressive enhancement with adapter pattern
+
+---
+
+## Who Should Use This Integration?
+
+This Mastra adapter is a **generic integration** for any project using:
+
+- **DuckDB** for analytics
+- **Mastra AI Framework** for agent orchestration
+- **TypeScript** as primary language
+
+### ✅ Perfect For
+
+- SQL analytics agents (natural language → SQL)
+- Data analysis workflows
+- Business intelligence agents
+- Generic DuckDB + AI agent projects
+
+### ❌ NOT Included
+
+- Deposium-specific business logic
+- Pre-built agents for specific domains
+- External service integrations
+
+This is an **adapter only** - you provide the business logic, we provide the DuckDB tool integration.
 
 ---
 
@@ -139,11 +173,11 @@ This document outlines the phased integration of [Mastra AI Framework](https://m
 
 #### Deliverables
 
-1. **SLM Integration** (20h) 🔒 INTERNAL FEATURE
-   - Space-aware SLM agents (qwen2.5:0.5b via Ollama)
-   - Natural language → SQL translation per space
-   - Context building with SpaceContext
-   - **Note**: Internal/hidden strategic feature initially
+1. **SLM Integration** (20h)
+   - Small Language Model agents (qwen2.5:0.5b via Ollama)
+   - Natural language → SQL translation
+   - Context-aware query generation
+   - Local inference for privacy-sensitive use cases
 
 2. **DuckDB Vector Store** (16h)
    - Integration with @mastra/duckdb vector store (if available)
@@ -306,19 +340,6 @@ const validationWorkflow = new Workflow({
 
 ## Testing Strategy
 
-### Local Development Testing
-
-**Test Environment**: localhost:3003/search
-**Purpose**: Rapid iteration on features before integration
-
-```bash
-# Start test server (if available)
-npm run dev:test-server
-
-# Open browser
-open http://localhost:3003/search
-```
-
 ### Unit Tests (Phase 1+)
 
 ```bash
@@ -433,9 +454,8 @@ npm run test:mastra:integration
 ### DuckDB MCP Native
 
 - **Main README**: ../README.md
-- **Process Mining**: PROCESS_MINING_ROADMAP.md
-- **Architecture**: ARCHITECTURE.md
 - **API Docs**: https://github.com/theseedship/duckdb_mcp_node
+- **Process Mining Tools**: See main README for available tools
 
 ### Related Resources
 
@@ -462,10 +482,6 @@ npm run test:mastra:integration
 ### Q: What LLM providers are supported?
 
 **A**: Mastra supports 40+ providers (OpenAI, Anthropic, Google, Llama, Ollama, etc.). You can use any provider Mastra supports with DuckDB tools.
-
-### Q: How does this relate to the SLM integration mentioned in internal docs?
-
-**A**: Phase 3 includes SLM (Small Language Models) integration with Ollama for space-aware NL-to-SQL. This is initially an internal feature and will be publicly released when ready.
 
 ### Q: What's the performance impact?
 

@@ -4,13 +4,15 @@
 
 ### Added
 
-- **Mastra AI Integration Phase 0**: Preparation for AI agents powered by DuckDB (Q1 2026)
-  - Export path `/mastra` for Mastra adapter module
+- **Mastra AI Integration Phase 0**: Generic adapter preparation (Q1 2026, community-driven)
+  - Export path `/mastra` for Mastra adapter module (generic tool conversion)
   - Adapter skeleton (`src/adapters/mastra-adapter.ts`) with comprehensive JSDoc
-  - Complete integration roadmap (`docs/MASTRA_INTEGRATION.md`) - 498 lines documenting Phase 1-3
+  - Complete integration roadmap (`docs/MASTRA_INTEGRATION.md`) documenting Phase 1-3
   - API stability guarantees documented in main entry point
-  - README.md Mastra section with use cases and timeline
-  - **Breaking Changes**: NONE - All functions throw "Not yet implemented" errors directing to roadmap
+  - README.md Mastra section with use cases and experimental warning
+  - **Scope**: Generic adapter only (NOT deposium-specific agents)
+  - **Status**: EXPERIMENTAL - Skeleton only, Phase 1 implementation community-driven
+  - **Breaking Changes**: NONE - All functions throw "Not yet implemented" errors
   - **Related**: PR #16, Issue #17 (Epic tracking)
 
 ## [0.10.4] - 2025-11-04
