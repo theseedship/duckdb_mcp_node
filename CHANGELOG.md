@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.10.4...v0.11.0) (2025-11-04)
+
+
+### Features
+
+* **mastra:** phase 0 - mastra AI integration preparation ([#16](https://github.com/theseedship/duckdb_mcp_node/issues/16)) ([341f253](https://github.com/theseedship/duckdb_mcp_node/commit/341f253dbe0d02059b073948d9555bc03eaf0749))
+
 ## [Unreleased]
 
 ## [0.10.5] - 2025-11-04
