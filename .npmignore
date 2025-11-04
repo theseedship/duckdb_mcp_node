@@ -13,11 +13,12 @@ coverage/
 
 # Development files
 examples/
-scripts/
+# scripts/ - now included for test utilities
 docs/
 doc-internal/
 *.md
 !README.md
+!VALIDATION_P2.8_P2.9.md
 
 # Configuration files
 .github/
