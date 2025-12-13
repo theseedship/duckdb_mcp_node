@@ -305,7 +305,7 @@ export class MCPClient {
       let data: any = null
       const mimeType = content?.mimeType || ''
 
-      if (content?.blob && typeof content.blob === 'string') {
+      if (content && 'blob' in content && typeof content.blob === 'string') {
         // Handle binary content (base64 encoded)
         const binaryData = Buffer.from(content.blob, 'base64')
 
@@ -320,23 +320,24 @@ export class MCPClient {
           // Return raw binary data for other types
           data = { type: 'binary', data: binaryData }
         }
-      } else if (content?.text && typeof content.text === 'string') {
+      } else if (content && 'text' in content && typeof content.text === 'string') {
         // Check MIME type or try to detect content type
+        const textContent = content.text
 
         if (mimeType.includes('json') || mimeType === '') {
           // Try to parse as JSON, fallback to raw text
           try {
-            data = JSON.parse(content.text)
+            data = JSON.parse(textContent)
           } catch {
             // If it's not JSON, return as raw text (CSV, TSV, etc.)
-            data = content.text
+            data = textContent
           }
         } else if (mimeType.includes('csv') || mimeType.includes('text')) {
           // Return raw text for CSV, text files
-          data = content.text
+          data = textContent
         } else {
           // For other types, return raw text
-          data = content.text
+          data = textContent
         }
       }
 
