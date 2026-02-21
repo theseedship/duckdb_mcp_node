@@ -104,8 +104,8 @@ describe('MCPConnectionPool', () => {
     it('should create separate connections for different URLs', async () => {
       pool = new MCPConnectionPool()
 
-      const client1 = await pool.getClient('ws://server1:8080')
-      const client2 = await pool.getClient('ws://server2:8080')
+      const client1 = await pool.getClient('ws://127.0.0.1:8081')
+      const client2 = await pool.getClient('ws://127.0.0.1:8082')
 
       expect(client1).not.toBe(client2)
       const stats = pool.getStats()
@@ -115,11 +115,11 @@ describe('MCPConnectionPool', () => {
     it('should respect max connections limit', async () => {
       pool = new MCPConnectionPool({ maxConnections: 2 })
 
-      await pool.getClient('ws://server1:8080')
-      await pool.getClient('ws://server2:8080')
+      await pool.getClient('ws://127.0.0.1:8081')
+      await pool.getClient('ws://127.0.0.1:8082')
 
       // Third connection should evict least recently used
-      await pool.getClient('ws://server3:8080')
+      await pool.getClient('ws://127.0.0.1:8083')
 
       const stats = pool.getStats()
       expect(stats.totalConnections).toBe(2)
@@ -317,14 +317,14 @@ describe('MCPConnectionPool', () => {
         maxConnections: 2,
       })
 
-      await pool.getClient('ws://server1:8080') // Oldest
-      await pool.getClient('ws://server2:8080')
+      await pool.getClient('ws://127.0.0.1:8081') // Oldest
+      await pool.getClient('ws://127.0.0.1:8082')
 
       // Use server1 to make it more recently used
-      await pool.getClient('ws://server1:8080')
+      await pool.getClient('ws://127.0.0.1:8081')
 
       // This should evict server2 (least recently used)
-      await pool.getClient('ws://server3:8080')
+      await pool.getClient('ws://127.0.0.1:8083')
 
       const stats = pool.getStats()
       expect(stats.totalConnections).toBe(2)
@@ -332,9 +332,9 @@ describe('MCPConnectionPool', () => {
       // Check that server2 was evicted
       const connections = stats.connectionsByUseCount
       const urls = connections.map((c) => c.url)
-      expect(urls).toContain('ws://server1:8080')
-      expect(urls).toContain('ws://server3:8080')
-      expect(urls).not.toContain('ws://server2:8080')
+      expect(urls).toContain('ws://127.0.0.1:8081')
+      expect(urls).toContain('ws://127.0.0.1:8083')
+      expect(urls).not.toContain('ws://127.0.0.1:8082')
     })
   })
 
@@ -439,9 +439,9 @@ describe('MCPConnectionPool', () => {
     it('should provide connection statistics', async () => {
       pool = new MCPConnectionPool()
 
-      await pool.getClient('ws://server1:8080')
-      await pool.getClient('ws://server2:8080')
-      await pool.getClient('tcp://server3:9999', 'tcp')
+      await pool.getClient('ws://127.0.0.1:8081')
+      await pool.getClient('ws://127.0.0.1:8082')
+      await pool.getClient('tcp://127.0.0.1:9999', 'tcp')
 
       const stats = pool.getStats()
 
@@ -469,11 +469,11 @@ describe('MCPConnectionPool', () => {
     it('should track connection health status', async () => {
       pool = new MCPConnectionPool()
 
-      await pool.getClient('ws://server1:8080')
-      await pool.getClient('ws://server2:8080')
+      await pool.getClient('ws://127.0.0.1:8081')
+      await pool.getClient('ws://127.0.0.1:8082')
 
       // Mark one as unhealthy - use correct key format: transport://url
-      const key = 'auto://ws://server1:8080'
+      const key = 'auto://ws://127.0.0.1:8081'
       const connection = (pool as any).connections.get(key)
       if (connection) {
         connection.healthy = false
@@ -490,8 +490,8 @@ describe('MCPConnectionPool', () => {
     it('should close all connections on pool close', async () => {
       pool = new MCPConnectionPool()
 
-      const client1 = await pool.getClient('ws://server1:8080')
-      const client2 = await pool.getClient('ws://server2:8080')
+      const client1 = await pool.getClient('ws://127.0.0.1:8081')
+      const client2 = await pool.getClient('ws://127.0.0.1:8082')
 
       const closeSpy1 = vi.spyOn(client1, 'close')
       const closeSpy2 = vi.spyOn(client2, 'close')
@@ -566,7 +566,7 @@ describe('MCPConnectionPool', () => {
 
       // Rapidly create connections to different servers
       for (let i = 0; i < 10; i++) {
-        await pool.getClient(`ws://server${i}:8080`)
+        await pool.getClient(`ws://127.0.0.1:${9000 + i}`)
       }
 
       const stats = pool.getStats()

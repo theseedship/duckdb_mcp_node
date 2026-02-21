@@ -39,7 +39,7 @@ export default defineConfig({
     clearMocks: true,
     pool: 'forks',
     maxWorkers: 1, // Vitest v4: replaces poolOptions.forks.singleFork
-    isolate: false, // Vitest v4: equivalent to singleFork: true
+    isolate: true, // Each test file gets isolated module state to prevent mock leaks
     testTimeout: 10000,
     hookTimeout: 10000,
   },
