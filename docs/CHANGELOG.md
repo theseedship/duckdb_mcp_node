@@ -5,9 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0] - 2026-02-21
+## [1.0.0] - 2026-02-22
 
-### 🎯 Features — Graph Algorithm MCP Tools (S2: F1-F5)
+### Features — MCP SDK 1.26.0 + HITL (S3)
+
+- **HITL elicitation**: Production mode now uses MCP elicitation API to ask user confirmation before executing destructive SQL (DROP, DELETE, ALTER, TRUNCATE, etc.) instead of hard-blocking
+- **connect() guard**: `start()` checks `server.transport` before calling `connect()` to prevent SDK 1.26.0 double-connect errors
+- **MCP SDK pinned** to `^1.26.0` (was `^1.24.3`)
+- Elicitation fallback: if client doesn't support elicitation, destructive queries are blocked (safe default)
+- `MCP_ELICIT_TIMEOUT` env var controls elicitation timeout (default 30s)
+
+### Features — Graph Algorithm MCP Tools (S2: F1-F5)
 
 8 new graph algorithm tools accessible via MCP, using iterative SQL with temp tables (DuckPGQ workaround for DuckDB 1.4.x):
 
@@ -20,17 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`graph.compare_periods`** — Compare two periods: classify edges as NEW/REMOVED/STRENGTHENED/WEAKENED/STABLE
 - **`graph.export`** — Export graph in 5 formats: JSON, CSV (Gephi), D3, GraphML, Parquet
 
-### 📦 Package
+### Bug Fixes — Test Stabilization (S1)
+
+- 422/422 tests green, ESM class-based mocks, transport mock rewrite, federation + context alignment
+
+### Package
 
 - New `@seed-ship/duckdb-mcp-native/graph` subpath export
 - All graph types exported from main entry point
-- 19 new integration tests (441 total, 0 failures)
+- 469 tests passing (28 new HITL + 19 graph), 0 failures
 
-### ⚠️ Technical Notes
+### Technical Notes
 
-- All algorithms use iterative SQL with temp tables — **no recursive CTEs** (segfault risk on DuckDB 1.4.x)
-- Temp tables use unique `_graph_{timestamp}_{random}` prefixes with cleanup in `finally` blocks
-- Shared `GraphInputBase` schema: `node_table`, `edge_table`, `node_id_column`, `source_column`, `target_column`, `weight_column`, `filter`
+- All graph algorithms use iterative SQL with temp tables — **no recursive CTEs** (segfault risk on DuckDB 1.4.x)
+- `validateQuery()` method preserved for backward compatibility
+- HTTP transport clarified as client-side only (distinct from SDK's server-side `StreamableHTTPServerTransport`)
 
 ## [0.7.1] - 2025-10-19
 

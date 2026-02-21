@@ -1,9 +1,10 @@
 # Changelog
 
-## [0.12.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.2...v0.12.0) (2026-02-21)
+## [1.0.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.2...v1.0.0) (2026-02-22)
 
 ### Features
 
+- **hitl:** MCP SDK 1.26.0 alignment + HITL elicitation for destructive SQL in production mode (S3)
 - **graph:** add 8 graph algorithm MCP tools (S2: F1-F5) ([b089a57](https://github.com/theseedship/duckdb_mcp_node/commit/b089a57))
   - `graph.pagerank` — iterative PageRank centrality
   - `graph.eigenvector` — power iteration eigenvector centrality
@@ -14,12 +15,13 @@
   - `graph.compare_periods` — classify edge changes between periods
   - `graph.export` — JSON, CSV (Gephi), D3, GraphML, Parquet
   - All use iterative SQL with temp tables (no recursive CTEs)
-  - 19 integration tests, 441 total passing
+- **tests:** S1+S2+S3 test stabilization — 469 tests, 0 failures
 
 ### Package
 
 - New `@seed-ship/duckdb-mcp-native/graph` subpath export
 - All graph types exported from main entry point
+- MCP SDK pinned to `^1.26.0`
 
 ## [0.11.2](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.0...v0.11.2) (2026-02-21)
 

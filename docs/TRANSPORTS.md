@@ -23,10 +23,12 @@ await mcpClient.attachServer(
 )
 ```
 
-### 2. HTTP
+### 2. HTTP (Client-Side)
 
-**Status**: ✅ Implemented  
-**Use Case**: RESTful communication over HTTP
+**Status**: ✅ Implemented (client-side only)
+**Use Case**: Connecting OUT to remote HTTP MCP servers
+
+> **Note**: `src/protocol/http-transport.ts` is a client-side transport — it connects to remote servers. The SDK's `StreamableHTTPServerTransport` is server-side (accepts incoming connections). These serve different purposes. Adding an HTTP server mode to DuckDBMCPServer is future work.
 
 ```typescript
 // Basic HTTP connection
@@ -325,6 +327,54 @@ Enable debug logging for transports:
 
 ```typescript
 process.env.DEBUG = 'mcp:transport:*'
+```
+
+## HITL Elicitation Flow (v1.0.0+)
+
+When `MCP_SECURITY_MODE=production`, the server uses the MCP SDK's elicitation API to request user confirmation before executing destructive SQL operations.
+
+### When It Triggers
+
+Destructive patterns detected: `DROP TABLE`, `TRUNCATE`, `DELETE FROM`, `INSERT INTO`, `UPDATE ... SET`, `ALTER TABLE`, `CREATE USER`, `GRANT`, `REVOKE`.
+
+Only applies when:
+
+1. `MCP_SECURITY_MODE=production`
+2. The tool receives a `sql` argument (e.g., `query_duckdb`)
+3. The SQL matches a destructive pattern
+
+Graph tools use internal DuckDB calls with temp tables — they are not affected.
+
+### Client Capability Requirements
+
+The server checks `getClientCapabilities()?.elicitation` before attempting elicitation. If the client does not advertise elicitation support, the query is blocked immediately (safe default).
+
+### Fallback Behavior
+
+| Scenario                                                    | Result                              |
+| ----------------------------------------------------------- | ----------------------------------- |
+| Client supports elicitation, user accepts (`confirm: true`) | Query executes                      |
+| Client supports elicitation, user declines or cancels       | Query blocked                       |
+| Client does not support elicitation                         | Query blocked                       |
+| `elicitInput()` throws (timeout, network error)             | Query blocked                       |
+| `MCP_SECURITY_MODE=development`                             | No elicitation, all queries allowed |
+
+### Configuration
+
+| Env Variable         | Default       | Description                          |
+| -------------------- | ------------- | ------------------------------------ |
+| `MCP_SECURITY_MODE`  | `development` | Set to `production` to enable HITL   |
+| `MCP_ELICIT_TIMEOUT` | `30000`       | Timeout for elicitation request (ms) |
+| `MCP_MAX_QUERY_SIZE` | `1000000`     | Max SQL query size in characters     |
+
+### Protocol Flow
+
+```
+Client → Server: tools/call { name: "query_duckdb", arguments: { sql: "DROP TABLE users" } }
+Server → Client: elicitation/create { message: "Destructive SQL operation (DROP TABLE)...", schema: { confirm: boolean } }
+Client → Server: elicitation/create response { action: "accept", content: { confirm: true } }
+Server: executes query
+Server → Client: tools/call response { content: [...] }
 ```
 
 ---

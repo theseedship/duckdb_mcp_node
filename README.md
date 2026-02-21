@@ -7,10 +7,11 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**v0.12.0** — 441 tests, 0 failures
+**v1.0.0** — 469 tests, 0 failures
 
-### What's New in v0.12.0
+### What's New in v1.0.0
 
+- **MCP SDK 1.26.0 alignment + HITL** (S3): Elicitation-based confirmation for destructive SQL in production mode, connect() guard, SDK pinned to ^1.26.0
 - **8 Graph Algorithm MCP Tools** (S2): PageRank, eigenvector, community detection, modularity, weighted paths, temporal analysis, period comparison, multi-format export
 - **Test Stabilization** (S1): 422/422 tests green, test infrastructure rewritten for ESM compatibility
 
@@ -22,14 +23,11 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - **Tools**: 32+ MCP tools (native, process mining, graph algorithms, data helpers)
 - **Graph Algorithms**: 8 tools using iterative SQL (DuckPGQ workaround for DuckDB 1.4.x)
 - **Process Mining**: 3 tools for workflow analysis from Parquet files
+- **HITL Security**: Production mode uses MCP elicitation for destructive SQL confirmation
 - **Virtual Tables**: JSON/CSV/Parquet with auto-refresh
 - **Virtual Filesystem**: Direct SQL access via mcp:// URIs
 - **Monitoring**: Built-in performance metrics and slow query detection
 - **Security**: SQL injection prevention, server authentication, path traversal protection
-
-### Next
-
-- S3: MCP SDK 1.26.0 alignment + Human-in-the-Loop (HITL) via elicitation — see [roadmap](docs/roadmap/02-2026-update.md)
 
 ## Installation
 
@@ -334,7 +332,7 @@ When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration wil
 
 ---
 
-## 📊 Graph Algorithm Tools (v0.12.0+)
+## 📊 Graph Algorithm Tools
 
 8 MCP tools for graph analysis using iterative SQL (DuckPGQ workaround for DuckDB 1.4.x).
 
@@ -959,9 +957,22 @@ See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for:
 ## Security Modes
 
 - **development**: All queries allowed (default)
-- **production**: Blocks DROP/TRUNCATE, enforces limits
+- **production**: Destructive SQL (DROP/DELETE/ALTER/TRUNCATE) triggers HITL elicitation — the server asks the user for confirmation via MCP's elicitation API before executing. If the client doesn't support elicitation, the query is blocked.
 
 Set via: `MCP_SECURITY_MODE=production`
+
+### HITL Elicitation
+
+When `MCP_SECURITY_MODE=production`, destructive SQL operations trigger a confirmation prompt via the MCP SDK's elicitation API:
+
+| Scenario                                   | Behavior                     |
+| ------------------------------------------ | ---------------------------- |
+| Client supports elicitation, user confirms | Query executes               |
+| Client supports elicitation, user declines | Query blocked                |
+| Client does not support elicitation        | Query blocked (safe default) |
+| Elicitation times out or errors            | Query blocked                |
+
+Configure timeout: `MCP_ELICIT_TIMEOUT=30000` (ms, default 30s)
 
 ## Scripts
 

@@ -544,9 +544,28 @@ class DuckDBMCPServer {
           throw new Error(`Missing arguments for tool: ${name}`)
         }
 
-        // Validate security in production mode
+        // Validate security in production mode with HITL elicitation
         if (process.env.MCP_SECURITY_MODE === 'production' && 'sql' in args) {
-          this.validateQuery(args.sql as string)
+          const sql = args.sql as string
+          // Check query size (always enforced)
+          const maxSize = parseInt(process.env.MCP_MAX_QUERY_SIZE || '1000000')
+          if (sql.length > maxSize) {
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Query exceeds maximum size of ${maxSize} characters`
+            )
+          }
+          // Check if destructive — elicit confirmation instead of hard-blocking
+          const operationType = this.classifyDestructiveQuery(sql)
+          if (operationType !== null) {
+            const confirmed = await this.requestDestructiveQueryConfirmation(sql, operationType)
+            if (!confirmed) {
+              throw new McpError(
+                ErrorCode.InvalidRequest,
+                `Destructive operation (${operationType}) blocked — user confirmation required`
+              )
+            }
+          }
         }
 
         switch (name) {
@@ -1680,6 +1699,74 @@ Checks to perform: ${args.checks || 'nulls, duplicates, ranges'}
   }
 
   /**
+   * Classify whether a SQL query is destructive, returning the operation type or null if safe.
+   */
+  private classifyDestructiveQuery(sql: string): string | null {
+    const patterns: Array<[RegExp, string]> = [
+      [/DROP\s+TABLE/i, 'DROP TABLE'],
+      [/TRUNCATE/i, 'TRUNCATE'],
+      [/DELETE\s+FROM/i, 'DELETE'],
+      [/INSERT\s+INTO/i, 'INSERT'],
+      [/UPDATE\s+.*\s+SET/i, 'UPDATE'],
+      [/ALTER\s+TABLE/i, 'ALTER TABLE'],
+      [/CREATE\s+USER/i, 'CREATE USER'],
+      [/GRANT/i, 'GRANT'],
+      [/REVOKE/i, 'REVOKE'],
+    ]
+
+    for (const [pattern, opType] of patterns) {
+      if (pattern.test(sql)) {
+        return opType
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Request user confirmation for destructive SQL via MCP elicitation.
+   * Returns true if the user confirms, false otherwise (including when elicitation is unsupported).
+   */
+  private async requestDestructiveQueryConfirmation(
+    sql: string,
+    operationType: string
+  ): Promise<boolean> {
+    try {
+      // Check if the connected client supports form elicitation
+      const clientCaps = this.server.getClientCapabilities()
+      if (!clientCaps?.elicitation) {
+        return false
+      }
+
+      const sqlPreview = sql.length > 200 ? sql.substring(0, 200) + '...' : sql
+      const timeout = parseInt(process.env.MCP_ELICIT_TIMEOUT || '30000')
+
+      const result = await this.server.elicitInput(
+        {
+          message: `Destructive SQL operation (${operationType}). Confirm execution?`,
+          requestedSchema: {
+            type: 'object',
+            properties: {
+              confirm: {
+                type: 'boolean',
+                title: 'Confirm execution',
+                description: sqlPreview,
+              },
+            },
+            required: ['confirm'],
+          },
+        },
+        { timeout }
+      )
+
+      return result.action === 'accept' && result.content?.confirm === true
+    } catch (error) {
+      logger.warn('Elicitation request failed, blocking destructive query:', error)
+      return false
+    }
+  }
+
+  /**
    * Get native tool handlers for embedding in other MCP servers
    * This is the main API for using DuckDB MCP as a library
    */
@@ -1760,6 +1847,11 @@ Checks to perform: ${args.checks || 'nulls, duplicates, ranges'}
 
     // Only start stdio transport if not in embedded mode
     if (!this.embeddedMode) {
+      // SDK 1.26.0: connect() throws if already connected — guard against double-connect
+      if (this.server.transport) {
+        logger.warn('Server already connected to a transport, skipping reconnect')
+        return
+      }
       const transport = new StdioServerTransport()
       await this.server.connect(transport)
       // DuckDB MCP Server started successfully

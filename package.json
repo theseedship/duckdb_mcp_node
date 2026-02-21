@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "0.12.0",
+  "version": "1.0.0",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -161,7 +161,7 @@
   "homepage": "https://github.com/theseedship/duckdb_mcp_node#readme",
   "dependencies": {
     "@duckdb/node-api": "1.4.1-r.5",
-    "@modelcontextprotocol/sdk": "^1.24.3",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.1",
     "dotenv": "^17.2.3",
     "ws": "^8.18.3",

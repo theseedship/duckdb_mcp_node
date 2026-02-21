@@ -5,8 +5,12 @@ import { MessageFormatter } from './messages.js'
 import { logger } from '../utils/logger.js'
 
 /**
- * HTTP transport implementation for MCP communication
- * Compatible with Python mcp-server-motherduck HTTP mode
+ * HTTP transport implementation for MCP communication (client-side only).
+ * Connects OUT to remote HTTP MCP servers (e.g. Python mcp-server-motherduck).
+ *
+ * Note: This is distinct from the SDK's StreamableHTTPServerTransport which is
+ * server-side (accepts incoming connections). An HTTP server mode for
+ * DuckDBMCPServer is future work — not needed for S3 scope.
  */
 export class HTTPTransport extends Transport {
   private url: string

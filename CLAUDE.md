@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 Native TypeScript port of DuckDB MCP extension. Implements bidirectional MCP server/client with federation capabilities.
 
-**Status**: v0.12.0 (441 tests, 0 failures). S1 (test stabilization) and S2 (graph tools) complete. Next: S3 (MCP SDK 1.26 + HITL).
+**Status**: v1.0.0 (469 tests, 0 failures). S1 (test stabilization), S2 (graph tools), and S3 (MCP SDK 1.26.0 + HITL) complete.
 
 ## Key Commands
 
@@ -119,8 +119,8 @@ MCP_SECURITY_MODE=development
 ## Roadmap
 
 S1 ✅: Test stabilization (422/422 green)
-S2 ✅: Graph algorithm MCP tools (8 tools, v0.12.0)
-S3 📋: MCP SDK 1.26.0 alignment + HITL (v0.13.0)
+S2 ✅: Graph algorithm MCP tools (8 tools, v1.0.0)
+S3 ✅: MCP SDK 1.26.0 alignment + HITL (v1.0.0)
 
 See `docs/roadmap/02-2026-update.md` for details.
 
