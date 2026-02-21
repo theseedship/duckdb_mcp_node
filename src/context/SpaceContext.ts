@@ -48,6 +48,9 @@ export class SpaceContext {
   private ducklakeCatalog?: string
 
   constructor(spaceId: string, config: SpaceConfig = {}) {
+    if (!spaceId) {
+      throw new Error('Space ID is required')
+    }
     this.spaceId = spaceId
     this.schema = `space_${spaceId.replace(/[^a-zA-Z0-9_]/g, '_')}`
     this.tablePrefix = config.tablePrefix || ''
@@ -72,6 +75,13 @@ export class SpaceContext {
    */
   getSchema(): string {
     return this.schema
+  }
+
+  /**
+   * Get the table mapping for security audit
+   */
+  getTableMappings(): Map<string, string> {
+    return this.tableMapping
   }
 
   /**
@@ -101,26 +111,34 @@ export class SpaceContext {
   applyToQuery(sql: string): string {
     let modifiedSql = sql
 
+    // Helper regex fragment: captures table name, optionally with schema prefix (schema.table)
+    const tableRef = '([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)'
+
     // Replace table references in FROM clauses
-    modifiedSql = modifiedSql.replace(/FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi, (match, tableName) => {
-      // Don't qualify if it's already qualified or is a function
-      if (tableName.includes('.') || tableName.includes('(')) {
-        return match
+    modifiedSql = modifiedSql.replace(
+      new RegExp(`FROM\\s+${tableRef}`, 'gi'),
+      (match, tableName) => {
+        if (tableName.includes('.') || tableName.includes('(')) {
+          return match
+        }
+        return `FROM ${this.qualifyTableName(tableName)}`
       }
-      return `FROM ${this.qualifyTableName(tableName)}`
-    })
+    )
 
     // Replace table references in JOIN clauses
-    modifiedSql = modifiedSql.replace(/JOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi, (match, tableName) => {
-      if (tableName.includes('.') || tableName.includes('(')) {
-        return match
+    modifiedSql = modifiedSql.replace(
+      new RegExp(`JOIN\\s+${tableRef}`, 'gi'),
+      (match, tableName) => {
+        if (tableName.includes('.') || tableName.includes('(')) {
+          return match
+        }
+        return `JOIN ${this.qualifyTableName(tableName)}`
       }
-      return `JOIN ${this.qualifyTableName(tableName)}`
-    })
+    )
 
     // Replace table references in INSERT INTO
     modifiedSql = modifiedSql.replace(
-      /INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi,
+      new RegExp(`INSERT\\s+INTO\\s+${tableRef}`, 'gi'),
       (match, tableName) => {
         if (tableName.includes('.')) {
           return match
@@ -130,12 +148,37 @@ export class SpaceContext {
     )
 
     // Replace table references in UPDATE
-    modifiedSql = modifiedSql.replace(/UPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi, (match, tableName) => {
-      if (tableName.includes('.')) {
-        return match
+    modifiedSql = modifiedSql.replace(
+      new RegExp(`UPDATE\\s+${tableRef}`, 'gi'),
+      (match, tableName) => {
+        if (tableName.includes('.')) {
+          return match
+        }
+        return `UPDATE ${this.qualifyTableName(tableName)}`
       }
-      return `UPDATE ${this.qualifyTableName(tableName)}`
-    })
+    )
+
+    // Replace table references in CREATE TABLE
+    modifiedSql = modifiedSql.replace(
+      new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${tableRef}`, 'gi'),
+      (match, tableName) => {
+        if (tableName.includes('.')) {
+          return match
+        }
+        return match.replace(tableName, this.qualifyTableName(tableName))
+      }
+    )
+
+    // Replace table references in DROP TABLE
+    modifiedSql = modifiedSql.replace(
+      new RegExp(`DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?${tableRef}`, 'gi'),
+      (match, tableName) => {
+        if (tableName.includes('.')) {
+          return match
+        }
+        return match.replace(tableName, this.qualifyTableName(tableName))
+      }
+    )
 
     return modifiedSql
   }
@@ -259,18 +302,27 @@ export class SpaceContext {
    * Hidden feature: Prepare context for SLM integration
    * @internal
    */
-  async __prepareForSLM?(): Promise<{
+  async __prepareSLMContext(): Promise<{
+    spaceId: string
     schema: string
     tables: string[]
     metadata: Record<string, any>
+    [key: string]: any
   }> {
-    // Stub for future SLM pilot integration
-    // This will be implemented in Deposium, not here
-    return {
+    const baseContext = {
+      spaceId: this.spaceId,
       schema: this.schema,
       tables: Array.from(this.tableMapping.values()),
       metadata: Object.fromEntries(this.metadata),
     }
+
+    // Call custom context builder if configured
+    if (this.config.slmConfig?.contextBuilder) {
+      const customContext = this.config.slmConfig.contextBuilder(this)
+      return { ...baseContext, ...customContext }
+    }
+
+    return baseContext
   }
 
   /**
@@ -448,6 +500,6 @@ export class SpaceManager {
    */
   async __prepareSLMContext?(spaceId: string): Promise<any> {
     const context = await this.factory.getOrCreate(spaceId)
-    return (context as any).__prepareForSLM?.()
+    return context.__prepareSLMContext()
   }
 }

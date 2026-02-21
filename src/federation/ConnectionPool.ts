@@ -291,10 +291,10 @@ export class MCPConnectionPool {
    */
   private async evictLeastRecentlyUsed(): Promise<void> {
     let lruKey: string | null = null
-    let lruTime = new Date()
+    let lruTime = new Date(Date.now() + 1) // Initialize to future to ensure first entry is always selected
 
     for (const [key, conn] of this.connections) {
-      if (conn.lastUsed < lruTime) {
+      if (conn.lastUsed <= lruTime) {
         lruTime = conn.lastUsed
         lruKey = key
       }
@@ -381,26 +381,44 @@ export class MCPConnectionPool {
     totalConnections: number
     healthyConnections: number
     unhealthyConnections: number
+    activeConnections: number
+    idleConnections: number
     connectionsByTransport: Record<string, number>
+    connectionsByUseCount: Array<{ url: string; useCount: number; ageMs: number }>
     averageUseCount: number
   } {
     const connections = Array.from(this.connections.values())
     const healthy = connections.filter((c) => c.healthy).length
     const unhealthy = connections.filter((c) => !c.healthy).length
+    const active = this.getActiveConnectionCount()
 
     const byTransport: Record<string, number> = {}
     let totalUseCount = 0
 
+    const now = Date.now()
+    const byUseCount: Array<{ url: string; useCount: number; ageMs: number }> = []
+
     for (const conn of connections) {
       byTransport[conn.transport] = (byTransport[conn.transport] || 0) + 1
       totalUseCount += conn.useCount
+      byUseCount.push({
+        url: conn.url,
+        useCount: conn.useCount,
+        ageMs: now - conn.connectedAt.getTime(),
+      })
     }
+
+    // Sort by use count descending
+    byUseCount.sort((a, b) => b.useCount - a.useCount)
 
     return {
       totalConnections: connections.length,
       healthyConnections: healthy,
       unhealthyConnections: unhealthy,
+      activeConnections: active,
+      idleConnections: connections.length - active,
       connectionsByTransport: byTransport,
+      connectionsByUseCount: byUseCount,
       averageUseCount: connections.length > 0 ? totalUseCount / connections.length : 0,
     }
   }

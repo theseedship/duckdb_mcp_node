@@ -118,6 +118,44 @@ export class ResourceRegistry {
   }
 
   /**
+   * Resolve a glob pattern to matching resources
+   * Supports * wildcard in both server and resource portions
+   * @param pattern The glob pattern (e.g., 'mcp://storage/logs/*.log' or 'mcp://&#42;/data.json')
+   * @returns Array of matching server/resource pairs
+   */
+  resolveGlob(pattern: string): Array<{ server: string; resource: FederatedResource }> {
+    const match = pattern.match(/^mcp:\/\/([^/]+)\/(.+)$/)
+    if (!match) return []
+
+    const [, serverPattern, resourcePattern] = match
+    const resourceRegex = new RegExp(
+      '^' + resourcePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$',
+      'i'
+    )
+
+    const results: Array<{ server: string; resource: FederatedResource }> = []
+
+    if (serverPattern === '*') {
+      // Match across all servers
+      for (const resource of this.resources.values()) {
+        if (resourceRegex.test(resource.uri)) {
+          results.push({ server: resource.serverAlias, resource })
+        }
+      }
+    } else {
+      // Match within specific server
+      const serverResources = this.getServerResources(serverPattern)
+      for (const resource of serverResources) {
+        if (resourceRegex.test(resource.uri)) {
+          results.push({ server: serverPattern, resource })
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
    * Search for resources by name or URI pattern
    * @param pattern The search pattern (supports * wildcard)
    * @returns Matching resources
@@ -188,13 +226,13 @@ export class ResourceRegistry {
     totalResources: number
     totalServers: number
     cachedResources: number
-    serverStats: Record<string, number>
+    serverStats: Array<{ alias: string; resourceCount: number }>
   } {
     const cachedResources = Array.from(this.resources.values()).filter((r) => r.cached).length
 
-    const serverStats: Record<string, number> = {}
+    const serverStats: Array<{ alias: string; resourceCount: number }> = []
     for (const [server, resources] of this.serverResources) {
-      serverStats[server] = resources.size
+      serverStats.push({ alias: server, resourceCount: resources.size })
     }
 
     return {

@@ -15,7 +15,7 @@ vi.mock('../utils/logger', () => ({
 // Mock DuckDBService
 vi.mock('../duckdb/service', () => ({
   DuckDBService: vi.fn().mockImplementation(() => ({
-    query: vi.fn(),
+    executeQuery: vi.fn(),
     close: vi.fn(),
     isInitialized: true,
   })),
@@ -27,7 +27,7 @@ describe('SpaceContext', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDuckDB = {
-      query: vi.fn().mockResolvedValue({ rows: [] }),
+      executeQuery: vi.fn().mockResolvedValue({ rows: [] }),
       close: vi.fn(),
       isInitialized: true,
     }
@@ -263,7 +263,7 @@ describe('SpaceContext', () => {
       await space.initialize(mockDuckDB)
 
       // In strict mode, schema should be created
-      expect(mockDuckDB.query).toHaveBeenCalledWith(
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('CREATE SCHEMA IF NOT EXISTS')
       )
     })
@@ -303,7 +303,7 @@ describe('SpaceContext', () => {
 
       await space.initialize(mockDuckDB)
 
-      expect(space.getDuckLakeCatalog()).toBe('ducklake_tenant_123')
+      expect(space.getDuckLakeCatalog()).toBe('ducklake_space_tenant_123')
     })
 
     it('should handle DuckLake with time travel', () => {
@@ -352,7 +352,9 @@ describe('SpaceContext', () => {
 
       await space.initialize(mockDuckDB)
 
-      expect(mockDuckDB.query).toHaveBeenCalledWith(expect.stringContaining('ducklake_catalogs'))
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ducklake_space_tenant_123')
+      )
     })
   })
 
@@ -404,7 +406,7 @@ describe('SpaceContext', () => {
   describe('Error Handling', () => {
     it('should handle initialization errors gracefully', async () => {
       const failingDuckDB = {
-        query: vi.fn().mockRejectedValue(new Error('DB Error')),
+        executeQuery: vi.fn().mockRejectedValue(new Error('DB Error')),
         isInitialized: false,
       }
 

@@ -58,13 +58,25 @@ describe('QueryRouter', () => {
       }),
     }
 
-    // Mock ResourceRegistry - only return resources for actual servers, not SQL aliases
+    // Mock ResourceRegistry - only return resources for actual MCP servers, not SQL aliases
     mockResourceRegistry = {
       getServerResources: vi.fn().mockImplementation((serverName: string) => {
-        // Only return resources for known servers, not SQL aliases like 'a' or 'b'
-        if (
-          ['github', 'server1', 'server2', 'remote', 'data', 'csv', 'storage'].includes(serverName)
-        ) {
+        // Only return resources for known MCP servers
+        // Exclude 'data', 'json' etc. to avoid false positives from server.table regex matching 'data.json'
+        const knownServers = [
+          'github',
+          'server1',
+          'server2',
+          'server3',
+          'remote',
+          'csv',
+          'storage',
+          'analytics',
+          'metrics',
+          'empty',
+          'server',
+        ]
+        if (knownServers.includes(serverName)) {
           return [{ uri: 'data.json', fullUri: `mcp://${serverName}/data.json` }]
         }
         return []
@@ -196,12 +208,9 @@ describe('QueryRouter', () => {
         JOIN 'mcp://server2/data.json' b ON a.id = b.id
       `
 
-      mockResourceRegistry.getServerResources.mockImplementation((server) => {
-        return [{ uri: 'data.json', fullUri: `mcp://${server}/data.json` }]
-      })
-
       const result = await router.executeQuery(sql)
 
+      // getClient is called once per remote server (server1 + server2)
       expect(mockConnectionPool.getClient).toHaveBeenCalledTimes(2)
       expect(result.metadata?.sourcesQueried).toContain('server1')
       expect(result.metadata?.sourcesQueried).toContain('server2')
@@ -473,7 +482,7 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql2)
 
       const stats = router.getStats()
-      expect(stats.tempTablesCreated).toBe(4) // 2 queries, each creating 2 temp tables due to resource detection
+      expect(stats.tempTablesCreated).toBe(2) // 1 temp table per query
     })
 
     it('should track queries routed', async () => {
@@ -572,10 +581,6 @@ describe('QueryRouter', () => {
         JOIN 'mcp://server3/data.json' c ON b.id = c.id
       `
 
-      mockResourceRegistry.getServerResources.mockImplementation((server) => {
-        return [{ uri: 'data.json', fullUri: `mcp://${server}/data.json` }]
-      })
-
       const fetchPromises: Promise<any>[] = []
       mockConnectionPool.getClient.mockImplementation(() => {
         const promise = new Promise((resolve) => {
@@ -606,7 +611,7 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql2)
 
       const stats = router.getStats()
-      expect(stats.tempTablesCreated).toBe(4)
+      expect(stats.tempTablesCreated).toBe(2) // 1 temp table per query
 
       // Table names should be sequential
       expect(mockDuckDB.createTableFromJSON).toHaveBeenNthCalledWith(
@@ -673,6 +678,9 @@ describe('QueryRouter', () => {
           contents: [{ text: '[]' }],
         }),
       })
+
+      // After creating temp tables with empty data, the final query returns empty
+      mockDuckDB.executeQuery.mockResolvedValue([])
 
       const sql = "SELECT * FROM 'mcp://empty/data.json'"
       const result = await router.executeQuery(sql)
