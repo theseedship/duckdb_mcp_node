@@ -34,15 +34,16 @@ CREATE PROPERTY GRAPH my_graph
 
 ### Path Patterns
 
-| Pattern | SQL:2023 (DuckPGQ) | Cypher/Neo4j | Status |
-|---------|-------------------|--------------|--------|
-| **1-hop** | `-[e:Label]->` | `-[e:Label]->` | ✅ Works |
-| **N-hop (fixed)** | `-[e1]->(b)-[e2]->` | `-[e1]->(b)-[e2]->` | ✅ Works |
-| **Bounded** | `-[e:Label]->{n,m}` | `-[e:Label]{n,m}->` | ✅ Works (note position!) |
-| **Kleene star** | `->*` with ANY SHORTEST | `*->` or `*` | ⚠️ Only with ANY SHORTEST |
-| **Kleene plus** | `->+` with ANY SHORTEST | `+->` or `+` | ⚠️ Only with ANY SHORTEST |
+| Pattern           | SQL:2023 (DuckPGQ)      | Cypher/Neo4j        | Status                    |
+| ----------------- | ----------------------- | ------------------- | ------------------------- |
+| **1-hop**         | `-[e:Label]->`          | `-[e:Label]->`      | ✅ Works                  |
+| **N-hop (fixed)** | `-[e1]->(b)-[e2]->`     | `-[e1]->(b)-[e2]->` | ✅ Works                  |
+| **Bounded**       | `-[e:Label]->{n,m}`     | `-[e:Label]{n,m}->` | ✅ Works (note position!) |
+| **Kleene star**   | `->*` with ANY SHORTEST | `*->` or `*`        | ⚠️ Only with ANY SHORTEST |
+| **Kleene plus**   | `->+` with ANY SHORTEST | `+->` or `+`        | ⚠️ Only with ANY SHORTEST |
 
 **Critical Differences:**
+
 - **DuckPGQ**: Quantifiers AFTER arrow (`->{n,m}`, `->*`)
 - **Cypher**: Quantifiers BEFORE arrow (`{n,m}->`, `*->`)
 
@@ -111,6 +112,7 @@ FROM GRAPH_TABLE (my_graph
 ```
 
 **Key syntax points:**
+
 - `p =` assigns path to variable
 - `ANY SHORTEST` before pattern
 - `->*` AFTER arrow (not before!)
@@ -130,6 +132,7 @@ MATCH (a)-[e:Label]->{2,2}(b)
 ```
 
 **Key syntax points:**
+
 - `->{n,m}` quantifier AFTER arrow
 - Works without ANY SHORTEST
 - Labels required on edges
@@ -204,6 +207,7 @@ MATCH (a)-[e:Knows]->{1,3}(b)
 ### Safety Features (Intentional Blocks)
 
 **ALL unbounded paths** - Blocked by design
+
 - **Affected**: Standalone `->*`, `->+` without ANY SHORTEST
 - **Why**: Prevents infinite results on cyclic graphs
 - **Solution**: Use ANY SHORTEST or bounded quantifiers
@@ -211,15 +215,18 @@ MATCH (a)-[e:Knows]->{1,3}(b)
 ### Roadmap Items (Future Support)
 
 **Anonymous edge syntax** - Temporary limitation
+
 - **Current**: `-[e:Label]->` (variable required)
 - **Future**: `-[:Label]->` will work
 - **Why**: Internal query translation needs named references
 
 **Label inference** - Implemented but disabled
+
 - **Status**: Logic exists, not exposed in API
 - **Future**: `(p:Person)-[]->(p2:Person)` will auto-infer edge type
 
 **Path modes** - Not implemented
+
 - **Planned**: TRAIL, ACYCLIC, SIMPLE
 - **Current**: WALK (default, allows cycles)
 - **Impact**: May enable ALL unbounded when implemented
@@ -228,14 +235,14 @@ MATCH (a)-[e:Knows]->{1,3}(b)
 
 ## 📋 Syntax Comparison: SQL:2023 vs Cypher
 
-| Feature | SQL:2023 (DuckPGQ) | Cypher/Neo4j |
-|---------|-------------------|--------------|
-| **Bounded quantifier** | `-[e:Label]->{2,5}` | `-[e:Label]{2,5}->` or `-[e:Label]*2..5` |
-| **Kleene star** | `-[e:Label]->*` | `-[e:Label]*->` or `-[e:Label]*` |
-| **Kleene plus** | `-[e:Label]->+` | `-[e:Label]+->` or `-[e:Label]+` |
-| **Shortest path** | `ANY SHORTEST (a)-[e]->*(b)` | `shortestPath((a)-[e*]->(b))` |
-| **Anonymous edges** | Not yet (`-[:Label]->`) | `(a)-[:Label]->(b)` |
-| **Path variable** | `p = (a)-[e]->(b)` | `p = (a)-[e]->(b)` |
+| Feature                | SQL:2023 (DuckPGQ)           | Cypher/Neo4j                             |
+| ---------------------- | ---------------------------- | ---------------------------------------- |
+| **Bounded quantifier** | `-[e:Label]->{2,5}`          | `-[e:Label]{2,5}->` or `-[e:Label]*2..5` |
+| **Kleene star**        | `-[e:Label]->*`              | `-[e:Label]*->` or `-[e:Label]*`         |
+| **Kleene plus**        | `-[e:Label]->+`              | `-[e:Label]+->` or `-[e:Label]+`         |
+| **Shortest path**      | `ANY SHORTEST (a)-[e]->*(b)` | `shortestPath((a)-[e*]->(b))`            |
+| **Anonymous edges**    | Not yet (`-[:Label]->`)      | `(a)-[:Label]->(b)`                      |
+| **Path variable**      | `p = (a)-[e]->(b)`           | `p = (a)-[e]->(b)`                       |
 
 **Key Takeaway:** DuckPGQ strictly follows SQL:2023 (quantifiers AFTER arrow).
 
@@ -280,12 +287,12 @@ FROM GRAPH_TABLE (my_graph
 
 ## 📚 Further Reading
 
-| Document | Purpose |
-|----------|---------|
-| [DUCKPGQ_FINDINGS.md](DUCKPGQ_FINDINGS.md) | What works - comprehensive test results |
+| Document                                                   | Purpose                                           |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| [DUCKPGQ_FINDINGS.md](DUCKPGQ_FINDINGS.md)                 | What works - comprehensive test results           |
 | [DUCKPGQ_FAILURE_ANALYSIS.md](DUCKPGQ_FAILURE_ANALYSIS.md) | Why it works - 18 test cases + developer insights |
-| [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) | How to migrate - detailed examples |
-| [docs/DUCKPGQ_INTEGRATION.md](docs/DUCKPGQ_INTEGRATION.md) | Full integration guide |
+| [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)                   | How to migrate - detailed examples                |
+| [docs/DUCKPGQ_INTEGRATION.md](docs/DUCKPGQ_INTEGRATION.md) | Full integration guide                            |
 
 ---
 

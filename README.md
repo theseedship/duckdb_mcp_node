@@ -7,25 +7,29 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Status
 
-**🚀 Production Ready** (v0.8.1+)
+**v0.12.0** — 441 tests, 0 failures
 
-### ✅ Production-Ready Features
+### What's New in v0.12.0
+
+- **8 Graph Algorithm MCP Tools** (S2): PageRank, eigenvector, community detection, modularity, weighted paths, temporal analysis, period comparison, multi-format export
+- **Test Stabilization** (S1): 422/422 tests green, test infrastructure rewritten for ESM compatibility
+
+### Features
 
 - **Core**: Native TypeScript, no C++ dependencies
 - **Transports**: stdio ✅ | WebSocket ✅ | TCP ✅ | HTTP ⚠️
-- **Federation**: Distributed queries across multiple MCP servers ✨
-- **Tools**: 26 MCP tools including new `federate_query`
+- **Federation**: Distributed queries across multiple MCP servers
+- **Tools**: 32+ MCP tools (native, process mining, graph algorithms, data helpers)
+- **Graph Algorithms**: 8 tools using iterative SQL (DuckPGQ workaround for DuckDB 1.4.x)
+- **Process Mining**: 3 tools for workflow analysis from Parquet files
 - **Virtual Tables**: JSON/CSV/Parquet with auto-refresh
 - **Virtual Filesystem**: Direct SQL access via mcp:// URIs
 - **Monitoring**: Built-in performance metrics and slow query detection
-- **Security**: Enhanced SQL injection prevention, server authentication, path traversal protection
-- **DuckPGQ Documentation**: Comprehensive guides with developer insights, syntax validation, and migration examples
+- **Security**: SQL injection prevention, server authentication, path traversal protection
 
-### 🚧 In Progress
+### Next
 
-- HTTP transport initialization issues
-- MotherDuck cloud integration (waiting for DuckDB v1.4.0 support)
-- Test coverage improvement (current: ~75%, target: 80%)
+- S3: MCP SDK 1.26.0 alignment + Human-in-the-Loop (HITL) via elicitation — see [roadmap](docs/roadmap/02-2026-update.md)
 
 ## Installation
 
@@ -325,8 +329,8 @@ When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration wil
 ### 📚 Resources
 
 - **Complete Guide**: [`docs/DUCKPGQ_INTEGRATION.md`](docs/DUCKPGQ_INTEGRATION.md) - Full integration guide
-- **What Works**: [`DUCKPGQ_FINDINGS.md`](DUCKPGQ_FINDINGS.md) - Comprehensive syntax testing results
-- **Why It Works**: [`DUCKPGQ_FAILURE_ANALYSIS.md`](DUCKPGQ_FAILURE_ANALYSIS.md) - 18 test cases + developer insights
+- **What Works**: [`docs/duckpgq/FINDINGS.md`](docs/duckpgq/FINDINGS.md) - Comprehensive syntax testing results
+- **Why It Works**: [`docs/duckpgq/FAILURE_ANALYSIS.md`](docs/duckpgq/FAILURE_ANALYSIS.md) - 18 test cases + developer insights
 
 ---
 
@@ -592,75 +596,13 @@ CREATE TABLE process_edges (
 
 ---
 
-## 🤖 Mastra AI Integration ⚠️ EXPERIMENTAL
+## 🤖 Mastra AI Integration ⏸️ PAUSED
 
-**Status**: Phase 0 - Preparation (November 2025) | **Stability**: EXPERIMENTAL - API may change
+**Status**: Phase 0 skeleton only (November 2025) | On hold — deposium_MCPs + MCP SDK HITL cover the use cases.
 
-> **Note**: This is a **generic adapter only**. It provides tool conversion for Mastra agents but does NOT include pre-built agents or business logic. Community contributions welcome for Phase 1 implementation!
+The adapter skeleton exists at `src/adapters/mastra-adapter.ts` with export path `/mastra`, but implementation is paused. The deposium_MCPs architecture and native MCP SDK elicitation (HITL in S3) cover the originally planned capabilities.
 
-### Overview
-
-[Mastra AI Framework](https://mastra.ai) integration provides an adapter to convert DuckDB tools to Mastra-compatible format, enabling AI agents powered by DuckDB's analytical capabilities.
-
-**Why Mastra?**
-
-- **TypeScript-Native**: Seamless integration with existing codebase
-- **MCP First-Class Support**: `@mastra/mcp` provides bidirectional MCP integration
-- **Production-Ready**: Batteries included (workflows, HITL, observability, state management)
-- **Rapid Growth**: Y Combinator W25 backed, 7.5K+ GitHub stars
-
-### Planned Capabilities
-
-**Phase 1 (December 2025 - January 2026)**: Proof-of-Concept
-
-- Convert DuckDB MCP tools to Mastra-compatible format
-- Example SQL Analytics Agent (natural language → SQL)
-- Basic agent examples and validation
-
-**Phase 2 (February - April 2026)**: Production-Ready
-
-- Full MCPServer integration for external Mastra agents
-- Process mining agents (workflow discovery, similarity search, composition)
-- Multi-agent orchestration patterns
-
-**Phase 3 (May - September 2026)**: Advanced Features
-
-- Small Language Models (SLM) for context-aware NL-to-SQL
-- Human-in-the-Loop (HITL) workflows with suspend/resume
-- Vector store integration for semantic search
-
-### Use Case Preview
-
-```typescript
-// Example: SQL Analytics Agent (Phase 1)
-import { Agent } from '@mastra/core'
-import { convertToMastraTools } from '@seed-ship/duckdb-mcp-native/mastra'
-
-const analyticsAgent = new Agent({
-  name: 'Business Intelligence Agent',
-  tools: convertToMastraTools({ duckdb: myDuckDBInstance }),
-  instructions: `You are a SQL expert. Convert natural language questions into SQL queries...`,
-  model: { provider: 'ANTHROPIC', name: 'claude-3-5-sonnet' },
-})
-
-await analyticsAgent.generate({
-  messages: [{ role: 'user', content: 'What were our top selling products last quarter?' }],
-})
-```
-
-### Current Status
-
-**Phase 0 (November 2025)** - Infrastructure preparation:
-
-- ✅ Export path `/mastra` in package.json
-- ✅ Adapter skeleton `src/adapters/mastra-adapter.ts`
-- ✅ Comprehensive integration roadmap
-
-**Next Steps**: Phase 1 implementation begins December 2025
-
-📚 **Complete Roadmap**: [`docs/MASTRA_INTEGRATION.md`](docs/MASTRA_INTEGRATION.md)
-
-💡 **Community Interest**: Mastra integration contributions welcome! See roadmap for details.
+📚 **Details**: [`docs/MASTRA_INTEGRATION.md`](docs/MASTRA_INTEGRATION.md)
 
 ---
 

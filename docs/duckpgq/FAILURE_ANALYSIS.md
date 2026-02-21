@@ -42,15 +42,18 @@ These are **intentional design choices for v7705c5c**, not bugs.
 ### 🛡️ Unbounded Query Safety
 
 **Developer Commentary:**
+
 > "Without specifying ANY SHORTEST in combination with an unbounded upper bound, you can theoretically get infinite results. No good in a system, so I don't allow that combination."
 
 **Technical Details:**
+
 - **Problem**: `(a)-[e]->*(b)` with cycles → infinite paths possible
 - **Default semantics**: Standalone Kleene operators use ALL path quantifier
 - **Safety mechanism**: Block ALL + unbounded to prevent runaway queries
 - **Solution by design**: ANY SHORTEST constrains to single shortest path
 
 **Why it matters**: On large graphs with cycles, unrestricted transitive closure can:
+
 - Generate millions/billions of result rows
 - Consume unbounded memory
 - Never terminate on infinite graphs
@@ -58,15 +61,18 @@ These are **intentional design choices for v7705c5c**, not bugs.
 ### 🛤️ Path Mode Roadmap
 
 **Developer Commentary:**
+
 > "SQL/PGQ defines a couple of path modes, WALK being the default, also TRAIL, ACYCLIC, or SIMPLE. I want to support these others as well at some point, but it's future work. IIRC in some of these modes, ALL unbounded with some of these is possible?"
 
 **Current State:**
+
 - ✅ **WALK** (default): Allows repeated vertices and edges
 - 🚧 **TRAIL** (planned): No repeated edges, vertices may repeat
 - 🚧 **ACYCLIC** (planned): No repeated vertices
 - 🚧 **SIMPLE** (planned): No repeated vertices or edges
 
 **Future Possibilities:**
+
 - TRAIL/ACYCLIC modes might enable some ALL unbounded patterns
 - Preventing cycles could make ALL unbounded safe in certain cases
 - Requires careful analysis before implementation
@@ -74,9 +80,11 @@ These are **intentional design choices for v7705c5c**, not bugs.
 ### 🏷️ Edge Variable Names
 
 **Developer Commentary:**
+
 > "I think I need the edge variable name [e:Knows] just for my internal translation of the query. In a future version, I will allow omitting this [:Knows], but haven't gotten around to it."
 
 **Technical Details:**
+
 - **Current**: Edge variable required for internal query translation
 - **Implementation**: Translation layer needs named references
 - **Future**: Anonymous edge syntax `[:Knows]` will be supported
@@ -87,15 +95,18 @@ These are **intentional design choices for v7705c5c**, not bugs.
 ### 🔍 Label Inference
 
 **Developer Commentary:**
+
 > "In some cases you can deduce the label without explicit mentioning. Say there's one edge relation in your property graph Knows starting from a Person and ending at Person, then in your pattern you may omit the Knows `(p:Person)-[]->(p2:Person)`. Then I deduce that this needs to be Knows, but I currently don't support this either."
 
 **Capability:**
+
 - ✅ **Implemented**: Label inference logic exists internally
 - ❌ **Disabled**: Not exposed in 7705c5c API
 - 🎯 **Use case**: Unambiguous edge types can be inferred from node types
 - 📋 **Future**: Will be enabled when API design finalized
 
 **Example (will work in future):**
+
 ```sql
 -- If only one edge type exists between Person nodes:
 MATCH (p1:Person)-[]->(p2:Person)  -- System deduces [:Knows]
@@ -103,11 +114,12 @@ MATCH (p1:Person)-[]->(p2:Person)  -- System deduces [:Knows]
 
 ---
 
-## Category 1: Standalone Kleene Star (->*)
+## Category 1: Standalone Kleene Star (->\*)
 
-### ❌ Test 1.1: Basic ->* with full syntax
+### ❌ Test 1.1: Basic ->\* with full syntax
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -119,6 +131,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Find all reachable nodes from Alice (transitive closure)
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -127,6 +140,7 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - Kleene star for zero-or-more repetitions
 
 **Analysis**:
+
 - **Root cause**: Unbounded `->*` with ALL semantics could return infinite results
 - **Design decision**: SYSTEM SAFETY - prevent runaway queries on cyclic graphs
 - **Rationale**: Without upper bound, transitive closure with cycles → infinite paths
@@ -135,6 +149,7 @@ as this could lead to infinite results
 - **Solution**: Use `ANY SHORTEST` (constrains to single shortest path) or bounded quantifiers
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use ANY SHORTEST
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -149,9 +164,10 @@ COLUMNS (a.name, b.name)
 
 ---
 
-### ❌ Test 1.2: ->* without node labels
+### ❌ Test 1.2: ->\* without node labels
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a)-[e:test_knows]->*(b)
@@ -163,6 +179,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should work - node labels are optional in SQL:2023
 
 **Actual Error**:
+
 ```
 Constraint Error: All patterns must bind to a label
 ```
@@ -170,12 +187,14 @@ Constraint Error: All patterns must bind to a label
 **SQL:2023 Standard**: ✅ Valid - untyped nodes allowed
 
 **Analysis**:
+
 - **Primary issue**: Label binding required (not unbounded path issue in this case)
 - **Current limitation**: All node patterns must specify type label
 - **Note**: Even if labels were added, would still fail with ALL unbounded error
 - **Status**: Label inference capability exists but not exposed yet
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Add node labels AND use ANY SHORTEST
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -185,9 +204,10 @@ COLUMNS (a.name, b.name)
 
 ---
 
-### ❌ Test 1.3: ->* with path variable
+### ❌ Test 1.3: ->\* with path variable
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH p = (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -199,6 +219,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should work with path functions like path_length()
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -207,12 +228,14 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - path variables and path functions
 
 **Analysis**:
+
 - **Same root cause**: Unbounded `->*` defaults to ALL semantics
 - **Path variable alone doesn't help**: Still uses ALL path quantifier
 - **Path functions work**: `path_length(p)` is valid, but query must succeed first
 - **Design decision**: Path variable assignment doesn't change path semantics
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use ANY SHORTEST to enable path functions
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -222,9 +245,10 @@ COLUMNS (a.name, b.name, path_length(p) as hops)
 
 ---
 
-### ❌ Test 1.4: ->* with WHERE filter on edges
+### ❌ Test 1.4: ->\* with WHERE filter on edges
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e:test_knows WHERE e.since > 2020]->*(b:test_persons)
@@ -236,6 +260,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Filter edges during path traversal (only traverse recent connections)
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -244,12 +269,14 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - inline WHERE clauses on edge patterns
 
 **Analysis**:
+
 - **Same root cause**: Unbounded `->*` defaults to ALL semantics
 - **Edge filtering is valid**: WHERE clause syntax works, but doesn't fix path semantics
 - **Security note**: Even with filtered edges, cycles still possible → infinite results
 - **Design decision**: Predicate doesn't constrain path length
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use ANY SHORTEST with edge filtering
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows WHERE e.since > 2020]->*(b:test_persons)
@@ -269,6 +296,7 @@ COLUMNS (a.name, b.name)
 ### ❌ Test 2.1: Basic ->+ with edge variable and label
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e:test_knows]->+(b:test_persons)
@@ -280,6 +308,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Find all reachable nodes (at least 1 hop) via transitive closure
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -288,12 +317,14 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - Kleene plus for one-or-more repetitions
 
 **Analysis**:
+
 - **Identical to `->*` issue**: Kleene plus (`->+`) defaults to ALL semantics
 - **Difference from star**: Requires minimum 1 hop (vs 0 for `->*`)
 - **Same safety concern**: Without upper bound → infinite results possible
 - **Design decision**: CONSISTENCY - both Kleene operators blocked for same reason
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use bounded quantifiers (explicit lower bound)
 MATCH (a:test_persons)-[e:test_knows]->{1,10}(b:test_persons)
@@ -311,6 +342,7 @@ COLUMNS (a.name, b.name)
 ### ❌ Test 2.2: ->+ with LIMIT clause
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e:test_knows]->+(b:test_persons)
@@ -323,6 +355,7 @@ LIMIT 10
 **Expected**: LIMIT should constrain results to prevent infinite expansion
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -331,6 +364,7 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - LIMIT is standard result limiting
 
 **Analysis**:
+
 - **LIMIT doesn't help**: Error occurs during query **planning**, not execution
 - **Why it fails early**: DuckPGQ validates path semantics before building execution plan
 - **Security architecture**: Prevention at parse/plan time, not runtime
@@ -339,12 +373,14 @@ as this could lead to infinite results
 
 **Technical Detail**:
 Query planning stages:
+
 1. Parse query → ✅ Syntax valid
 2. Validate path semantics → ❌ Blocked here (ALL + unbounded)
 3. Build execution plan → Never reached
 4. Execute with LIMIT → Never reached
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use bounded quantifiers with LIMIT for performance
 MATCH (a:test_persons)-[e:test_knows]->{1,5}(b:test_persons)
@@ -360,6 +396,7 @@ LIMIT 10
 ### ❌ Test 3.1: Single hop without edge variable
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[:test_knows]->(b:test_persons)
@@ -370,6 +407,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should work - edge variable optional in SQL:2023
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near ":"
 ```
@@ -377,6 +415,7 @@ Parser Error: syntax error at or near ":"
 **SQL:2023 Standard**: ✅ Valid - anonymous edges allowed (`[:Label]` syntax)
 
 **Analysis**:
+
 - **Parser limitation**: 7705c5c doesn't support `[:Label]` syntax (yet)
 - **Developer insight**: Edge variable needed for internal query translation
 - **Status**: TEMPORARY requirement, not fundamental limitation
@@ -384,10 +423,12 @@ Parser Error: syntax error at or near ":"
 - **Implementation note**: Translation layer currently needs named references
 
 **Developer Commentary**:
+
 > "I think I need the edge variable name [e:Knows] just for my internal translation of the query.
 > In a future version, I will allow omitting this [:Knows]."
 
 **Workaround**:
+
 ```sql
 -- ✅ Always use named edge variables
 MATCH (a:test_persons)-[e:test_knows]->(b:test_persons)
@@ -398,6 +439,7 @@ MATCH (a:test_persons)-[e:test_knows]->(b:test_persons)
 ### ❌ Test 3.2: Bounded quantifier without edge variable
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[:test_knows]->{1,3}(b:test_persons)
@@ -408,6 +450,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should work with bounded quantifier (common use case)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near ":"
 ```
@@ -415,12 +458,14 @@ Parser Error: syntax error at or near ":"
 **SQL:2023 Standard**: ✅ Valid - anonymous edges with quantifiers
 
 **Analysis**:
+
 - **Same parser limitation**: `[:Label]` syntax not implemented
 - **Applies to all patterns**: Single-hop, multi-hop, quantified
 - **Consistent requirement**: Edge variable needed regardless of pattern type
 - **Future support**: Will work when anonymous edge syntax added
 
 **Workaround**:
+
 ```sql
 -- ✅ Add edge variable (works today)
 MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
@@ -431,6 +476,7 @@ MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
 ### ❌ Test 3.3: ANY SHORTEST without edge variable
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH p = ANY SHORTEST (a:test_persons)-[:test_knows]->*(b:test_persons)
@@ -442,6 +488,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: ANY SHORTEST should work without edge variable
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near ":"
 ```
@@ -449,12 +496,14 @@ Parser Error: syntax error at or near ":"
 **SQL:2023 Standard**: ✅ Valid - anonymous edges in ANY SHORTEST
 
 **Analysis**:
+
 - **Universal requirement**: Edge variables required in **ALL** contexts
 - **Includes ANY SHORTEST**: Even though it constrains results, still needs variable
 - **Confirmed limitation**: No exceptions for any pattern type
 - **Translation layer**: Internal query translation needs named edge references
 
 **Workaround**:
+
 ```sql
 -- ✅ Works with edge variable
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -469,6 +518,7 @@ COLUMNS (a.name, b.name, path_length(p))
 ### ⚠️ Test 4.1: Bounded quantifier without edge label
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e]->{1,3}(b:test_persons)
@@ -479,12 +529,14 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should traverse any edge type within 1-3 hops (or infer unambiguous type)
 
 **Actual**: **INCONSISTENT** - Depends on graph schema
+
 - Single edge type → May work (inference possible)
 - Multiple edge types → `Binder Error: Could not bind edge table`
 
 **SQL:2023 Standard**: ✅ Valid - untyped edges allowed
 
 **Analysis**:
+
 - **Label inference EXISTS**: Internal capability implemented
 - **Not exposed in 7705c5c**: Inference logic disabled in current API
 - **Why inconsistent**: Sometimes binder guesses, sometimes requires explicit label
@@ -492,12 +544,14 @@ FROM GRAPH_TABLE (test_graph
 - **Status**: FUTURE FEATURE - will be enabled in future release
 
 **Developer Commentary**:
+
 > "In some cases you can deduce the label without explicit mentioning. Say there's one edge
 > relation in your property graph Knows starting from a Person and ending at Person, then in
 > your pattern you may omit the Knows `(p:Person)-[]->(p2:Person)`. Then I deduce that this
 > needs to be Knows, but I currently don't support this either."
 
 **Safer approach**:
+
 ```sql
 -- ✅ Explicit label (always works)
 MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
@@ -508,6 +562,7 @@ MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
 ### ⚠️ Test 4.2: Node types but no edge label
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons WHERE a.type = 'researcher')-[e]->{1,3}(b:test_persons)
@@ -522,12 +577,14 @@ FROM GRAPH_TABLE (test_graph
 **SQL:2023 Standard**: ✅ Valid - label inference allowed
 
 **Analysis**:
+
 - **Same root cause**: Label inference capability disabled
 - **Unambiguous case**: If only ONE edge type connects Person to Person, should be deducible
 - **Current behavior**: Fails even when inference is possible
 - **Best practice**: Always specify labels to avoid unpredictable failures
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Explicit label prevents ambiguity
 MATCH (a:test_persons WHERE a.type = 'researcher')-[e:test_knows]->{1,3}(b:test_persons)
@@ -540,6 +597,7 @@ MATCH (a:test_persons WHERE a.type = 'researcher')-[e:test_knows]->{1,3}(b:test_
 ### ❌ Test 5.1: Explicit WALK path mode
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH WALK (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -551,6 +609,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Explicit WALK mode (allows repeated vertices and edges)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "WALK"
 ```
@@ -558,12 +617,14 @@ Parser Error: syntax error at or near "WALK"
 **SQL:2023 Standard**: ✅ Valid - WALK is a standard path mode keyword
 
 **Analysis**:
+
 - **Path mode keywords not recognized**: Parser doesn't support WALK/TRAIL/ACYCLIC/SIMPLE
 - **Default behavior**: WALK is the implicit default (but can't specify explicitly)
 - **Current limitation**: Cannot override or specify path mode
 - **Roadmap item**: Path mode support is planned future work
 
 **Developer Commentary**:
+
 > "SQL/PGQ defines a couple of path modes, WALK being the default, also TRAIL, ACYCLIC, or
 > SIMPLE. I want to support these others as well at some point, but it's future work."
 
@@ -572,6 +633,7 @@ Parser Error: syntax error at or near "WALK"
 ### ❌ Test 5.2: Explicit TRAIL path mode
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH TRAIL (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -583,6 +645,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: TRAIL mode (no repeated edges, vertices may repeat)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "TRAIL"
 ```
@@ -590,6 +653,7 @@ Parser Error: syntax error at or near "TRAIL"
 **SQL:2023 Standard**: ✅ Valid - TRAIL prevents edge repetition
 
 **Analysis**:
+
 - **Not implemented yet**: TRAIL is on roadmap
 - **Semantic difference**: Would allow vertex cycles but not edge cycles
 - **Potential benefit**: TRAIL mode might enable some ALL unbounded patterns safely
@@ -597,6 +661,7 @@ Parser Error: syntax error at or near "TRAIL"
 
 **Impact on ALL unbounded**:
 TRAIL mode could theoretically make some unbounded queries safe:
+
 - With TRAIL, paths cannot repeat edges
 - On finite graphs, finite number of edges → finite paths
 - ALL unbounded might work with TRAIL/ACYCLIC (future investigation needed)
@@ -606,6 +671,7 @@ TRAIL mode could theoretically make some unbounded queries safe:
 ### ❌ Test 5.3: Explicit ACYCLIC path mode
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH ACYCLIC (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -617,6 +683,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: ACYCLIC mode (no repeated vertices)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "ACYCLIC"
 ```
@@ -624,6 +691,7 @@ Parser Error: syntax error at or near "ACYCLIC"
 **SQL:2023 Standard**: ✅ Valid - ACYCLIC prevents vertex cycles
 
 **Analysis**:
+
 - **Future roadmap item**: ACYCLIC path mode planned
 - **Strongest cycle prevention**: No repeated vertices (implies no repeated edges)
 - **Performance benefit**: ACYCLIC bounds path length by graph size
@@ -632,6 +700,7 @@ Parser Error: syntax error at or near "ACYCLIC"
   - Finite graphs → finite results guaranteed
 
 **Path Mode Comparison** (SQL:2023):
+
 - **WALK** (current default): Allows all repetitions → infinite paths possible
 - **TRAIL** (planned): No edge repetition → may bound results
 - **ACYCLIC** (planned): No vertex repetition → definitely bounds results
@@ -646,6 +715,7 @@ Parser Error: syntax error at or near "ACYCLIC"
 ### ❌ Test 6.1: Quantifier BEFORE arrow
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH (a:test_persons)-[e:test_knows]{1,3}->(b:test_persons)
@@ -656,6 +726,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Test if quantifier can go before arrow (Cypher/Neo4j style)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "{"
 ```
@@ -663,6 +734,7 @@ Parser Error: syntax error at or near "{"
 **SQL:2023 Standard**: ❌ **Not valid** - SQL:2023 uses `->{n,m}` syntax
 
 **Analysis**:
+
 - **Cypher compatibility**: Cypher/Neo4j use `{n,m}->` syntax (quantifier before arrow)
 - **SQL:2023 syntax**: Uses `->{n,m}` (quantifier after arrow)
 - **DuckPGQ follows SQL:2023**: Not Cypher-compatible
@@ -670,6 +742,7 @@ Parser Error: syntax error at or near "{"
 - **Design decision**: Strict SQL:2023 compliance over Cypher compatibility
 
 **Syntax Comparison**:
+
 ```sql
 -- ❌ Cypher/Neo4j style (NOT supported)
 -[e:Knows]{1,3}->
@@ -679,6 +752,7 @@ Parser Error: syntax error at or near "{"
 ```
 
 **Correct syntax**:
+
 ```sql
 -- ✅ Quantifier AFTER arrow (SQL:2023)
 MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
@@ -689,6 +763,7 @@ MATCH (a:test_persons)-[e:test_knows]->{1,3}(b:test_persons)
 ### ❌ Test 6.2: Star operator BEFORE arrow
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH ANY SHORTEST (a:test_persons)-[e:test_knows]*->(b:test_persons)
@@ -700,6 +775,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Test if star can go before arrow (Cypher/Neo4j style)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "*"
 ```
@@ -707,12 +783,14 @@ Parser Error: syntax error at or near "*"
 **SQL:2023 Standard**: ❌ **Not valid** - SQL:2023 uses `->*` syntax
 
 **Analysis**:
+
 - **Cypher compatibility**: Cypher/Neo4j use `*->` or `*..5->` syntax
 - **SQL:2023 syntax**: Uses `->*` (star after arrow)
 - **Common mistake**: Many users coming from Cypher expect `*->`
 - **Critical for migration**: Documentation must highlight this difference
 
 **Syntax Comparison**:
+
 ```sql
 -- ❌ Cypher/Neo4j style (NOT supported)
 -[e:Knows]*->
@@ -724,6 +802,7 @@ Parser Error: syntax error at or near "*"
 ```
 
 **Correct syntax**:
+
 ```sql
 -- ✅ Star AFTER arrow (SQL:2023)
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -738,6 +817,7 @@ COLUMNS (a.name, b.name)
 ### ❌ Test 7.1: Explicit ALL unbounded
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH ALL (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -749,6 +829,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Should fail - this is the root cause of ALL standalone Kleene operator failures
 
 **Actual Error**:
+
 ```
 Constraint Error: ALL unbounded with path mode WALK is not possible
 as this could lead to infinite results
@@ -757,18 +838,21 @@ as this could lead to infinite results
 **SQL:2023 Standard**: ✅ Valid - ALL is a standard path quantifier
 
 **Analysis**:
+
 - **This is THE core limitation**: ALL + unbounded + WALK = blocked
 - **Why standalone `->*` fails**: When you don't specify quantifier, defaults to ALL
 - **Design decision**: Safety feature to prevent runaway queries
 - **Default semantics**: Implicit ALL for all patterns (unless ANY SHORTEST specified)
 
 **Path Quantifier Semantics** (SQL:2023):
+
 - **ALL**: Return all matching paths (can be infinite with cycles)
 - **ANY**: Return any single path
 - **ANY SHORTEST**: Return shortest path (deterministic)
 - **ANY K SHORTEST**: Return K shortest paths
 
 **Critical Insight**:
+
 ```sql
 -- These are IDENTICAL (both use ALL semantics):
 MATCH (a)-[e]->*(b)
@@ -779,6 +863,7 @@ MATCH ANY SHORTEST (a)-[e]->*(b)
 ```
 
 **Why ALL + unbounded fails**:
+
 1. Graph has cycle: Alice→Bob→Alice
 2. ALL means "return ALL paths"
 3. Unbounded means "any length"
@@ -786,6 +871,7 @@ MATCH ANY SHORTEST (a)-[e]->*(b)
 5. System blocks to prevent memory exhaustion
 
 **Working Alternative**:
+
 ```sql
 -- ✅ Use ANY SHORTEST to get single path
 MATCH p = ANY SHORTEST (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -798,6 +884,7 @@ COLUMNS (a.name, b.name, path_length(p))
 ### ❌ Test 7.2: ALL with TRAIL mode
 
 **Query:**
+
 ```sql
 FROM GRAPH_TABLE (test_graph
   MATCH ALL TRAIL (a:test_persons)-[e:test_knows]->*(b:test_persons)
@@ -809,6 +896,7 @@ FROM GRAPH_TABLE (test_graph
 **Expected**: Test if ALL works with TRAIL mode (might be safe with edge constraints)
 
 **Actual Error**:
+
 ```
 Parser Error: syntax error at or near "TRAIL"
 ```
@@ -816,24 +904,28 @@ Parser Error: syntax error at or near "TRAIL"
 **SQL:2023 Standard**: ✅ Valid - ALL with TRAIL is valid SQL:2023
 
 **Analysis**:
+
 - **Cannot test**: TRAIL keyword not implemented in 7705c5c parser
 - **Theoretical possibility**: TRAIL might make ALL unbounded safe
 - **Developer speculation**: "IIRC in some of these modes, ALL unbounded with some of these is possible?"
 - **Why it might work**: TRAIL prevents edge repetition → finite paths on finite graphs
 
 **TRAIL Semantics** (SQL:2023):
+
 - **No repeated edges**: Each edge can appear at most once in a path
 - **Vertices may repeat**: Can revisit nodes via different edges
 - **Finite bound**: Max path length = number of edges in graph
 - **Safety implication**: ALL unbounded + TRAIL = finite results
 
 **ACYCLIC would be even safer**:
+
 - **No repeated vertices**: Each node appears at most once
 - **Stronger bound**: Max path length = number of vertices
 - **Guaranteed finite**: ALL unbounded + ACYCLIC = safe
 
 **Future Investigation Needed**:
 Once TRAIL/ACYCLIC implemented, test these combinations:
+
 ```sql
 -- Might work in future:
 MATCH ALL TRAIL (a)-[e]->*(b)      -- Bounded by edge count
@@ -854,6 +946,7 @@ MATCH ALL ACYCLIC (a)-[e]->*(b)    -- Bounded by vertex count
    - **Workaround**: Use `ANY SHORTEST` or bounded quantifiers `->{n,m}`
 
 **Developer Quote**:
+
 > "Without specifying ANY SHORTEST in combination with an unbounded upper bound, you can
 > theoretically get infinite results. No good in a system, so I don't allow that combination."
 
@@ -896,6 +989,7 @@ MATCH ALL ACYCLIC (a)-[e]->*(b)    -- Bounded by vertex count
 ### ✅ What DOES Work (Validated Features)
 
 1. **ANY SHORTEST with Kleene star**
+
    ```sql
    MATCH p = ANY SHORTEST (a:Person)-[e:Knows]->*(b:Person)
    WHERE a.id = 1 AND b.id = 10
@@ -903,6 +997,7 @@ MATCH ALL ACYCLIC (a)-[e]->*(b)    -- Bounded by vertex count
    ```
 
 2. **Bounded quantifiers**
+
    ```sql
    MATCH (a:Person)-[e:Knows]->{1,5}(b:Person)
    COLUMNS (a.name, b.name)
@@ -991,11 +1086,13 @@ Based on developer commentary, these features are planned for future releases:
 ### 1. Path Mode Support (High Impact)
 
 **Features**:
+
 - TRAIL: No repeated edges
 - ACYCLIC: No repeated vertices
 - SIMPLE: No repeated vertices or edges
 
 **Impact**:
+
 - **May enable ALL unbounded**: Developer speculation that TRAIL/ACYCLIC might make ALL unbounded safe
 - **Better cycle control**: Users can specify cycle handling explicitly
 - **Performance**: ACYCLIC could improve performance by bounding path length
@@ -1003,6 +1100,7 @@ Based on developer commentary, these features are planned for future releases:
 **Status**: Future work, no timeline specified
 
 **Developer Quote**:
+
 > "SQL/PGQ defines a couple of path modes, WALK being the default, also TRAIL, ACYCLIC, or
 > SIMPLE. I want to support these others as well at some point, but it's future work.
 > IIRC in some of these modes, ALL unbounded with some of these is possible?"
@@ -1012,6 +1110,7 @@ Based on developer commentary, these features are planned for future releases:
 **Feature**: Support `-[:Label]->` syntax (edge without variable name)
 
 **Impact**:
+
 - **Cleaner queries**: When edge variable not needed in results
 - **SQL:2023 compliance**: Standard allows anonymous edges
 - **Reduced boilerplate**: No need to name unused variables
@@ -1019,6 +1118,7 @@ Based on developer commentary, these features are planned for future releases:
 **Status**: Temporary limitation, planned for future
 
 **Developer Quote**:
+
 > "I think I need the edge variable name [e:Knows] just for my internal translation of the
 > query. In a future version, I will allow omitting this [:Knows], but haven't gotten around to it."
 
@@ -1029,6 +1129,7 @@ Based on developer commentary, these features are planned for future releases:
 **Capability**: ✅ **Already implemented internally**, just not exposed
 
 **Impact**:
+
 - **More concise queries**: `(p:Person)-[]->(p2:Person)` instead of `(p:Person)-[e:Knows]->(p2:Person)`
 - **Reduced redundancy**: When schema has single edge type between nodes
 - **Better UX**: Less typing for common patterns
@@ -1036,6 +1137,7 @@ Based on developer commentary, these features are planned for future releases:
 **Status**: Internal logic exists, API exposure pending
 
 **Developer Quote**:
+
 > "In some cases you can deduce the label without explicit mentioning. Say there's one edge
 > relation in your property graph Knows starting from a Person and ending at Person, then in
 > your pattern you may omit the Knows (p:Person)-[]->(p2:Person). Then I deduce that this

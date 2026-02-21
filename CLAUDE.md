@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 Native TypeScript port of DuckDB MCP extension. Implements bidirectional MCP server/client with federation capabilities.
 
-**Status**: Alpha (15% test coverage). Focus on improving stability and test coverage.
+**Status**: v0.12.0 (441 tests, 0 failures). S1 (test stabilization) and S2 (graph tools) complete. Next: S3 (MCP SDK 1.26 + HITL).
 
 ## Key Commands
 
@@ -31,11 +31,13 @@ npm run inspector:reset # Reset stuck Inspector
 
 ### Core Components
 
-- `src/server/mcp-server.ts` - MCP server with 14 tools
+- `src/server/mcp-server.ts` - MCP server with 32+ tools
 - `src/duckdb/service.ts` - DuckDB wrapper with pooling
 - `src/protocol/` - Transport implementations
 - `src/federation/` - ResourceRegistry, ConnectionPool, QueryRouter
 - `src/client/` - MCP client for external servers
+- `src/tools/graph-*.ts` - 8 graph algorithm tools (S2)
+- `src/tools/process-tools.ts` - 3 process mining tools
 
 ### Transport Status
 
@@ -114,18 +116,40 @@ MCP_SECURITY_MODE=development
 # Optional: MINIO_* for S3 storage
 ```
 
-## Migration Notes
+## Roadmap
 
-Phase 1 ✅: Core protocol and server
-Phase 2 🚧: Federation and virtual tables
-Phase 3 📋: Virtual filesystem (mcp:// URIs)
-Phase 4 📋: Integration with deposium_MCPs
+S1 ✅: Test stabilization (422/422 green)
+S2 ✅: Graph algorithm MCP tools (8 tools, v0.12.0)
+S3 📋: MCP SDK 1.26.0 alignment + HITL (v0.13.0)
 
-Differences from C++ version:
+See `docs/roadmap/02-2026-update.md` for details.
 
-- Uses @modelcontextprotocol/sdk
-- Node.js async patterns
-- stdio + partial transport support
+## Graph Tools (S2)
+
+8 graph tools in `src/tools/graph-*.ts`, all using iterative SQL (no recursive CTEs):
+
+- Centrality: `graph.pagerank`, `graph.eigenvector`
+- Community: `graph.community_detect`, `graph.modularity`
+- Paths: `graph.weighted_path` (strongest/cheapest/combined)
+- Temporal: `graph.temporal_filter`, `graph.compare_periods`
+- Export: `graph.export` (json/csv/d3/graphml/parquet)
+
+Shared schema in `src/types/graph-schemas.ts`, types in `src/types/graph-types.ts`.
+
+## Doc Structure
+
+```
+docs/
+  CHANGELOG.md        -- Detailed changelog (keep a changelog format)
+  ROADMAP.md          -- Points to current roadmap
+  roadmap/            -- Roadmap versions
+  duckpgq/            -- DuckPGQ reference docs
+  ARCHITECTURE.md     -- System architecture
+  DEVELOPMENT.md      -- Dev setup guide
+  CONTRIBUTING.md     -- Contribution guidelines
+  FEDERATION_GUIDE.md -- Federation docs
+  TRANSPORTS.md       -- Transport protocol docs
+```
 
 <!-- gitnexus:start -->
 
