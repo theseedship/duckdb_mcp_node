@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.2...v0.12.0) (2026-02-21)
+
+
+### Features
+
+* **graph:** add 8 graph algorithm MCP tools (S2: F1-F5) ([b089a57](https://github.com/theseedship/duckdb_mcp_node/commit/b089a57b3b4e2172cab66fff72d4aeb00d7d1d84))
+* v1.0.0 — MCP SDK 1.26.0 alignment + HITL elicitation (S3) ([bac0074](https://github.com/theseedship/duckdb_mcp_node/commit/bac00745e7d9f3530a4b60b8774074ca81ce4524))
+
+
+### Bug Fixes
+
+* **tests:** fix median tests and test isolation for 100% pass rate (S1-V4) ([f577eda](https://github.com/theseedship/duckdb_mcp_node/commit/f577edae97acbdf9f5e0072007ed36dd4f62355d))
+* **tests:** resolve 54 failures in federation and context modules (S1-V3) ([3e06480](https://github.com/theseedship/duckdb_mcp_node/commit/3e064804e44dae3c511514d89bd2ee33e90c57aa))
+* **tests:** rewrite transport tests to match real implementations (S1-V2) ([c9ced21](https://github.com/theseedship/duckdb_mcp_node/commit/c9ced2109f49954045d0169b39f1abb44f5b2e1d))
+
 ## [1.0.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.2...v1.0.0) (2026-02-22)
 
 ### Features
