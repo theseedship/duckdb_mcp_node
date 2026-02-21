@@ -330,6 +330,69 @@ When full DuckPGQ support arrives for DuckDB 1.4.x/1.5.x, your configuration wil
 
 ---
 
+## 📊 Graph Algorithm Tools (v0.12.0+)
+
+8 MCP tools for graph analysis using iterative SQL (DuckPGQ workaround for DuckDB 1.4.x).
+
+### Tools
+
+| Tool                     | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| `graph.pagerank`         | PageRank centrality with configurable damping/iterations       |
+| `graph.eigenvector`      | Eigenvector centrality via power iteration                     |
+| `graph.community_detect` | Label propagation community detection                          |
+| `graph.modularity`       | Modularity score Q for community quality                       |
+| `graph.weighted_path`    | Weighted paths: strongest, cheapest, or combined               |
+| `graph.temporal_filter`  | Filter graph by time period, return stats                      |
+| `graph.compare_periods`  | Compare two periods (NEW/REMOVED/STRENGTHENED/WEAKENED/STABLE) |
+| `graph.export`           | Export as JSON, CSV (Gephi), D3, GraphML, or Parquet           |
+
+### Usage
+
+All tools share a common base schema:
+
+```typescript
+import { graphToolHandlers } from '@seed-ship/duckdb-mcp-native/graph'
+
+const result = await graphToolHandlers['graph.pagerank'](
+  {
+    node_table: 'vars',
+    edge_table: 'drives',
+    node_id_column: 'var_id',
+    source_column: 'from_var',
+    target_column: 'to_var',
+    weight_column: 'confidence',
+    iterations: 20,
+    damping: 0.85,
+    top_n: 10,
+  },
+  duckdb
+)
+// result.nodes = [{ node_id: 4, rank: 0.21 }, ...]
+```
+
+### Temporal Analysis
+
+```typescript
+// Compare graph evolution across time periods
+const changes = await graphToolHandlers['graph.compare_periods'](
+  {
+    node_table: 'vars',
+    edge_table: 'drives',
+    source_column: 'from_var',
+    target_column: 'to_var',
+    weight_column: 'confidence',
+    period_column: 'period',
+    period_a: '1993-2023',
+    period_b: '2020-2023',
+  },
+  duckdb
+)
+// changes.summary = { new_edges: 3, removed_edges: 5, strengthened: 2, ... }
+```
+
+---
+
 ## 🔄 Process Mining Tools (v0.9.4+)
 
 **NEW**: Enhanced process mining capabilities with embeddings standardization and robust composition

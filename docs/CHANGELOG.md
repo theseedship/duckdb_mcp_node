@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-02-21
+
+### 🎯 Features — Graph Algorithm MCP Tools (S2: F1-F5)
+
+8 new graph algorithm tools accessible via MCP, using iterative SQL with temp tables (DuckPGQ workaround for DuckDB 1.4.x):
+
+- **`graph.pagerank`** — Iterative PageRank centrality with configurable damping factor and iterations
+- **`graph.eigenvector`** — Power iteration eigenvector centrality (undirected adjacency)
+- **`graph.community_detect`** — Label propagation community detection with convergence check
+- **`graph.modularity`** — Modularity score Q for community structure quality (auto-detects communities if needed)
+- **`graph.weighted_path`** — Weighted path finding in 3 modes: strongest (multiplicative), cheapest (Bellman-Ford), combined (additive)
+- **`graph.temporal_filter`** — Filter graph by time period, return node/edge counts, avg weight, density
+- **`graph.compare_periods`** — Compare two periods: classify edges as NEW/REMOVED/STRENGTHENED/WEAKENED/STABLE
+- **`graph.export`** — Export graph in 5 formats: JSON, CSV (Gephi), D3, GraphML, Parquet
+
+### 📦 Package
+
+- New `@seed-ship/duckdb-mcp-native/graph` subpath export
+- All graph types exported from main entry point
+- 19 new integration tests (441 total, 0 failures)
+
+### ⚠️ Technical Notes
+
+- All algorithms use iterative SQL with temp tables — **no recursive CTEs** (segfault risk on DuckDB 1.4.x)
+- Temp tables use unique `_graph_{timestamp}_{random}` prefixes with cleanup in `finally` blocks
+- Shared `GraphInputBase` schema: `node_table`, `edge_table`, `node_id_column`, `source_column`, `target_column`, `weight_column`, `filter`
+
 ## [0.7.1] - 2025-10-19
 
 ### ⬆️ Updated

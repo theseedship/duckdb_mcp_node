@@ -24,6 +24,7 @@ import {
 } from '../tools/motherduck-tools.js'
 import { processToolDefinitions, processToolHandlers } from '../tools/process-tools.js'
 import { dataHelperToolDefinitions, dataHelperToolHandlers } from '../tools/data-helper-tools.js'
+import { graphToolDefinitions, graphToolHandlers } from '../tools/graph-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
 import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
@@ -528,6 +529,8 @@ class DuckDBMCPServer {
           ...processToolDefinitions,
           // Data helper tools
           ...dataHelperToolDefinitions,
+          // Graph algorithm tools
+          ...graphToolDefinitions,
         ],
       }
     })
@@ -1270,6 +1273,27 @@ class DuckDBMCPServer {
 
           case 'sample_parquet': {
             const result = await dataHelperToolHandlers.sample_parquet(args, this.duckdb)
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            }
+          }
+
+          // Graph algorithm tools
+          case 'graph.pagerank':
+          case 'graph.eigenvector':
+          case 'graph.community_detect':
+          case 'graph.modularity':
+          case 'graph.weighted_path':
+          case 'graph.temporal_filter':
+          case 'graph.compare_periods':
+          case 'graph.export': {
+            const handler = graphToolHandlers[name as keyof typeof graphToolHandlers]
+            const result = await handler(args, this.duckdb)
             return {
               content: [
                 {

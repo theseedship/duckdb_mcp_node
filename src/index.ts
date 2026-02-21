@@ -115,6 +115,39 @@ export type {
 // Data helper tools exports (json_to_parquet, profile_parquet, sample_parquet)
 export { dataHelperToolHandlers, dataHelperToolDefinitions } from './tools/data-helper-tools.js'
 
+// Graph algorithm tools exports (S2: F1-F5)
+export { graphToolHandlers, graphToolDefinitions } from './tools/graph-tools.js'
+export {
+  handlePageRank,
+  handleEigenvector,
+  handleCommunityDetect,
+  handleModularity,
+  handleWeightedPath,
+  handleTemporalFilter,
+  handleComparePeriods,
+  handleGraphExport,
+} from './tools/graph-tools.js'
+
+// Export graph types for TypeScript users
+export type {
+  PageRankResult,
+  PageRankNode,
+  EigenvectorResult,
+  EigenvectorNode,
+  CommunityDetectResult,
+  CommunityInfo,
+  CommunityNode,
+  ModularityResult,
+  WeightedPathResult,
+  PathResult,
+  PathStep,
+  TemporalFilterResult,
+  ComparePeriodsResult,
+  EdgeChange,
+  PeriodMetrics,
+  GraphExportResult,
+} from './types/graph-types.js'
+
 // DuckLake tools exports (ACID transactions, time travel, snapshots)
 export {
   createDuckLakeToolDefinitions,
