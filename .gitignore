@@ -115,3 +115,4 @@ test-*.sh
 
 # Yarn Integrity file
 .yarn-integrity
+.gitnexus
