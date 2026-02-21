@@ -9,14 +9,12 @@ const { mockHandlers } = vi.hoisted(() => {
   return { mockHandlers: handlers }
 })
 
-// Mock the MCP SDK Server
+// Mock the MCP SDK Server (class for ESM constructor compat)
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn(() => ({
-    setRequestHandler: vi.fn((schema, handler) => {
-      // Map schema objects to handler keys based on their structure
+  Server: class MockServer {
+    _handlers = mockHandlers
+    setRequestHandler = vi.fn((schema: any, handler: any) => {
       let key = 'unknown'
-
-      // Check schema object or name to determine handler type
       if (schema?.parse?.name?.includes('ListTools') || schema === 'tools/list') {
         key = 'tools/list'
       } else if (schema?.parse?.name?.includes('CallTool') || schema === 'tools/call') {
@@ -26,49 +24,47 @@ vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
       } else if (schema?.parse?.name?.includes('ReadResource') || schema === 'resources/read') {
         key = 'resources/read'
       }
-
       mockHandlers.set(key, handler)
-    }),
-    connect: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    error: vi.fn(),
-    // Expose handlers for testing
-    _handlers: mockHandlers,
-  })),
+    })
+    connect = vi.fn().mockResolvedValue(undefined)
+    close = vi.fn().mockResolvedValue(undefined)
+    error = vi.fn()
+    constructor(..._args: any[]) {}
+  },
 }))
 
-// Mock stdio transport
+// Mock stdio transport (class for ESM constructor compat)
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: vi.fn().mockImplementation(() => ({})),
+  StdioServerTransport: class {},
 }))
 
-// Mock DuckDBService
+// Mock DuckDBService (class for ESM constructor compat)
 vi.mock('../duckdb/service.js', () => ({
-  DuckDBService: vi.fn(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    executeQuery: vi.fn().mockResolvedValue([
+  DuckDBService: class {
+    initialize = vi.fn().mockResolvedValue(undefined)
+    executeQuery = vi.fn().mockResolvedValue([
       { id: 1, name: 'test1' },
       { id: 2, name: 'test2' },
-    ]),
-    executeScalar: vi.fn().mockResolvedValue({ count: 10 }),
-    getSchema: vi.fn().mockResolvedValue([
+    ])
+    executeScalar = vi.fn().mockResolvedValue({ count: 10 })
+    getSchema = vi.fn().mockResolvedValue([
       { table_schema: 'main', table_name: 'users', table_type: 'TABLE' },
       { table_schema: 'main', table_name: 'products', table_type: 'TABLE' },
-    ]),
-    getTableColumns: vi.fn().mockResolvedValue([
+    ])
+    getTableColumns = vi.fn().mockResolvedValue([
       { column_name: 'id', data_type: 'INTEGER', is_nullable: 'NO' },
       { column_name: 'name', data_type: 'VARCHAR', is_nullable: 'YES' },
-    ]),
-    createTableFromJSON: vi.fn().mockResolvedValue(undefined),
-    readParquet: vi.fn().mockResolvedValue([{ data: 'parquet' }]),
-    readCSV: vi.fn().mockResolvedValue([{ data: 'csv' }]),
-    readJSON: vi.fn().mockResolvedValue([{ data: 'json' }]),
-    exportToFile: vi.fn().mockResolvedValue(undefined),
-    tableExists: vi.fn().mockResolvedValue(true),
-    getRowCount: vi.fn().mockResolvedValue(100),
-    close: vi.fn().mockResolvedValue(undefined),
-    isReady: vi.fn().mockReturnValue(true),
-  })),
+    ])
+    createTableFromJSON = vi.fn().mockResolvedValue(undefined)
+    readParquet = vi.fn().mockResolvedValue([{ data: 'parquet' }])
+    readCSV = vi.fn().mockResolvedValue([{ data: 'csv' }])
+    readJSON = vi.fn().mockResolvedValue([{ data: 'json' }])
+    exportToFile = vi.fn().mockResolvedValue(undefined)
+    tableExists = vi.fn().mockResolvedValue(true)
+    getRowCount = vi.fn().mockResolvedValue(100)
+    close = vi.fn().mockResolvedValue(undefined)
+    isReady = vi.fn().mockReturnValue(true)
+  },
   getDuckDBService: vi.fn().mockReturnValue({
     initialize: vi.fn().mockResolvedValue(undefined),
     executeQuery: vi.fn().mockResolvedValue([
@@ -96,12 +92,12 @@ vi.mock('../duckdb/service.js', () => ({
   }),
 }))
 
-// Mock MCPClient
+// Mock MCPClient (class for ESM constructor compat)
 vi.mock('../client/MCPClient.js', () => ({
-  MCPClient: vi.fn(() => ({
-    attachServer: vi.fn().mockResolvedValue(undefined),
-    detachServer: vi.fn().mockResolvedValue(undefined),
-    listAttachedServers: vi.fn().mockReturnValue([
+  MCPClient: class {
+    attachServer = vi.fn().mockResolvedValue(undefined)
+    detachServer = vi.fn().mockResolvedValue(undefined)
+    listAttachedServers = vi.fn().mockReturnValue([
       {
         alias: 'test-server',
         url: 'stdio://test',
@@ -111,17 +107,17 @@ vi.mock('../client/MCPClient.js', () => ({
         tools: [],
         lastRefresh: new Date(),
       },
-    ]),
-    listResources: vi.fn().mockResolvedValue([{ uri: 'test://resource1', name: 'Resource 1' }]),
-    readResource: vi.fn().mockResolvedValue({ data: 'test' }),
-    createVirtualTable: vi.fn().mockResolvedValue(undefined),
-    refreshVirtualTable: vi.fn().mockResolvedValue(undefined),
-    callTool: vi.fn().mockResolvedValue({ result: 'success' }),
-    clearCache: vi.fn(),
-    disconnectAll: vi.fn().mockResolvedValue(undefined),
-    getAttachedServer: vi.fn().mockReturnValue(undefined),
-    setDuckDBService: vi.fn(),
-  })),
+    ])
+    listResources = vi.fn().mockResolvedValue([{ uri: 'test://resource1', name: 'Resource 1' }])
+    readResource = vi.fn().mockResolvedValue({ data: 'test' })
+    createVirtualTable = vi.fn().mockResolvedValue(undefined)
+    refreshVirtualTable = vi.fn().mockResolvedValue(undefined)
+    callTool = vi.fn().mockResolvedValue({ result: 'success' })
+    clearCache = vi.fn()
+    disconnectAll = vi.fn().mockResolvedValue(undefined)
+    getAttachedServer = vi.fn().mockReturnValue(undefined)
+    setDuckDBService = vi.fn()
+  },
 }))
 
 // Mock DuckDB service
@@ -543,11 +539,13 @@ describe('DuckDBMCPServer', () => {
 
   describe('Lifecycle', () => {
     it('should start server', async () => {
+      // Spy on the mock server's connect before calling start
+      // @ts-ignore
+      const connectSpy = vi.spyOn(server.server, 'connect')
       await server.start()
 
       expect(mockDuckDB.initialize).toHaveBeenCalled()
-      // @ts-ignore
-      expect(server.server.connect).toHaveBeenCalled()
+      expect(connectSpy).toHaveBeenCalled()
     })
 
     it('should handle initialization timeout', async () => {

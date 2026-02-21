@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { DuckDBMcpNativeService, createDuckDBMcpNativeService } from './DuckDBMcpNativeService.js'
 
-// Mock the MCPClient to avoid real connections
+// Mock the MCPClient to avoid real connections (class for ESM constructor compat)
 vi.mock('../client/MCPClient.js', () => ({
-  MCPClient: vi.fn(() => ({
-    attachServer: vi.fn().mockResolvedValue(undefined),
-    detachServer: vi.fn().mockResolvedValue(undefined),
-    listResources: vi.fn().mockResolvedValue([]),
-    readResource: vi.fn().mockResolvedValue({}),
-    callTool: vi.fn().mockResolvedValue({}),
-    getAttachedServer: vi.fn().mockReturnValue({
+  MCPClient: class {
+    attachServer = vi.fn().mockResolvedValue(undefined)
+    detachServer = vi.fn().mockResolvedValue(undefined)
+    listResources = vi.fn().mockResolvedValue([])
+    readResource = vi.fn().mockResolvedValue({})
+    callTool = vi.fn().mockResolvedValue({})
+    getAttachedServer = vi.fn().mockReturnValue({
       alias: 'test-alias',
       url: 'stdio://test',
       transport: 'stdio',
@@ -17,21 +17,22 @@ vi.mock('../client/MCPClient.js', () => ({
       resources: [],
       tools: [],
       lastRefresh: new Date(),
-    }),
-    listAttachedServers: vi.fn().mockReturnValue([]),
-    clearCache: vi.fn(),
-    disconnectAll: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-    setDuckDBService: vi.fn(),
-  })),
+    })
+    listAttachedServers = vi.fn().mockReturnValue([])
+    clearCache = vi.fn()
+    disconnectAll = vi.fn().mockResolvedValue(undefined)
+    close = vi.fn().mockResolvedValue(undefined)
+    setDuckDBService = vi.fn()
+  },
 }))
 
-// Mock DuckDBMCPServer to avoid starting real servers
+// Mock DuckDBMCPServer to avoid starting real servers (class for ESM constructor compat)
 vi.mock('../server/mcp-server.js', () => ({
-  DuckDBMCPServer: vi.fn(() => ({
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-  })),
+  DuckDBMCPServer: class {
+    start = vi.fn().mockResolvedValue(undefined)
+    stop = vi.fn().mockResolvedValue(undefined)
+    constructor(..._args: any[]) {}
+  },
 }))
 
 // Tests for DuckDBMcpNativeService

@@ -46,12 +46,25 @@ const { getMockClientInstance } = vi.hoisted(() => {
 // Keep a reference to the current mock instance for tests
 let mockClientInstance: any
 
-// Mock the MCP SDK client
+// Mock the MCP SDK client with a class (vi.fn arrow functions are not constructable in ESM)
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: vi.fn(() => {
-    mockClientInstance = getMockClientInstance()
-    return mockClientInstance
-  }),
+  Client: class MockClient {
+    connect: any
+    close: any
+    listResources: any
+    listTools: any
+    readResource: any
+    callTool: any
+    constructor(..._args: any[]) {
+      mockClientInstance = getMockClientInstance()
+      this.connect = mockClientInstance.connect
+      this.close = mockClientInstance.close
+      this.listResources = mockClientInstance.listResources
+      this.listTools = mockClientInstance.listTools
+      this.readResource = mockClientInstance.readResource
+      this.callTool = mockClientInstance.callTool
+    }
+  },
 }))
 
 // Mock stdio transport to prevent real process spawning
@@ -67,25 +80,27 @@ vi.mock('fs/promises', () => ({
   unlink: vi.fn().mockResolvedValue(undefined),
 }))
 
-// Mock protocol transports
+// Mock protocol transports (use classes, not vi.fn arrows, for ESM constructor compat)
 vi.mock('../protocol/index.js', () => ({
-  HTTPTransport: vi.fn(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
-  WebSocketTransport: vi.fn(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
-  TCPTransport: vi.fn(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
+  HTTPTransport: class {
+    connect = vi.fn().mockResolvedValue(undefined)
+    close = vi.fn().mockResolvedValue(undefined)
+  },
+  WebSocketTransport: class {
+    connect = vi.fn().mockResolvedValue(undefined)
+    close = vi.fn().mockResolvedValue(undefined)
+  },
+  TCPTransport: class {
+    connect = vi.fn().mockResolvedValue(undefined)
+    close = vi.fn().mockResolvedValue(undefined)
+  },
 }))
 
-// Mock SDK transport adapter
+// Mock SDK transport adapter (class-based for ESM constructor compat)
 vi.mock('../protocol/sdk-transport-adapter.js', () => ({
-  SDKTransportAdapter: vi.fn((transport) => transport),
+  SDKTransportAdapter: class {
+    constructor(public transport: any) {}
+  },
 }))
 
 describe('MCPClient', () => {
