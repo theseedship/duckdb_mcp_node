@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.0.1...v1.1.0) (2026-03-12)
+
+### Features
+
+- **duckdb:** Upgrade to DuckDB 1.5.0 "Variegata" (`@duckdb/node-api@1.5.0-r.1`)
+- **duckpgq:** DuckPGQ community extension confirmed working on 1.5.0 (version `aec2e25`)
+- All 469 tests pass on DuckDB 1.5.0
+
+### DuckDB 1.5.0 Highlights
+
+- VARIANT type support, `read_duckdb` function, `ALTER DATABASE RENAME TO`
+- `ATTACH` with recovery mode and `NO_WAL`
+- Roaring boolean compression, parallel row group destruction
+- Buffer-managed query results for lower memory usage
+
 ## [1.0.0](https://github.com/theseedship/duckdb_mcp_node/compare/v0.11.2...v1.0.0) (2026-02-22)
 
 ### Features

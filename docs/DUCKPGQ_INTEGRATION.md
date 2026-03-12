@@ -39,14 +39,14 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 
 ## Compatibility Matrix
 
-| DuckDB Version      | DuckPGQ Version | Fixed Paths | ANY SHORTEST | Bounded {n,m} | Standalone Kleene | Status               |
-| ------------------- | --------------- | ----------- | ------------ | ------------- | ----------------- | -------------------- |
-| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅           | ✅            | ✅                | **Fully Supported**  |
-| 1.3.x               | Partial         | ✅          | ⚠️           | ⚠️            | ⚠️                | **Limited**          |
-| **1.4.x** (current) | **7705c5c**     | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**       |
-| 1.5.x+              | TBD             | ?           | ?            | ?             | ?                 | Planned              |
+| DuckDB Version      | DuckPGQ Version | Fixed Paths | ANY SHORTEST | Bounded {n,m} | Standalone Kleene | Status              |
+| ------------------- | --------------- | ----------- | ------------ | ------------- | ----------------- | ------------------- |
+| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅           | ✅            | ✅                | **Fully Supported** |
+| 1.3.x               | Partial         | ✅          | ⚠️           | ⚠️            | ⚠️                | **Limited**         |
+| 1.4.x               | 7705c5c         | ✅          | ✅           | ✅            | ❌                | Functional          |
+| **1.5.0** (current) | **aec2e25**     | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
 
-**Current Package**: This project uses `@duckdb/node-api ^1.4.1-r.4` (DuckDB 1.4.1)
+**Current Package**: This project uses `@duckdb/node-api 1.5.0-r.1` (DuckDB 1.5.0)
 
 ### Version-Specific Notes
 
@@ -486,4 +486,4 @@ Found an issue or have improvements?
 
 ---
 
-_Last updated: 2025-10-20_
+_Last updated: 2026-03-12_

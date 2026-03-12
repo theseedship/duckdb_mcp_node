@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -160,7 +160,7 @@
   },
   "homepage": "https://github.com/theseedship/duckdb_mcp_node#readme",
   "dependencies": {
-    "@duckdb/node-api": "1.4.1-r.5",
+    "@duckdb/node-api": "1.5.0-r.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.1",
     "dotenv": "^17.2.3",
@@ -171,6 +171,7 @@
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@types/node": "^22.19.2",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "@vitest/coverage-v8": "^4.0.15",
@@ -184,8 +185,7 @@
     "prettier": "^3.7.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15",
-    "@types/ws": "^8.18.1"
+    "vitest": "^4.0.15"
   },
   "engines": {
     "node": ">=20.0.0"

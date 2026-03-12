@@ -122,7 +122,7 @@ npm test              # Run tests
 
 ### MotherDuck Cloud
 
-> MotherDuck requires DuckDB v1.3.2. These tools will activate once MotherDuck supports DuckDB v1.4.x.
+> MotherDuck requires DuckDB v1.3.2. These tools will activate once MotherDuck supports DuckDB v1.5.x.
 
 | Tool                         | Description                 |
 | ---------------------------- | --------------------------- |
@@ -139,7 +139,7 @@ npm test              # Run tests
 
 ## Graph Algorithm Tools
 
-8 MCP tools for graph analysis using iterative SQL with temp tables (no recursive CTEs — DuckPGQ workaround for DuckDB 1.4.x).
+8 MCP tools for graph analysis using iterative SQL with temp tables (no recursive CTEs — DuckPGQ workaround).
 
 ### Tools
 
@@ -218,12 +218,12 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 | DuckDB Version      | DuckPGQ Version | Fixed Paths | Bounded {n,m} | ANY SHORTEST | Kleene (alone) | Status               |
 | ------------------- | --------------- | ----------- | ------------- | ------------ | -------------- | -------------------- |
 | 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | ✅             | **Production Ready** |
-| **1.4.1** (current) | **7705c5c**     | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**       |
-| 1.5.x+              | TBD             | ?           | ?             | ?            | ?              | Planned              |
+| 1.4.1               | 7705c5c         | ✅          | ✅            | ✅           | ❌             | Functional           |
+| **1.5.0** (current) | **aec2e25**     | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**       |
 
 ### What Works (Validated via Automated Testing)
 
-**Version 7705c5c (current for DuckDB 1.4.x)**
+**Version aec2e25 (current for DuckDB 1.5.0)**
 
 ✅ **Working features:**
 

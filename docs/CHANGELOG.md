@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-12
+
+### Upgraded
+
+- **DuckDB 1.5.0 "Variegata"**: `@duckdb/node-api` upgraded from `1.4.1-r.5` to `1.5.0-r.1`
+- **DuckPGQ**: Community extension confirmed working on DuckDB 1.5.0 (version `aec2e25`, was `7705c5c` on 1.4.x)
+- All 469 tests pass on DuckDB 1.5.0, zero regressions
+
+### DuckPGQ Feature Status on 1.5.0
+
+- ✅ Fixed-length paths, bounded quantifiers `{n,m}`, ANY SHORTEST
+- ❌ Standalone Kleene `->*`/`->+` still intentionally blocked (infinite result safety)
+- ❌ Anonymous edges still require variable binding
+
 ## [1.0.0] - 2026-02-22
 
 ### Features — MCP SDK 1.26.0 + HITL (S3)

@@ -1,14 +1,14 @@
 # DuckPGQ Migration Guide
 
-**Preparing for Full DuckPGQ Support in DuckDB 1.4.x/1.5.x**
+**Preparing for Full DuckPGQ Support in DuckDB 1.5.x+**
 
-_Last Updated: 2025-10-20_
+_Last Updated: 2026-03-12_
 
 ---
 
-## Current State (DuckDB 1.4.1 + DuckPGQ 7705c5c)
+## Current State (DuckDB 1.5.0 + DuckPGQ aec2e25)
 
-### What You Have Now (Validated 2025-10-20)
+### What You Have Now (Validated 2026-03-12 on DuckDB 1.5.0)
 
 ✅ **Available Features:**
 
