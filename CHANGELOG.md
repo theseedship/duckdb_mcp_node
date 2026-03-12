@@ -2,6 +2,13 @@
 
 ## [1.1.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.0.1...v1.1.0) (2026-03-12)
 
+
+### Features
+
+* upgrade to DuckDB 1.5.0 + DuckPGQ aec2e25 ([97c37bd](https://github.com/theseedship/duckdb_mcp_node/commit/97c37bd3ad58264ddde4bcad417d33677a0135e3))
+
+## [1.1.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.0.1...v1.1.0) (2026-03-12)
+
 ### Features
 
 - **duckdb:** Upgrade to DuckDB 1.5.0 "Variegata" (`@duckdb/node-api@1.5.0-r.1`)
