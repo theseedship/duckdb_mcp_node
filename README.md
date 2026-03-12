@@ -122,7 +122,7 @@ npm test              # Run tests
 
 ### MotherDuck Cloud
 
-> MotherDuck requires DuckDB v1.3.2. These tools will activate once MotherDuck supports DuckDB v1.5.x.
+> MotherDuck supports DuckDB 1.4.0–1.4.4. DuckDB 1.5.0 support is expected within weeks (as of March 2026). These tools will activate once MotherDuck supports DuckDB v1.5.x.
 
 | Tool                         | Description                 |
 | ---------------------------- | --------------------------- |
