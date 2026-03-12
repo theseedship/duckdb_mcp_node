@@ -5,7 +5,7 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.0.0** — 469 tests, 0 failures
+**v1.1.0** — DuckDB 1.5.0 + DuckPGQ aec2e25 — 469 tests, 0 failures
 
 ## Features
 
@@ -17,7 +17,8 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - **Transports**: stdio, WebSocket, TCP (HTTP client-side)
 - **Process Mining**: 3 tools for workflow analysis from Parquet files
 - **DuckLake**: ACID transactions and time travel on Parquet files
-- **DuckPGQ**: SQL:2023 property graph queries (fixed paths, ANY SHORTEST, bounded quantifiers)
+- **DuckPGQ**: SQL:2023 property graph queries + native CSR algorithms (PageRank, WCC, clustering)
+- **Geospatial Graphs**: GEOMETRY + CRS vertex tables work with DuckPGQ graph algorithms
 - **MCP SDK 1.26.0**: Pinned, with elicitation API and connect() guard
 
 ## Installation
@@ -221,33 +222,44 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 | 1.4.1               | 7705c5c         | ✅          | ✅            | ✅           | ❌             | Functional           |
 | **1.5.0** (current) | **aec2e25**     | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**       |
 
-### What Works (Validated via Automated Testing)
+### What Works (Validated 2026-03-12 — aec2e25 on DuckDB 1.5.0)
 
-**Version aec2e25 (current for DuckDB 1.5.0)**
+✅ **Native CSR Algorithms (NEW in 1.5.0 validation):**
 
-✅ **Working features:**
+- `pagerank(graph, vertices, edges)` — native PageRank table function
+- `weakly_connected_component(graph, vertices, edges)` — WCC table function
+- `local_clustering_coefficient(graph, vertices, edges)` — clustering table function
+- `summarize_property_graph('graph_name')` — graph statistics
+- `vertices(p)` / `edges(p)` / `path_length(p)` — path extraction functions
+
+✅ **GEOMETRY + CRS Integration (NEW):**
+
+- Property graphs with `GEOMETRY` vertex columns
+- Spatial functions (`ST_Distance`, `ST_AsText`) in `GRAPH_TABLE COLUMNS`
+- `GEOMETRY('OGC:CRS84')` CRS-typed vertex columns
+- PageRank/WCC/clustering on GEOMETRY vertex tables
+
+✅ **Graph Query Features:**
 
 - Property graph creation (VERTEX/EDGE TABLES)
-- Basic pattern matching with `GRAPH_TABLE`
-- Fixed-length paths (explicit hops: 1-hop, 2-hop, 3-hop, etc.)
-- **ANY SHORTEST path queries** with `->*` syntax (star AFTER arrow)
-- **Bounded quantifiers** `{n,m}` with `->{n,m}` syntax (quantifier AFTER arrow)
-- Direct relationship queries (edge variable required: `[e:Label]`)
+- Pattern matching with `GRAPH_TABLE`
+- Fixed-length paths (1-hop, 2-hop, N-hop)
+- **ANY SHORTEST** path queries with `->*` syntax
+- **Bounded quantifiers** `{n,m}` with `->{n,m}` syntax
+- WHERE on edges in 1-hop patterns
+- CTE wrapping GRAPH_TABLE (no segfault, #276/#294 fixed)
+- Edge variable required: `[e:Label]`
 
-⚠️ **Design Decisions (Not Bugs):**
+❌ **Not Yet Available:**
 
-1. **Safety Feature**: Standalone Kleene operators (`->*`, `->+`) blocked without ANY SHORTEST
-   - **Why**: Prevents potentially infinite results on cyclic graphs
-   - **Error**: "ALL unbounded with path mode WALK is not possible"
-   - **Workaround**: Use `ANY SHORTEST` or bounded quantifiers `->{n,m}`
+- `ALL SHORTEST` — "Not implemented yet"
+- `CHEAPEST` path matching — not in parser
+- Standalone Kleene `->*`/`->+` — blocked (safety: infinite results on cycles)
+- Anonymous edges `[:Label]` — requires variable binding `[e:Label]`
+- Edge properties in bounded quantifiers `{n,m}` — edge variable not accessible
+- Onager extension — not built for DuckDB 1.5.0 yet
 
-2. **Roadmap Item**: Edge variable names required (temporary)
-   - **Current**: Must use `[e:Label]`, not `[:Label]`
-   - **Future**: Anonymous edge syntax will be supported
-
-3. **Roadmap Item**: Explicit label binding sometimes required
-   - **Status**: Label inference implemented but not yet exposed
-   - **Workaround**: Always specify labels explicitly
+**Full capability report**: [`docs/duckpgq/CAPABILITY_REPORT_1.5.md`](docs/duckpgq/CAPABILITY_REPORT_1.5.md)
 
 ### Example Queries
 
@@ -287,7 +299,7 @@ FROM GRAPH_TABLE (social_network
 );
 ```
 
-**Detailed findings**: [`docs/duckpgq/FINDINGS.md`](docs/duckpgq/FINDINGS.md) | **Failure analysis**: [`docs/duckpgq/FAILURE_ANALYSIS.md`](docs/duckpgq/FAILURE_ANALYSIS.md)
+**1.5.0 capabilities**: [`docs/duckpgq/CAPABILITY_REPORT_1.5.md`](docs/duckpgq/CAPABILITY_REPORT_1.5.md) | **Migration**: [`docs/duckpgq/MIGRATE_DUCKDB_1.5.md`](docs/duckpgq/MIGRATE_DUCKDB_1.5.md)
 
 ---
 
