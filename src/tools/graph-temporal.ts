@@ -26,10 +26,18 @@ export async function handleTemporalFilter(
   const session = openComputeSession(duckdb)
 
   const input = TemporalFilterInputSchema.parse(args)
-  await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { nodeCount: totalNodes, edgeCount: totalEdges } = await validateGraphTables(session, input)
   const { edgeTable, sourceCol, targetCol, weightCol } = getColumnRefs(input)
   const periodCol = escapeIdentifier(input.period_column)
   const periodVal = escapeString(input.period_value)
+  logger.debug('graph.temporal_filter: start', {
+    total_nodes: totalNodes,
+    total_edges: totalEdges,
+    period_column: input.period_column,
+    period_value: input.period_value,
+    has_weight_column: Boolean(weightCol),
+  })
 
   try {
     // Count edges in this period
@@ -57,6 +65,13 @@ export async function handleTemporalFilter(
     const maxEdges = nodeCount * (nodeCount - 1) || 1
     const density = edgeCount / maxEdges
 
+    logger.debug('graph.temporal_filter: done', {
+      period_node_count: nodeCount,
+      period_edge_count: edgeCount,
+      density,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'temporal_filter',
@@ -68,7 +83,7 @@ export async function handleTemporalFilter(
       density,
     }
   } catch (error) {
-    logger.error('graph.temporal_filter failed', error)
+    logger.error('graph.temporal_filter failed', { duration_ms: Date.now() - t0, error })
     throw error
   }
 }
@@ -123,11 +138,20 @@ export async function handleComparePeriods(
   const session = openComputeSession(duckdb)
 
   const input = ComparePeriodsInputSchema.parse(args)
-  await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { nodeCount: totalNodes, edgeCount: totalEdges } = await validateGraphTables(session, input)
   const { edgeTable, sourceCol, targetCol, weightCol } = getColumnRefs(input)
   const periodCol = escapeIdentifier(input.period_column)
   const periodA = escapeString(input.period_a)
   const periodB = escapeString(input.period_b)
+  logger.debug('graph.compare_periods: start', {
+    total_nodes: totalNodes,
+    total_edges: totalEdges,
+    period_column: input.period_column,
+    period_a: input.period_a,
+    period_b: input.period_b,
+    has_weight_column: Boolean(weightCol),
+  })
 
   try {
     // Compute metrics for each period
@@ -199,6 +223,12 @@ export async function handleComparePeriods(
       stable: edgeChanges.filter((c) => c.change_type === 'STABLE').length,
     }
 
+    logger.debug('graph.compare_periods: done', {
+      changes: edgeChanges.length,
+      ...summary,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'compare_periods',
@@ -208,7 +238,7 @@ export async function handleComparePeriods(
       summary,
     }
   } catch (error) {
-    logger.error('graph.compare_periods failed', error)
+    logger.error('graph.compare_periods failed', { duration_ms: Date.now() - t0, error })
     throw error
   }
 }

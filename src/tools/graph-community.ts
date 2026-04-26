@@ -27,9 +27,18 @@ export async function handleCommunityDetect(
   const session = openComputeSession(duckdb)
 
   const input = CommunityDetectInputSchema.parse(args)
-  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { distinctNodeCount, nodeCount, edgeCount } = await validateGraphTables(session, input)
   const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
+  logger.debug('graph.community_detect: start', {
+    nodes: nodeCount,
+    edges: edgeCount,
+    distinct_node_count: distinctNodeCount,
+    max_iterations: input.max_iterations,
+    directed: input.directed,
+    has_filter: Boolean(input.filter),
+  })
   if (distinctNodeCount < nodeCount) {
     logger.warn('graph.community: node table has duplicate node_ids — using DISTINCT subquery', {
       nodeCount,
@@ -39,6 +48,9 @@ export async function handleCommunityDetect(
   }
 
   if (distinctNodeCount === 0) {
+    logger.debug('graph.community_detect: done (empty graph)', {
+      duration_ms: Date.now() - t0,
+    })
     return {
       success: true,
       algorithm: 'label_propagation',
@@ -128,6 +140,13 @@ export async function handleCommunityDetect(
        ORDER BY size DESC`
     )
 
+    logger.debug('graph.community_detect: done', {
+      num_communities: communityGroups.length,
+      iterations_used: iterationsUsed,
+      converged,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'label_propagation',
@@ -145,7 +164,7 @@ export async function handleCommunityDetect(
       converged,
     }
   } catch (error) {
-    logger.error('graph.community_detect failed', error)
+    logger.error('graph.community_detect failed', { duration_ms: Date.now() - t0, error })
     throw error
   } finally {
     await dropTempTable(session, compTable)
@@ -165,11 +184,20 @@ export async function handleModularity(
   const session = openComputeSession(duckdb)
 
   const input = ModularityInputSchema.parse(args)
-  const { edgeCount } = await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { edgeCount, nodeCount, distinctNodeCount } = await validateGraphTables(session, input)
   const { edgeSub, sourceCol, targetCol } = getColumnRefs(input)
   const prefix = tempTablePrefix()
+  logger.debug('graph.modularity: start', {
+    nodes: nodeCount,
+    edges: edgeCount,
+    distinct_node_count: distinctNodeCount,
+    has_community_column: Boolean(input.community_column),
+    max_iterations: input.max_iterations,
+  })
 
   if (edgeCount === 0) {
+    logger.debug('graph.modularity: done (no edges)', { duration_ms: Date.now() - t0 })
     return {
       success: true,
       algorithm: 'modularity',
@@ -268,6 +296,13 @@ export async function handleModularity(
     const Q = Number(result[0]?.Q ?? 0)
     const numComm = Number(result[0]?.num_comm ?? 0)
 
+    logger.debug('graph.modularity: done', {
+      modularity: Q,
+      num_communities: numComm,
+      total_edges: m,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'modularity',
@@ -276,7 +311,7 @@ export async function handleModularity(
       total_edges: m,
     }
   } catch (error) {
-    logger.error('graph.modularity failed', error)
+    logger.error('graph.modularity failed', { duration_ms: Date.now() - t0, error })
     throw error
   } finally {
     if (createdCommTable) {

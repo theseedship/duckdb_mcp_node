@@ -29,9 +29,20 @@ export async function handleWeightedPath(
   const session = openComputeSession(duckdb)
 
   const input = WeightedPathInputSchema.parse(args)
-  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { distinctNodeCount, nodeCount, edgeCount } = await validateGraphTables(session, input)
   const { nodeIdCol, sourceCol, targetCol, edgeSub, weightCol, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
+  logger.debug('graph.weighted_path: start', {
+    nodes: nodeCount,
+    edges: edgeCount,
+    distinct_node_count: distinctNodeCount,
+    mode: input.mode,
+    max_hops: input.max_hops,
+    has_weight_column: Boolean(weightCol),
+    has_target: input.target_node !== undefined,
+    has_filter: Boolean(input.filter),
+  })
   if (distinctNodeCount < nodeCount) {
     logger.warn(
       'graph.weighted_path: node table has duplicate node_ids — using DISTINCT subquery',
@@ -51,8 +62,9 @@ export async function handleWeightedPath(
   const distNextTable = `${prefix}_dist_next`
 
   try {
+    let result: WeightedPathResult
     if (input.mode === 'cheapest') {
-      return await runCheapestPath(
+      result = await runCheapestPath(
         session,
         input,
         prefix,
@@ -69,7 +81,7 @@ export async function handleWeightedPath(
       )
     } else {
       // strongest or combined use BFS with multiplication / addition
-      return await runBFSPath(
+      result = await runBFSPath(
         session,
         input,
         prefix,
@@ -85,8 +97,14 @@ export async function handleWeightedPath(
         targetNode
       )
     }
+    logger.debug('graph.weighted_path: done', {
+      mode: input.mode,
+      paths_found: result.paths.length,
+      duration_ms: Date.now() - t0,
+    })
+    return result
   } catch (error) {
-    logger.error('graph.weighted_path failed', error)
+    logger.error('graph.weighted_path failed', { duration_ms: Date.now() - t0, error })
     throw error
   } finally {
     await dropTempTable(session, distTable)

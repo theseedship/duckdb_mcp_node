@@ -28,6 +28,34 @@ export function tempTablePrefix(): string {
 }
 
 /**
+ * Options for validateGraphTables.
+ * @since v1.3.0
+ */
+export interface ValidateGraphTablesOptions {
+  /**
+   * If set, validateGraphTables returns the first N distinct node_ids in the
+   * `topNodesPreview` field. Useful for visual diagnostic when a graph
+   * algorithm is producing unexpected results — lets the caller see "what
+   * does the plugin actually see" without re-running a query. Default: undefined
+   * (no preview, no extra query).
+   */
+  previewNodes?: number
+}
+
+/**
+ * Result of validateGraphTables.
+ * @since v1.3.0 — `topNodesPreview` added (opt-in via options.previewNodes)
+ */
+export interface ValidateGraphTablesResult {
+  nodeCount: number
+  edgeCount: number
+  /** @since v1.2.2 — DISTINCT count of node_id values, post-filter */
+  distinctNodeCount: number
+  /** @since v1.3.0 — opt-in via options.previewNodes; undefined otherwise */
+  topNodesPreview?: Array<string | number>
+}
+
+/**
  * Validate that the graph tables and columns exist, return node/edge counts.
  *
  * Accepts a `ComputeSession` (preferred) or a `DuckDBLike` for backward
@@ -37,8 +65,9 @@ export function tempTablePrefix(): string {
  */
 export async function validateGraphTables(
   target: ComputeSession | DuckDBLike,
-  config: GraphInputBase
-): Promise<{ nodeCount: number; edgeCount: number; distinctNodeCount: number }> {
+  config: GraphInputBase,
+  options?: ValidateGraphTablesOptions
+): Promise<ValidateGraphTablesResult> {
   const session = openComputeSession(target)
 
   const nodeTable = escapeIdentifier(config.node_table)
@@ -81,7 +110,20 @@ export async function validateGraphTables(
     await session.exec(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
   }
 
-  return { nodeCount, edgeCount, distinctNodeCount }
+  // Opt-in preview of distinct node ids — does NOT run unless caller asks
+  // for it, so default-path callers pay no extra query.
+  // @since v1.3.0
+  let topNodesPreview: Array<string | number> | undefined
+  const previewN = options?.previewNodes
+  if (previewN && previewN > 0 && distinctNodeCount > 0) {
+    const limit = Math.min(previewN, 100)
+    const previewRows = await session.exec<{ node_id: string | number }>(
+      `SELECT DISTINCT ${nodeIdCol} AS node_id FROM ${nodeTable}${where} LIMIT ${limit}`
+    )
+    topNodesPreview = previewRows.map((r) => r.node_id)
+  }
+
+  return { nodeCount, edgeCount, distinctNodeCount, topNodesPreview }
 }
 
 /**

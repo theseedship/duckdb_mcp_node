@@ -128,6 +128,27 @@ export {
   handleGraphExport,
 } from './tools/graph-tools.js'
 
+// Graph helper utilities (v1.3.0) — exposed so hosts can build their own
+// custom centrality / pathing queries without duplicating the dedup-safe
+// subquery logic. `buildNodeSubquery` is critical for algorithms iterating
+// over nodes — see graph-utils.ts for the cascade-amplification rationale.
+export {
+  validateGraphTables,
+  buildNodeSubquery,
+  buildEdgeSubquery,
+  getColumnRefs,
+  tempTablePrefix,
+  dropTempTable,
+  cleanupTempTables,
+} from './tools/graph-utils.js'
+
+export type { ValidateGraphTablesOptions, ValidateGraphTablesResult } from './tools/graph-utils.js'
+
+// Discovery API (v1.3.0) — host runtimes can boot-validate their op
+// bindings against what the plugin actually ships. Avoids silent drift
+// when the plugin adds/removes ops.
+export { AVAILABLE_OPS, type AvailableOp } from './tools/available-ops.js'
+
 // ComputeSession — pinned-connection executor for stateful multi-statement
 // algorithms (v1.2.0). Hosts that route reads/writes to different
 // connections must wrap their service via openComputeSession before passing

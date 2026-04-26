@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-26
+
+Audit-driven quickwins from [DUCKDB-MCP-NODE-AUDIT-2026-04-26](../docs/2026/handoffs/) (deposium side). Three additive items, no breaking changes.
+
+### Added
+
+- **Graph helper utilities** — exposed via main entry point so host runtimes can build their own custom centrality / pathing queries without duplicating the dedup-safe subquery logic. New exports:
+  - `validateGraphTables`, `buildNodeSubquery`, `buildEdgeSubquery`, `getColumnRefs`
+  - `tempTablePrefix`, `dropTempTable`, `cleanupTempTables`
+  - Type exports: `ValidateGraphTablesOptions`, `ValidateGraphTablesResult`
+- **Discovery API** — new `AVAILABLE_OPS` constant lists every graph + process op shipped by the plugin with `name`, `family`, `description`, `costClass`, `inputs`. Lets host runtimes boot-validate their op-to-model bindings against what is actually available, avoiding silent drift.
+- **`topNodesPreview` opt-in** — `validateGraphTables` accepts a third argument `{ previewNodes?: number }`. When set, the returned object includes `topNodesPreview: Array<string|number>` (DISTINCT node ids, capped at 100). No extra query for default-path callers.
+- **Entry/exit logs on every graph handler** — `handlePageRank`, `handleEigenvector`, `handleCommunityDetect`, `handleModularity`, `handleWeightedPath`, `handleTemporalFilter`, `handleComparePeriods` now emit:
+  - `debug` log on entry with `{nodes, edges, distinct_node_count, ...op-specific-params}`
+  - `debug` log on exit with `{...key-result-stats, duration_ms}`
+  - `error` log on failure now includes `duration_ms`
+    Stats only — never the full data payload. Decisive for diagnosing host-side issues without re-instrumenting call sites.
+
+### Compatibility
+
+- 477 tests pass (was 469), zero regressions
+- Backward compatible: all new exports are additive, `validateGraphTables` signature widened with optional third parameter
+
 ## [1.1.0] - 2026-03-12
 
 ### Upgraded

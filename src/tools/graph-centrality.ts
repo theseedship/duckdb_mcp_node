@@ -31,13 +31,23 @@ export async function handlePageRank(
   const session = openComputeSession(duckdb)
 
   const input = PageRankInputSchema.parse(args)
-  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { distinctNodeCount, nodeCount, edgeCount } = await validateGraphTables(session, input)
   const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
   // N must be the DISTINCT count: iteration reads from nodeSub (deduplicated).
   // Using nodeCount when duplicates exist would shrink the (1-d)/N term and
   // amplify the dividing-by-N initial rank. v1.2.2 fix.
   const N = distinctNodeCount
+  logger.debug('graph.pagerank: start', {
+    nodes: nodeCount,
+    edges: edgeCount,
+    distinct_node_count: distinctNodeCount,
+    iterations: input.iterations,
+    damping: input.damping,
+    top_n: input.top_n,
+    has_filter: Boolean(input.filter),
+  })
   if (distinctNodeCount < nodeCount) {
     logger.warn('graph.pagerank: node table has duplicate node_ids — using DISTINCT subquery', {
       nodeCount,
@@ -47,6 +57,7 @@ export async function handlePageRank(
   }
 
   if (N === 0) {
+    logger.debug('graph.pagerank: done (empty graph)', { duration_ms: Date.now() - t0 })
     return {
       success: true,
       algorithm: 'pagerank',
@@ -105,6 +116,13 @@ export async function handlePageRank(
       `SELECT node_id, rank FROM ${prTable} ORDER BY rank DESC LIMIT ${input.top_n}`
     )
 
+    logger.debug('graph.pagerank: done', {
+      total_nodes: N,
+      returned: results.length,
+      iterations: input.iterations,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'pagerank',
@@ -114,7 +132,7 @@ export async function handlePageRank(
       total_nodes: N,
     }
   } catch (error) {
-    logger.error('graph.pagerank failed', error)
+    logger.error('graph.pagerank failed', { duration_ms: Date.now() - t0, error })
     throw error
   } finally {
     await dropTempTable(session, prTable)
@@ -133,12 +151,21 @@ export async function handleEigenvector(
   const session = openComputeSession(duckdb)
 
   const input = EigenvectorInputSchema.parse(args)
-  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const t0 = Date.now()
+  const { distinctNodeCount, nodeCount, edgeCount } = await validateGraphTables(session, input)
   const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
   // Eigenvector has the same JOIN-amplification vulnerability as PageRank
   // when nodeTable contains duplicate node_ids — see buildNodeSubquery.
   const N = distinctNodeCount
+  logger.debug('graph.eigenvector: start', {
+    nodes: nodeCount,
+    edges: edgeCount,
+    distinct_node_count: distinctNodeCount,
+    iterations: input.iterations,
+    top_n: input.top_n,
+    has_filter: Boolean(input.filter),
+  })
   if (distinctNodeCount < nodeCount) {
     logger.warn('graph.eigenvector: node table has duplicate node_ids — using DISTINCT subquery', {
       nodeCount,
@@ -148,6 +175,7 @@ export async function handleEigenvector(
   }
 
   if (N === 0) {
+    logger.debug('graph.eigenvector: done (empty graph)', { duration_ms: Date.now() - t0 })
     return {
       success: true,
       algorithm: 'eigenvector',
@@ -203,6 +231,13 @@ export async function handleEigenvector(
       `SELECT node_id, score FROM ${evTable} ORDER BY score DESC LIMIT ${input.top_n}`
     )
 
+    logger.debug('graph.eigenvector: done', {
+      total_nodes: N,
+      returned: results.length,
+      iterations: input.iterations,
+      duration_ms: Date.now() - t0,
+    })
+
     return {
       success: true,
       algorithm: 'eigenvector',
@@ -211,7 +246,7 @@ export async function handleEigenvector(
       total_nodes: N,
     }
   } catch (error) {
-    logger.error('graph.eigenvector failed', error)
+    logger.error('graph.eigenvector failed', { duration_ms: Date.now() - t0, error })
     throw error
   } finally {
     await dropTempTable(session, evTable)
