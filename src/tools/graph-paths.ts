@@ -29,9 +29,19 @@ export async function handleWeightedPath(
   const session = openComputeSession(duckdb)
 
   const input = WeightedPathInputSchema.parse(args)
-  await validateGraphTables(session, input)
-  const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub, weightCol } = getColumnRefs(input)
+  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const { nodeIdCol, sourceCol, targetCol, edgeSub, weightCol, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
+  if (distinctNodeCount < nodeCount) {
+    logger.warn(
+      'graph.weighted_path: node table has duplicate node_ids — using DISTINCT subquery',
+      {
+        nodeCount,
+        distinctNodeCount,
+        duplicates: nodeCount - distinctNodeCount,
+      }
+    )
+  }
 
   const weightExpr = weightCol ?? '1.0'
   const sourceNode = input.source_node
@@ -48,7 +58,7 @@ export async function handleWeightedPath(
         prefix,
         distTable,
         distNextTable,
-        nodeTable,
+        nodeSub,
         nodeIdCol,
         sourceCol,
         targetCol,
@@ -65,7 +75,7 @@ export async function handleWeightedPath(
         prefix,
         distTable,
         distNextTable,
-        nodeTable,
+        nodeSub,
         nodeIdCol,
         sourceCol,
         targetCol,
@@ -95,7 +105,7 @@ async function runBFSPath(
   prefix: string,
   distTable: string,
   distNextTable: string,
-  nodeTable: string,
+  nodeTable: string, // v1.2.2: callers pass nodeSub (DISTINCT) — dedup-safe
   nodeIdCol: string,
   sourceCol: string,
   targetCol: string,
@@ -199,7 +209,7 @@ async function runCheapestPath(
   prefix: string,
   distTable: string,
   distNextTable: string,
-  nodeTable: string,
+  nodeTable: string, // v1.2.2: callers pass nodeSub (DISTINCT) — dedup-safe
   nodeIdCol: string,
   sourceCol: string,
   targetCol: string,

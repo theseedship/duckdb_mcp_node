@@ -27,11 +27,18 @@ export async function handleCommunityDetect(
   const session = openComputeSession(duckdb)
 
   const input = CommunityDetectInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(session, input)
-  const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
+  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
+  if (distinctNodeCount < nodeCount) {
+    logger.warn('graph.community: node table has duplicate node_ids — using DISTINCT subquery', {
+      nodeCount,
+      distinctNodeCount,
+      duplicates: nodeCount - distinctNodeCount,
+    })
+  }
 
-  if (nodeCount === 0) {
+  if (distinctNodeCount === 0) {
     return {
       success: true,
       algorithm: 'label_propagation',
@@ -47,11 +54,11 @@ export async function handleCommunityDetect(
   const compNextTable = `${prefix}_comp_next`
 
   try {
-    // Initialize: each node labeled with its own ID
+    // Initialize: each node labeled with its own ID (DEDUP)
     await session.exec(
       `CREATE TEMP TABLE ${compTable} AS
        SELECT ${nodeIdCol} AS node_id, ${nodeIdCol} AS cid
-       FROM ${nodeTable}`
+       FROM ${nodeSub}`
     )
 
     let converged = false
@@ -71,7 +78,7 @@ export async function handleCommunityDetect(
                           WHERE d.${targetCol} = v.node_id), c.cid)
              ) AS cid
            FROM ${compTable} c
-           JOIN ${nodeTable} nv ON c.node_id = nv.${nodeIdCol}
+           JOIN ${nodeSub} nv ON c.node_id = nv.${nodeIdCol}
            CROSS JOIN (SELECT node_id FROM ${compTable}) v(node_id)
            WHERE c.node_id = v.node_id`
         )

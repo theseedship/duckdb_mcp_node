@@ -38,7 +38,7 @@ export function tempTablePrefix(): string {
 export async function validateGraphTables(
   target: ComputeSession | DuckDBLike,
   config: GraphInputBase
-): Promise<{ nodeCount: number; edgeCount: number }> {
+): Promise<{ nodeCount: number; edgeCount: number; distinctNodeCount: number }> {
   const session = openComputeSession(target)
 
   const nodeTable = escapeIdentifier(config.node_table)
@@ -46,15 +46,26 @@ export async function validateGraphTables(
   const nodeIdCol = escapeIdentifier(config.node_id_column)
   const sourceCol = escapeIdentifier(config.source_column)
   const targetCol = escapeIdentifier(config.target_column)
+  const where = config.filter ? ` WHERE ${config.filter}` : ''
 
   // Verify node table has the id column
   const nodeCheck = await session.exec<{ cnt: number | string }>(
-    `SELECT COUNT(*) AS cnt FROM ${nodeTable} LIMIT 1`
+    `SELECT COUNT(*) AS cnt FROM ${nodeTable}${where} LIMIT 1`
   )
   const nodeCount = Number(nodeCheck[0]?.cnt ?? 0)
 
   // Verify the node_id column exists by selecting it
   await session.exec(`SELECT ${nodeIdCol} FROM ${nodeTable} LIMIT 0`)
+
+  // Distinct node count — used by algorithms as N for the (1-d)/N term.
+  // If `distinctNodeCount < nodeCount`, the table has duplicate rows per
+  // node_id; algorithms must read from `nodeSub` (DISTINCT subquery) to
+  // avoid the cascade-amplification bug — see buildNodeSubquery comment.
+  // @since v1.2.2
+  const distinctCheck = await session.exec<{ cnt: number | string }>(
+    `SELECT COUNT(DISTINCT ${nodeIdCol}) AS cnt FROM ${nodeTable}${where}`
+  )
+  const distinctNodeCount = Number(distinctCheck[0]?.cnt ?? 0)
 
   // Verify edge table has source/target columns
   const edgeCheck = await session.exec<{ cnt: number | string }>(
@@ -70,7 +81,7 @@ export async function validateGraphTables(
     await session.exec(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
   }
 
-  return { nodeCount, edgeCount }
+  return { nodeCount, edgeCount, distinctNodeCount }
 }
 
 /**
@@ -87,7 +98,47 @@ export function buildEdgeSubquery(config: GraphInputBase): string {
 }
 
 /**
+ * Build a deduplicated node subquery. Robust against pathological input
+ * data — many real-world entity tables (e.g. deposium_MCPs'
+ * uploaded_files_graph_entities) keep soft-deleted orphans or have
+ * imperfect dedup, leaving multiple rows per logical node_id.
+ *
+ * **Why this matters for iterative algorithms** (PageRank, Eigenvector,
+ * Community label propagation): the iteration formula
+ *
+ *   new_rank(v) = (1-d)/N + d * SUM(pr[s].rank / oc[s].cnt for in-edges)
+ *
+ * is correct only when each node appears once. If `nodeTable` has K
+ * duplicate rows for source s, the JOIN `pr ON e.source = pr.node_id`
+ * matches K rows and contributes K × (rank/oc.cnt) per edge — amplifying
+ * the rank by factor K each iteration. Over 20 iterations with K≈7,
+ * scores explode to ~9×10^16 (observed live 2026-04-26 on space
+ * 89b04306 with 5,332 duplicates / 50,062 nodes).
+ *
+ * Behaviour:
+ *   - Without filter: `(SELECT DISTINCT node_id_col AS node_id_col FROM table)`
+ *   - With filter: `(SELECT DISTINCT node_id_col FROM table WHERE filter)`
+ *
+ * The DISTINCT collapses duplicate rows by node_id_col only — any
+ * additional metadata (entity_name, type, …) is dropped here. Algorithms
+ * that need names should JOIN back to nodeTable AT THE END.
+ *
+ * @since v1.2.2 (Sprint α — root cause: dedup-cascade-explosion)
+ */
+export function buildNodeSubquery(config: GraphInputBase): string {
+  const nodeTable = escapeIdentifier(config.node_table)
+  const nodeIdCol = escapeIdentifier(config.node_id_column)
+  const where = config.filter ? ` WHERE ${config.filter}` : ''
+  return `(SELECT DISTINCT ${nodeIdCol} FROM ${nodeTable}${where})`
+}
+
+/**
  * Get column references for a graph config.
+ *
+ * `nodeSub` is the dedup-safe view of the node table — algorithms
+ * iterating over nodes should always read from `nodeSub`, never from raw
+ * `nodeTable`, to avoid the cascade-amplification bug. Use `nodeTable`
+ * only for things like JOIN-back-for-metadata at the end of an algorithm.
  */
 export function getColumnRefs(config: GraphInputBase) {
   return {
@@ -98,6 +149,7 @@ export function getColumnRefs(config: GraphInputBase) {
     targetCol: escapeIdentifier(config.target_column),
     weightCol: config.weight_column ? escapeIdentifier(config.weight_column) : null,
     edgeSub: buildEdgeSubquery(config),
+    nodeSub: buildNodeSubquery(config),
   }
 }
 

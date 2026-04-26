@@ -31,10 +31,20 @@ export async function handlePageRank(
   const session = openComputeSession(duckdb)
 
   const input = PageRankInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(session, input)
-  const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
+  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
-  const N = nodeCount
+  // N must be the DISTINCT count: iteration reads from nodeSub (deduplicated).
+  // Using nodeCount when duplicates exist would shrink the (1-d)/N term and
+  // amplify the dividing-by-N initial rank. v1.2.2 fix.
+  const N = distinctNodeCount
+  if (distinctNodeCount < nodeCount) {
+    logger.warn('graph.pagerank: node table has duplicate node_ids — using DISTINCT subquery', {
+      nodeCount,
+      distinctNodeCount,
+      duplicates: nodeCount - distinctNodeCount,
+    })
+  }
 
   if (N === 0) {
     return {
@@ -52,11 +62,11 @@ export async function handlePageRank(
   const prNextTable = `${prefix}_pr_next`
 
   try {
-    // Initialize rank = 1/N for all nodes
+    // Initialize rank = 1/N for all nodes (DEDUP — see buildNodeSubquery)
     await session.exec(
       `CREATE TEMP TABLE ${prTable} AS
        SELECT ${nodeIdCol} AS node_id, 1.0 / ${N} AS rank
-       FROM ${nodeTable}`
+       FROM ${nodeSub}`
     )
 
     // Compute out-degrees
@@ -69,7 +79,10 @@ export async function handlePageRank(
 
     const d = input.damping
 
-    // Iterative PageRank
+    // Iterative PageRank — outer FROM uses nodeSub (DISTINCT) so each
+    // logical node produces exactly one row per iteration. Without this,
+    // duplicate rows compounded the JOIN amplification (cascade-explosion
+    // bug, observed live at 9e16 scores on 5,332 duplicates / 50,062 rows).
     for (let i = 0; i < input.iterations; i++) {
       await session.exec(
         `CREATE TEMP TABLE ${prNextTable} AS
@@ -80,7 +93,7 @@ export async function handlePageRank(
               JOIN ${prTable} pr ON e.${sourceCol} = pr.node_id
               JOIN ${outCntTable} oc ON e.${sourceCol} = oc.node_id
               WHERE e.${targetCol} = v.${nodeIdCol}), 0) AS rank
-         FROM ${nodeTable} v`
+         FROM ${nodeSub} v`
       )
       await dropTempTable(session, prTable)
       await session.exec(`ALTER TABLE ${prNextTable} RENAME TO ${prTable}`)
@@ -120,10 +133,19 @@ export async function handleEigenvector(
   const session = openComputeSession(duckdb)
 
   const input = EigenvectorInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(session, input)
-  const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
+  const { distinctNodeCount, nodeCount } = await validateGraphTables(session, input)
+  const { nodeIdCol, sourceCol, targetCol, edgeSub, nodeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
-  const N = nodeCount
+  // Eigenvector has the same JOIN-amplification vulnerability as PageRank
+  // when nodeTable contains duplicate node_ids — see buildNodeSubquery.
+  const N = distinctNodeCount
+  if (distinctNodeCount < nodeCount) {
+    logger.warn('graph.eigenvector: node table has duplicate node_ids — using DISTINCT subquery', {
+      nodeCount,
+      distinctNodeCount,
+      duplicates: nodeCount - distinctNodeCount,
+    })
+  }
 
   if (N === 0) {
     return {
@@ -139,11 +161,11 @@ export async function handleEigenvector(
   const evNextTable = `${prefix}_ev_next`
 
   try {
-    // Initialize all scores = 1.0
+    // Initialize all scores = 1.0 (DEDUP)
     await session.exec(
       `CREATE TEMP TABLE ${evTable} AS
        SELECT ${nodeIdCol} AS node_id, 1.0 AS score
-       FROM ${nodeTable}`
+       FROM ${nodeSub}`
     )
 
     // Power iteration (undirected: sum scores from both directions)
@@ -165,7 +187,7 @@ export async function handleEigenvector(
                 JOIN ${evTable} ev ON e.${targetCol} = ev.node_id
                 WHERE e.${sourceCol} = v.${nodeIdCol}),
              0) AS raw_score
-           FROM ${nodeTable} v
+           FROM ${nodeSub} v
          ),
          max_score AS (
            SELECT GREATEST(MAX(raw_score), 1e-10) AS mx FROM raw_scores
