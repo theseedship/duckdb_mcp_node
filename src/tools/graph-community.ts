@@ -7,7 +7,7 @@
 
 import { CommunityDetectInputSchema, ModularityInputSchema } from '../types/graph-schemas.js'
 import type { CommunityDetectResult, ModularityResult } from '../types/graph-types.js'
-import type { DuckDBService } from '../duckdb/service.js'
+import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import {
   validateGraphTables,
   tempTablePrefix,
@@ -22,10 +22,12 @@ import { logger } from '../utils/logger.js'
  */
 export async function handleCommunityDetect(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<CommunityDetectResult> {
+  const session = openComputeSession(duckdb)
+
   const input = CommunityDetectInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(duckdb, input)
+  const { nodeCount } = await validateGraphTables(session, input)
   const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
 
@@ -46,7 +48,7 @@ export async function handleCommunityDetect(
 
   try {
     // Initialize: each node labeled with its own ID
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${compTable} AS
        SELECT ${nodeIdCol} AS node_id, ${nodeIdCol} AS cid
        FROM ${nodeTable}`
@@ -60,7 +62,7 @@ export async function handleCommunityDetect(
 
       if (input.directed) {
         // Directed: only follow edge direction
-        await duckdb.executeQuery(
+        await session.exec(
           `CREATE TEMP TABLE ${compNextTable} AS
            SELECT v.node_id,
              LEAST(c.cid,
@@ -75,7 +77,7 @@ export async function handleCommunityDetect(
         )
       } else {
         // Undirected: propagate in both directions
-        await duckdb.executeQuery(
+        await session.exec(
           `CREATE TEMP TABLE ${compNextTable} AS
            SELECT c.node_id,
              LEAST(c.cid,
@@ -91,14 +93,14 @@ export async function handleCommunityDetect(
       }
 
       // Convergence check
-      const changes = await duckdb.executeQuery(
+      const changes = await session.exec(
         `SELECT COUNT(*) AS cnt FROM ${compTable} o
          JOIN ${compNextTable} n ON o.node_id = n.node_id
          WHERE o.cid != n.cid`
       )
 
-      await dropTempTable(duckdb, compTable)
-      await duckdb.executeQuery(`ALTER TABLE ${compNextTable} RENAME TO ${compTable}`)
+      await dropTempTable(session, compTable)
+      await session.exec(`ALTER TABLE ${compNextTable} RENAME TO ${compTable}`)
 
       if (Number(changes[0]?.cnt ?? 0) === 0) {
         converged = true
@@ -107,11 +109,11 @@ export async function handleCommunityDetect(
     }
 
     // Gather results
-    const assignments = await duckdb.executeQuery(
+    const assignments = await session.exec(
       `SELECT node_id, cid AS community_id FROM ${compTable} ORDER BY cid, node_id`
     )
 
-    const communityGroups = await duckdb.executeQuery(
+    const communityGroups = await session.exec(
       `SELECT cid AS community_id, COUNT(*) AS size,
               LIST(node_id ORDER BY node_id) AS members
        FROM ${compTable}
@@ -139,8 +141,8 @@ export async function handleCommunityDetect(
     logger.error('graph.community_detect failed', error)
     throw error
   } finally {
-    await dropTempTable(duckdb, compTable)
-    await dropTempTable(duckdb, compNextTable)
+    await dropTempTable(session, compTable)
+    await dropTempTable(session, compNextTable)
   }
 }
 
@@ -151,10 +153,12 @@ export async function handleCommunityDetect(
  */
 export async function handleModularity(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<ModularityResult> {
+  const session = openComputeSession(duckdb)
+
   const input = ModularityInputSchema.parse(args)
-  const { edgeCount } = await validateGraphTables(duckdb, input)
+  const { edgeCount } = await validateGraphTables(session, input)
   const { edgeSub, sourceCol, targetCol } = getColumnRefs(input)
   const prefix = tempTablePrefix()
 
@@ -177,16 +181,12 @@ export async function handleModularity(
     if (!communityColumn) {
       const detectResult = await handleCommunityDetect(
         { ...input, max_iterations: input.max_iterations },
-        duckdb
+        session
       )
       // Create temp table with assignments
-      await duckdb.executeQuery(
-        `CREATE TEMP TABLE ${commTable} (node_id VARCHAR, community_id VARCHAR)`
-      )
+      await session.exec(`CREATE TEMP TABLE ${commTable} (node_id VARCHAR, community_id VARCHAR)`)
       for (const a of detectResult.node_assignments) {
-        await duckdb.executeQuery(
-          `INSERT INTO ${commTable} VALUES ('${a.node_id}', '${a.community_id}')`
-        )
+        await session.exec(`INSERT INTO ${commTable} VALUES ('${a.node_id}', '${a.community_id}')`)
       }
       createdCommTable = true
     }
@@ -257,7 +257,7 @@ export async function handleModularity(
         FROM edge_comm`
     }
 
-    const result = await duckdb.executeQuery(modQuery)
+    const result = await session.exec(modQuery)
     const Q = Number(result[0]?.Q ?? 0)
     const numComm = Number(result[0]?.num_comm ?? 0)
 
@@ -273,7 +273,7 @@ export async function handleModularity(
     throw error
   } finally {
     if (createdCommTable) {
-      await dropTempTable(duckdb, commTable)
+      await dropTempTable(session, commTable)
     }
   }
 }

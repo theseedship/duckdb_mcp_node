@@ -7,7 +7,7 @@
 
 import { WeightedPathInputSchema } from '../types/graph-schemas.js'
 import type { WeightedPathResult, PathResult } from '../types/graph-types.js'
-import type { DuckDBService } from '../duckdb/service.js'
+import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import {
   validateGraphTables,
   tempTablePrefix,
@@ -24,10 +24,12 @@ import { logger } from '../utils/logger.js'
  */
 export async function handleWeightedPath(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<WeightedPathResult> {
+  const session = openComputeSession(duckdb)
+
   const input = WeightedPathInputSchema.parse(args)
-  await validateGraphTables(duckdb, input)
+  await validateGraphTables(session, input)
   const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub, weightCol } = getColumnRefs(input)
   const prefix = tempTablePrefix()
 
@@ -41,7 +43,7 @@ export async function handleWeightedPath(
   try {
     if (input.mode === 'cheapest') {
       return await runCheapestPath(
-        duckdb,
+        session,
         input,
         prefix,
         distTable,
@@ -58,7 +60,7 @@ export async function handleWeightedPath(
     } else {
       // strongest or combined use BFS with multiplication / addition
       return await runBFSPath(
-        duckdb,
+        session,
         input,
         prefix,
         distTable,
@@ -77,8 +79,8 @@ export async function handleWeightedPath(
     logger.error('graph.weighted_path failed', error)
     throw error
   } finally {
-    await dropTempTable(duckdb, distTable)
-    await dropTempTable(duckdb, distNextTable)
+    await dropTempTable(session, distTable)
+    await dropTempTable(session, distNextTable)
   }
 }
 
@@ -88,7 +90,7 @@ export async function handleWeightedPath(
  * combined: strength = parent_weight + edge_weight (additive, maximize)
  */
 async function runBFSPath(
-  duckdb: DuckDBService,
+  session: ComputeSession,
   input: ReturnType<typeof WeightedPathInputSchema.parse>,
   prefix: string,
   distTable: string,
@@ -109,7 +111,7 @@ async function runBFSPath(
   const initWeight = isMultiplicative ? '1.0' : '0.0'
   const defaultWeight = isMultiplicative ? '0.0' : '-999999.0'
 
-  await duckdb.executeQuery(
+  await session.exec(
     `CREATE TEMP TABLE ${distTable} AS
      SELECT ${nodeIdCol} AS node_id,
        CASE WHEN ${nodeIdCol} = ${sourceVal} THEN ${initWeight} ELSE ${defaultWeight} END AS weight,
@@ -122,7 +124,7 @@ async function runBFSPath(
       ? `d.weight * CAST(e.${weightExpr} AS DOUBLE)`
       : `d.weight + CAST(e.${weightExpr} AS DOUBLE)`
 
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${distNextTable} AS
        WITH candidates AS (
          SELECT e.${targetCol} AS node_id,
@@ -147,8 +149,8 @@ async function runBFSPath(
        LEFT JOIN best_candidates bc ON cur.node_id = bc.node_id`
     )
 
-    await dropTempTable(duckdb, distTable)
-    await duckdb.executeQuery(`ALTER TABLE ${distNextTable} RENAME TO ${distTable}`)
+    await dropTempTable(session, distTable)
+    await session.exec(`ALTER TABLE ${distNextTable} RENAME TO ${distTable}`)
   }
 
   // Collect results
@@ -163,7 +165,7 @@ async function runBFSPath(
                    ORDER BY weight DESC`
   }
 
-  const rows = await duckdb.executeQuery(resultQuery)
+  const rows = await session.exec(resultQuery)
 
   const paths: PathResult[] = rows.map((r: any) => {
     const pathNodes = (r.path as string).split(',').filter(Boolean)
@@ -192,7 +194,7 @@ async function runBFSPath(
  * Cheapest path using Bellman-Ford (cost = 1 - weight, minimize).
  */
 async function runCheapestPath(
-  duckdb: DuckDBService,
+  session: ComputeSession,
   input: ReturnType<typeof WeightedPathInputSchema.parse>,
   prefix: string,
   distTable: string,
@@ -210,7 +212,7 @@ async function runCheapestPath(
   const INF = 999999.0
 
   // Initialize: source cost = 0, others = INF
-  await duckdb.executeQuery(
+  await session.exec(
     `CREATE TEMP TABLE ${distTable} AS
      SELECT ${nodeIdCol} AS node_id,
        CASE WHEN ${nodeIdCol} = ${sourceVal} THEN 0.0 ELSE ${INF} END AS cost,
@@ -221,7 +223,7 @@ async function runCheapestPath(
 
   for (let hop = 0; hop < input.max_hops; hop++) {
     // Bellman-Ford: relax edges from current minimum unvisited node
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${distNextTable} AS
        WITH current_min AS (
          SELECT node_id, cost, path FROM ${distTable}
@@ -245,8 +247,8 @@ async function runCheapestPath(
        LEFT JOIN relaxed r ON d.node_id = r.node_id`
     )
 
-    await dropTempTable(duckdb, distTable)
-    await duckdb.executeQuery(`ALTER TABLE ${distNextTable} RENAME TO ${distTable}`)
+    await dropTempTable(session, distTable)
+    await session.exec(`ALTER TABLE ${distNextTable} RENAME TO ${distTable}`)
   }
 
   let resultQuery: string
@@ -260,7 +262,7 @@ async function runCheapestPath(
                    ORDER BY cost ASC`
   }
 
-  const rows = await duckdb.executeQuery(resultQuery)
+  const rows = await session.exec(resultQuery)
 
   const paths: PathResult[] = rows.map((r: any) => {
     const pathNodes = (r.path as string).split(',').filter(Boolean)

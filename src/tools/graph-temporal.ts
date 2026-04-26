@@ -11,7 +11,7 @@ import type {
   EdgeChange,
   PeriodMetrics,
 } from '../types/graph-types.js'
-import type { DuckDBService } from '../duckdb/service.js'
+import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import { validateGraphTables, getColumnRefs } from './graph-utils.js'
 import { escapeIdentifier, escapeString } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
@@ -21,17 +21,19 @@ import { logger } from '../utils/logger.js'
  */
 export async function handleTemporalFilter(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<TemporalFilterResult> {
+  const session = openComputeSession(duckdb)
+
   const input = TemporalFilterInputSchema.parse(args)
-  await validateGraphTables(duckdb, input)
+  await validateGraphTables(session, input)
   const { edgeTable, sourceCol, targetCol, weightCol } = getColumnRefs(input)
   const periodCol = escapeIdentifier(input.period_column)
   const periodVal = escapeString(input.period_value)
 
   try {
     // Count edges in this period
-    const edgeStats = await duckdb.executeQuery(
+    const edgeStats = await session.exec(
       `SELECT COUNT(*) AS edge_count
               ${weightCol ? `, AVG(CAST(${weightCol} AS DOUBLE)) AS avg_weight` : ''}
        FROM ${edgeTable}
@@ -42,7 +44,7 @@ export async function handleTemporalFilter(
     const avgWeight = weightCol ? Number(edgeStats[0]?.avg_weight ?? 0) : null
 
     // Count distinct nodes active in this period
-    const nodeStats = await duckdb.executeQuery(
+    const nodeStats = await session.exec(
       `SELECT COUNT(DISTINCT node_id) AS node_count FROM (
          SELECT ${sourceCol} AS node_id FROM ${edgeTable} WHERE ${periodCol} = ${periodVal}
          UNION
@@ -75,7 +77,7 @@ export async function handleTemporalFilter(
  * Compute metrics for a single period.
  */
 async function computePeriodMetrics(
-  duckdb: DuckDBService,
+  session: ComputeSession,
   edgeTable: string,
   sourceCol: string,
   targetCol: string,
@@ -83,7 +85,7 @@ async function computePeriodMetrics(
   periodCol: string,
   periodVal: string
 ): Promise<PeriodMetrics> {
-  const edgeStats = await duckdb.executeQuery(
+  const edgeStats = await session.exec(
     `SELECT COUNT(*) AS edge_count
             ${weightCol ? `, AVG(CAST(${weightCol} AS DOUBLE)) AS avg_weight` : ''}
      FROM ${edgeTable}
@@ -93,7 +95,7 @@ async function computePeriodMetrics(
   const edgeCount = Number(edgeStats[0]?.edge_count ?? 0)
   const avgWeight = weightCol ? Number(edgeStats[0]?.avg_weight ?? 0) : null
 
-  const nodeStats = await duckdb.executeQuery(
+  const nodeStats = await session.exec(
     `SELECT COUNT(DISTINCT node_id) AS node_count FROM (
        SELECT ${sourceCol} AS node_id FROM ${edgeTable} WHERE ${periodCol} = ${periodVal}
        UNION
@@ -116,10 +118,12 @@ async function computePeriodMetrics(
  */
 export async function handleComparePeriods(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<ComparePeriodsResult> {
+  const session = openComputeSession(duckdb)
+
   const input = ComparePeriodsInputSchema.parse(args)
-  await validateGraphTables(duckdb, input)
+  await validateGraphTables(session, input)
   const { edgeTable, sourceCol, targetCol, weightCol } = getColumnRefs(input)
   const periodCol = escapeIdentifier(input.period_column)
   const periodA = escapeString(input.period_a)
@@ -128,7 +132,7 @@ export async function handleComparePeriods(
   try {
     // Compute metrics for each period
     const metricsA = await computePeriodMetrics(
-      duckdb,
+      session,
       edgeTable,
       sourceCol,
       targetCol,
@@ -137,7 +141,7 @@ export async function handleComparePeriods(
       periodA
     )
     const metricsB = await computePeriodMetrics(
-      duckdb,
+      session,
       edgeTable,
       sourceCol,
       targetCol,
@@ -177,7 +181,7 @@ export async function handleComparePeriods(
         ON a.src = b.src AND a.tgt = b.tgt
       ORDER BY change_type, source, target`
 
-    const changes = await duckdb.executeQuery(changeQuery)
+    const changes = await session.exec(changeQuery)
 
     const edgeChanges: EdgeChange[] = changes.map((c: any) => ({
       source: c.source,

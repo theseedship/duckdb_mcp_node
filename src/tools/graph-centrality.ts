@@ -3,11 +3,16 @@
  *
  * Uses iterative SQL with temp tables (no recursive CTEs — segfault risk).
  * Validated patterns from tests/fierce-f1-isolated.ts.
+ *
+ * v1.2.0: handlers wrap their `duckdb` argument in a `ComputeSession` so all
+ * statements (CREATE TEMP, ALTER, DROP, SELECT) run on the same pinned
+ * connection. See `src/compute-session.ts` for why this matters when the
+ * host service routes reads/writes to different connections.
  */
 
 import { PageRankInputSchema, EigenvectorInputSchema } from '../types/graph-schemas.js'
 import type { PageRankResult, EigenvectorResult } from '../types/graph-types.js'
-import type { DuckDBService } from '../duckdb/service.js'
+import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import {
   validateGraphTables,
   tempTablePrefix,
@@ -21,10 +26,12 @@ import { logger } from '../utils/logger.js'
  */
 export async function handlePageRank(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<PageRankResult> {
+  const session = openComputeSession(duckdb)
+
   const input = PageRankInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(duckdb, input)
+  const { nodeCount } = await validateGraphTables(session, input)
   const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
   const N = nodeCount
@@ -46,14 +53,14 @@ export async function handlePageRank(
 
   try {
     // Initialize rank = 1/N for all nodes
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${prTable} AS
        SELECT ${nodeIdCol} AS node_id, 1.0 / ${N} AS rank
        FROM ${nodeTable}`
     )
 
     // Compute out-degrees
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${outCntTable} AS
        SELECT ${sourceCol} AS node_id, COUNT(*) AS cnt
        FROM ${edgeSub} e
@@ -64,7 +71,7 @@ export async function handlePageRank(
 
     // Iterative PageRank
     for (let i = 0; i < input.iterations; i++) {
-      await duckdb.executeQuery(
+      await session.exec(
         `CREATE TEMP TABLE ${prNextTable} AS
          SELECT v.${nodeIdCol} AS node_id,
            (1.0 - ${d}) / ${N} + ${d} * COALESCE(
@@ -75,19 +82,20 @@ export async function handlePageRank(
               WHERE e.${targetCol} = v.${nodeIdCol}), 0) AS rank
          FROM ${nodeTable} v`
       )
-      await dropTempTable(duckdb, prTable)
-      await duckdb.executeQuery(`ALTER TABLE ${prNextTable} RENAME TO ${prTable}`)
+      await dropTempTable(session, prTable)
+      await session.exec(`ALTER TABLE ${prNextTable} RENAME TO ${prTable}`)
     }
 
-    // Get top_n results
-    const results = await duckdb.executeQuery(
+    // Get top_n results — runs on the same pinned connection that holds
+    // the temp table, so visibility is guaranteed.
+    const results = await session.exec<{ node_id: string | number; rank: number | string }>(
       `SELECT node_id, rank FROM ${prTable} ORDER BY rank DESC LIMIT ${input.top_n}`
     )
 
     return {
       success: true,
       algorithm: 'pagerank',
-      nodes: results.map((r: any) => ({ node_id: r.node_id, rank: Number(r.rank) })),
+      nodes: results.map((r) => ({ node_id: r.node_id, rank: Number(r.rank) })),
       iterations: input.iterations,
       damping: input.damping,
       total_nodes: N,
@@ -96,9 +104,9 @@ export async function handlePageRank(
     logger.error('graph.pagerank failed', error)
     throw error
   } finally {
-    await dropTempTable(duckdb, prTable)
-    await dropTempTable(duckdb, outCntTable)
-    await dropTempTable(duckdb, prNextTable)
+    await dropTempTable(session, prTable)
+    await dropTempTable(session, outCntTable)
+    await dropTempTable(session, prNextTable)
   }
 }
 
@@ -107,10 +115,12 @@ export async function handlePageRank(
  */
 export async function handleEigenvector(
   args: unknown,
-  duckdb: DuckDBService
+  duckdb: DuckDBLike | ComputeSession
 ): Promise<EigenvectorResult> {
+  const session = openComputeSession(duckdb)
+
   const input = EigenvectorInputSchema.parse(args)
-  const { nodeCount } = await validateGraphTables(duckdb, input)
+  const { nodeCount } = await validateGraphTables(session, input)
   const { nodeTable, nodeIdCol, sourceCol, targetCol, edgeSub } = getColumnRefs(input)
   const prefix = tempTablePrefix()
   const N = nodeCount
@@ -130,7 +140,7 @@ export async function handleEigenvector(
 
   try {
     // Initialize all scores = 1.0
-    await duckdb.executeQuery(
+    await session.exec(
       `CREATE TEMP TABLE ${evTable} AS
        SELECT ${nodeIdCol} AS node_id, 1.0 AS score
        FROM ${nodeTable}`
@@ -139,7 +149,7 @@ export async function handleEigenvector(
     // Power iteration (undirected: sum scores from both directions)
     for (let i = 0; i < input.iterations; i++) {
       // Sum neighbor scores from both edge directions, then normalize by max
-      await duckdb.executeQuery(
+      await session.exec(
         `CREATE TEMP TABLE ${evNextTable} AS
          WITH raw_scores AS (
            SELECT v.${nodeIdCol} AS node_id,
@@ -163,18 +173,18 @@ export async function handleEigenvector(
          SELECT node_id, raw_score / mx AS score
          FROM raw_scores, max_score`
       )
-      await dropTempTable(duckdb, evTable)
-      await duckdb.executeQuery(`ALTER TABLE ${evNextTable} RENAME TO ${evTable}`)
+      await dropTempTable(session, evTable)
+      await session.exec(`ALTER TABLE ${evNextTable} RENAME TO ${evTable}`)
     }
 
-    const results = await duckdb.executeQuery(
+    const results = await session.exec<{ node_id: string | number; score: number | string }>(
       `SELECT node_id, score FROM ${evTable} ORDER BY score DESC LIMIT ${input.top_n}`
     )
 
     return {
       success: true,
       algorithm: 'eigenvector',
-      nodes: results.map((r: any) => ({ node_id: r.node_id, score: Number(r.score) })),
+      nodes: results.map((r) => ({ node_id: r.node_id, score: Number(r.score) })),
       iterations: input.iterations,
       total_nodes: N,
     }
@@ -182,7 +192,7 @@ export async function handleEigenvector(
     logger.error('graph.eigenvector failed', error)
     throw error
   } finally {
-    await dropTempTable(duckdb, evTable)
-    await dropTempTable(duckdb, evNextTable)
+    await dropTempTable(session, evTable)
+    await dropTempTable(session, evNextTable)
   }
 }

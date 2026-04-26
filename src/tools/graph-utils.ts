@@ -4,10 +4,18 @@
  *
  * CRITICAL: All graph algorithms use iterative SQL with temp tables.
  * NO recursive CTEs (segfault risk on DuckDB 1.4.x).
+ *
+ * v1.2.0 update: utilities now operate on a `ComputeSession` instead of a
+ * raw `DuckDBService`. The session pins all queries to a single connection
+ * so TEMP tables created in one step are visible in later steps. See
+ * `src/compute-session.ts` for the full rationale.
+ *
+ * Backward compat: existing callers can still pass a DuckDBService — the
+ * helpers wrap it via `openComputeSession()` on entry.
  */
 
 import { escapeIdentifier } from '../utils/sql-escape.js'
-import type { DuckDBService } from '../duckdb/service.js'
+import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import type { GraphInputBase } from '../types/graph-schemas.js'
 
 /**
@@ -21,11 +29,18 @@ export function tempTablePrefix(): string {
 
 /**
  * Validate that the graph tables and columns exist, return node/edge counts.
+ *
+ * Accepts a `ComputeSession` (preferred) or a `DuckDBLike` for backward
+ * compat — the latter is auto-wrapped. All validation queries run on the
+ * same pinned connection so the caller can rely on subsequent statements
+ * (CREATE TEMP TABLE, etc.) seeing the same context.
  */
 export async function validateGraphTables(
-  duckdb: DuckDBService,
+  target: ComputeSession | DuckDBLike,
   config: GraphInputBase
 ): Promise<{ nodeCount: number; edgeCount: number }> {
+  const session = openComputeSession(target)
+
   const nodeTable = escapeIdentifier(config.node_table)
   const edgeTable = escapeIdentifier(config.edge_table)
   const nodeIdCol = escapeIdentifier(config.node_id_column)
@@ -33,22 +48,26 @@ export async function validateGraphTables(
   const targetCol = escapeIdentifier(config.target_column)
 
   // Verify node table has the id column
-  const nodeCheck = await duckdb.executeQuery(`SELECT COUNT(*) AS cnt FROM ${nodeTable} LIMIT 1`)
+  const nodeCheck = await session.exec<{ cnt: number | string }>(
+    `SELECT COUNT(*) AS cnt FROM ${nodeTable} LIMIT 1`
+  )
   const nodeCount = Number(nodeCheck[0]?.cnt ?? 0)
 
   // Verify the node_id column exists by selecting it
-  await duckdb.executeQuery(`SELECT ${nodeIdCol} FROM ${nodeTable} LIMIT 0`)
+  await session.exec(`SELECT ${nodeIdCol} FROM ${nodeTable} LIMIT 0`)
 
   // Verify edge table has source/target columns
-  const edgeCheck = await duckdb.executeQuery(`SELECT COUNT(*) AS cnt FROM ${edgeTable} LIMIT 1`)
+  const edgeCheck = await session.exec<{ cnt: number | string }>(
+    `SELECT COUNT(*) AS cnt FROM ${edgeTable} LIMIT 1`
+  )
   const edgeCount = Number(edgeCheck[0]?.cnt ?? 0)
 
-  await duckdb.executeQuery(`SELECT ${sourceCol}, ${targetCol} FROM ${edgeTable} LIMIT 0`)
+  await session.exec(`SELECT ${sourceCol}, ${targetCol} FROM ${edgeTable} LIMIT 0`)
 
   // Verify weight column if specified
   if (config.weight_column) {
     const weightCol = escapeIdentifier(config.weight_column)
-    await duckdb.executeQuery(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
+    await session.exec(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
   }
 
   return { nodeCount, edgeCount }
@@ -83,21 +102,27 @@ export function getColumnRefs(config: GraphInputBase) {
 }
 
 /**
- * Safely drop a temp table if it exists.
+ * Safely drop a temp table if it exists. Operates on the session's pinned
+ * connection — must be the same connection that created the table.
  */
-export async function dropTempTable(duckdb: DuckDBService, name: string): Promise<void> {
-  await duckdb.executeQuery(`DROP TABLE IF EXISTS ${name}`)
+export async function dropTempTable(
+  target: ComputeSession | DuckDBLike,
+  name: string
+): Promise<void> {
+  const session = openComputeSession(target)
+  await session.exec(`DROP TABLE IF EXISTS ${name}`)
 }
 
 /**
  * Clean up all temp tables matching a prefix.
  */
 export async function cleanupTempTables(
-  duckdb: DuckDBService,
+  target: ComputeSession | DuckDBLike,
   prefix: string,
   names: string[]
 ): Promise<void> {
+  const session = openComputeSession(target)
   for (const name of names) {
-    await dropTempTable(duckdb, `${prefix}_${name}`)
+    await dropTempTable(session, `${prefix}_${name}`)
   }
 }

@@ -128,6 +128,18 @@ export {
   handleGraphExport,
 } from './tools/graph-tools.js'
 
+// ComputeSession — pinned-connection executor for stateful multi-statement
+// algorithms (v1.2.0). Hosts that route reads/writes to different
+// connections must wrap their service via openComputeSession before passing
+// it to graph handlers, otherwise temp tables created by the algorithm are
+// silently lost between CREATE and final SELECT.
+export {
+  openComputeSession,
+  ensureSession,
+  type ComputeSession,
+  type DuckDBLike,
+} from './compute-session.js'
+
 // Export graph types for TypeScript users
 export type {
   PageRankResult,
