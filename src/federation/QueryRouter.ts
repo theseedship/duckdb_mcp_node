@@ -3,6 +3,7 @@ import { MCPConnectionPool } from './ConnectionPool.js'
 import { ResourceRegistry } from './ResourceRegistry.js'
 import { logger } from '../utils/logger.js'
 import { escapeIdentifier, escapeFilePath } from '../utils/sql-escape.js'
+import { openComputeSession, type ComputeSession } from '../compute-session.js'
 
 /**
  * Represents a federated query plan
@@ -127,6 +128,13 @@ export class QueryRouter {
     // Execute federated query
     const sourcesQueried: string[] = ['local']
 
+    // Pin every CREATE TEMP / SELECT / DROP to the same connection — routed
+    // hosts (deposium_MCPs DuckDBService) split CREATE → write conn and SELECT
+    // → read pool by default, which would make the temp tables created below
+    // invisible to the final query at the bottom of this method. Same pattern
+    // as the graph-* handlers since v1.2.0.
+    const session = openComputeSession(this.duckdb)
+
     // Fetch data from remote sources in parallel
     const remoteDataPromises: Promise<[string, any]>[] = []
 
@@ -145,7 +153,7 @@ export class QueryRouter {
     const tempTables: Map<string, string> = new Map()
 
     for (const [serverAlias, data] of remoteResults) {
-      const tempTableName = await this.createTempTable(serverAlias, data)
+      const tempTableName = await this.createTempTable(serverAlias, data, session)
       tempTables.set(serverAlias, tempTableName)
     }
 
@@ -168,11 +176,11 @@ export class QueryRouter {
       )
     }
 
-    // Execute the final query
-    const result = await this.duckdb.executeQuery(localQuery)
+    // Execute the final query through the pinned session
+    const result = await session.exec(localQuery)
 
-    // Clean up temp tables
-    await this.cleanupTempTables(Array.from(tempTables.values()))
+    // Clean up temp tables through the same session
+    await this.cleanupTempTables(Array.from(tempTables.values()), session)
 
     return {
       data: result,
@@ -287,13 +295,24 @@ export class QueryRouter {
   }
 
   /**
-   * Create a temporary table from remote data
+   * Create a temporary table from remote data.
+   *
+   * The optional session pins all CREATE statements to the same connection so
+   * the temp tables stay visible to the federated SELECT downstream. When
+   * called without a session (legacy callers), falls back to executeQuery.
    */
-  private async createTempTable(serverAlias: string, data: any): Promise<string> {
+  private async createTempTable(
+    serverAlias: string,
+    data: any,
+    session?: ComputeSession
+  ): Promise<string> {
     const tempTableName = `temp_${serverAlias}_${++this.tempTableCounter}`
+    const exec = (sql: string) => (session ? session.exec(sql) : this.duckdb.executeQuery(sql))
 
     if (Array.isArray(data)) {
-      // JSON array data
+      // JSON array data — createTableFromJSON creates a regular TABLE so the
+      // routing split doesn't apply (regular tables are visible across all
+      // connections of the same database). Kept as-is for compatibility.
       await this.duckdb.createTableFromJSON(tempTableName, data)
     } else if (typeof data === 'string') {
       // CSV or text data
@@ -305,7 +324,7 @@ export class QueryRouter {
       try {
         await fs.writeFile(tempFile, data)
         const sql = `CREATE TEMP TABLE ${escapeIdentifier(tempTableName)} AS SELECT * FROM read_csv_auto(${escapeFilePath(tempFile)})`
-        await this.duckdb.executeQuery(sql)
+        await exec(sql)
       } finally {
         try {
           await fs.unlink(tempFile)
@@ -323,7 +342,7 @@ export class QueryRouter {
       try {
         await fs.writeFile(tempFile, data)
         const sql = `CREATE TEMP TABLE ${escapeIdentifier(tempTableName)} AS SELECT * FROM read_parquet(${escapeFilePath(tempFile)})`
-        await this.duckdb.executeQuery(sql)
+        await exec(sql)
       } finally {
         try {
           await fs.unlink(tempFile)
@@ -340,12 +359,14 @@ export class QueryRouter {
   }
 
   /**
-   * Clean up temporary tables
+   * Clean up temporary tables. Session reuse keeps the DROP on the same
+   * connection that issued the CREATE — required for routed hosts.
    */
-  private async cleanupTempTables(tables: string[]): Promise<void> {
+  private async cleanupTempTables(tables: string[], session?: ComputeSession): Promise<void> {
+    const exec = (sql: string) => (session ? session.exec(sql) : this.duckdb.executeQuery(sql))
     for (const table of tables) {
       try {
-        await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${escapeIdentifier(table)}`)
+        await exec(`DROP TABLE IF EXISTS ${escapeIdentifier(table)}`)
       } catch (error) {
         logger.warn(`Failed to drop temp table '${table}':`, error)
       }

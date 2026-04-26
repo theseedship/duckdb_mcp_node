@@ -270,8 +270,11 @@ describe('QueryRouter', () => {
 
       await router.executeQuery(sql)
 
+      // v1.2.1: federation now pins through openComputeSession → exec(sql, params?)
+      // calls executeQuery(sql, params) with params=undefined when none provided.
       expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
-        expect.stringMatching(/DROP TABLE IF EXISTS "temp_remote_\d+"/)
+        expect.stringMatching(/DROP TABLE IF EXISTS "temp_remote_\d+"/),
+        undefined
       )
     })
 
@@ -289,7 +292,10 @@ describe('QueryRouter', () => {
       await router.executeQuery(sql)
 
       // Should write CSV to temp file and read it
-      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(expect.stringContaining('read_csv_auto'))
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('read_csv_auto'),
+        undefined
+      )
     })
 
     it('should handle binary data (Parquet) from remote source', async () => {
@@ -305,7 +311,10 @@ describe('QueryRouter', () => {
       const sql = "SELECT * FROM 'mcp://storage/data.parquet'"
       await router.executeQuery(sql)
 
-      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(expect.stringContaining('read_parquet'))
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('read_parquet'),
+        undefined
+      )
     })
 
     it('should track execution time in metadata', async () => {
@@ -431,7 +440,10 @@ describe('QueryRouter', () => {
       // Should treat as CSV/text when JSON parse fails
       await router.executeQuery(sql)
 
-      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(expect.stringContaining('read_csv_auto'))
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('read_csv_auto'),
+        undefined
+      )
     })
   })
 
@@ -569,7 +581,10 @@ describe('QueryRouter', () => {
 
       await router.executeQuery(sql)
 
-      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ROW_NUMBER'))
+      expect(mockDuckDB.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ROW_NUMBER'),
+        undefined
+      )
     })
   })
 

@@ -9,6 +9,7 @@ import { DuckLakeService } from '../service/ducklake.js'
 import { SpaceContextFactory } from '../context/SpaceContext.js'
 import { DuckLakeSpaceAdapter } from '../adapters/DuckLakeSpaceAdapter.js'
 import { logger } from '../utils/logger.js'
+import { openComputeSession } from '../compute-session.js'
 
 /**
  * Input schema for ducklake.attach tool
@@ -353,6 +354,13 @@ export class DuckLakeToolHandlers {
       const tempTableName = `_tt_${Date.now()}`
 
       if (data.length > 0) {
+        // Pin every statement to the same connection so the temp table created
+        // below stays visible to the SELECT and DROP. Routed hosts (e.g.
+        // deposium_MCPs DuckDBService) split CREATE → write conn and SELECT →
+        // read pool by default — without ComputeSession, the SELECT cannot
+        // see the temp. Same pattern as graph-* handlers since v1.2.0.
+        const session = openComputeSession(this.duckdb)
+
         // Create temporary table with time-traveled data
         const values = data
           .map(
@@ -363,17 +371,17 @@ export class DuckLakeToolHandlers {
           )
           .join(', ')
 
-        await this.duckdb.executeQuery(`
+        await session.exec(`
           CREATE TEMPORARY TABLE ${tempTableName} AS
           SELECT * FROM VALUES ${values}
         `)
 
         // Execute the user's query on the time-traveled data
         const queryWithTempTable = query.replace(tableName, tempTableName)
-        const result = await this.duckdb.executeQuery(`${queryWithTempTable} LIMIT ${input.limit}`)
+        const result = await session.exec(`${queryWithTempTable} LIMIT ${input.limit}`)
 
         // Clean up
-        await this.duckdb.executeQuery(`DROP TABLE IF EXISTS ${tempTableName}`)
+        await session.exec(`DROP TABLE IF EXISTS ${tempTableName}`)
 
         return {
           success: true,
