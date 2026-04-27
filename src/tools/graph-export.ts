@@ -10,6 +10,7 @@ import { openComputeSession, type ComputeSession, type DuckDBLike } from '../com
 import { validateGraphTables, getColumnRefs } from './graph-utils.js'
 import { escapeString } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * graph.export — Export graph in multiple formats
@@ -96,7 +97,7 @@ export async function handleGraphExport(
     }
   } catch (error) {
     logger.error('graph.export failed', error)
-    throw error
+    throw GraphError.fromUnknown(error)
   }
 }
 

@@ -50,6 +50,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
+ * Metrics accumulated by a ComputeSession over its lifetime.
+ * @since v1.4.0
+ */
+export interface SessionMetrics {
+  /** Number of `exec()` calls completed (success or error). */
+  queries_run: number
+  /** Sum of wall-clock duration of every completed `exec()` call, in ms. */
+  total_duration_ms: number
+  /** Wall-clock timestamp (ms since epoch) of the last completed `exec()`. `null` if no call yet. */
+  last_query_at: number | null
+  /** Count of `exec()` calls that threw. */
+  errors_count: number
+}
+
+/**
  * The minimum shape a ComputeSession exposes. All graph handler internals
  * use `exec(sql, params)`. Optional `cleanup()` lets callers release any
  * resources (connections, temp scratch). Handlers do their own per-table
@@ -74,6 +89,17 @@ export interface ComputeSession {
    * (e.g. a checked-out pool connection) can release here.
    */
   cleanup?(): Promise<void>
+
+  /**
+   * Snapshot of the session's runtime metrics. Sessions opened via
+   * `openComputeSession` provide this; bring-your-own sessions may not.
+   *
+   * Returns a defensive copy — mutating the result does not affect the
+   * session's internal counters.
+   *
+   * @since v1.4.0
+   */
+  metrics?(): SessionMetrics
 
   /**
    * Marker — distinguishes a `ComputeSession` from a raw DuckDB-like service
@@ -119,7 +145,7 @@ export interface DuckDBLike {
  * `finally` blocks.
  */
 export function openComputeSession(target: DuckDBLike | ComputeSession): ComputeSession {
-  // (1) Passthrough
+  // (1) Passthrough — caller already wrapped, do not double-instrument.
   if (
     target &&
     typeof (target as ComputeSession).exec === 'function' &&
@@ -130,31 +156,54 @@ export function openComputeSession(target: DuckDBLike | ComputeSession): Compute
 
   const dbLike = target as DuckDBLike
 
-  // (2) Routed service — pin to write connection
+  // Pick the underlying executor once, then wrap it with metrics. A single
+  // wrapper keeps the (2)/(3) branches symmetric and avoids duplicating the
+  // instrumentation. @since v1.4.0
+  let underlying: <T = any>(sql: string, params?: unknown[]) => Promise<T[]>
   if (typeof dbLike.queryWrite === 'function') {
-    return {
-      _isComputeSession: true,
-      async exec<T = any>(sql: string, params?: unknown[]): Promise<T[]> {
-        return dbLike.queryWrite!<T>(sql, params)
-      },
-    }
+    // (2) Routed service — pin to write connection so TEMP tables remain
+    // visible across reads/writes within the algorithm.
+    underlying = (sql, params) => dbLike.queryWrite!(sql, params)
+  } else if (typeof dbLike.executeQuery === 'function') {
+    // (3) Legacy single-connection service
+    underlying = (sql, params) => dbLike.executeQuery(sql, params)
+  } else {
+    throw new TypeError(
+      'openComputeSession: target must be a ComputeSession, a routed service ' +
+        'with queryWrite(), or a service with executeQuery(). Got: ' +
+        (typeof target === 'object' ? Object.keys(target ?? {}).join(',') : typeof target)
+    )
   }
 
-  // (3) Legacy single-connection service
-  if (typeof dbLike.executeQuery === 'function') {
-    return {
-      _isComputeSession: true,
-      async exec<T = any>(sql: string, params?: unknown[]): Promise<T[]> {
-        return dbLike.executeQuery<T>(sql, params)
-      },
-    }
+  // Per-session counters — closed over by the returned session. A defensive
+  // copy is returned from metrics() so callers cannot mutate the live state.
+  const state: SessionMetrics = {
+    queries_run: 0,
+    total_duration_ms: 0,
+    last_query_at: null,
+    errors_count: 0,
   }
 
-  throw new TypeError(
-    'openComputeSession: target must be a ComputeSession, a routed service ' +
-      'with queryWrite(), or a service with executeQuery(). Got: ' +
-      (typeof target === 'object' ? Object.keys(target ?? {}).join(',') : typeof target)
-  )
+  return {
+    _isComputeSession: true,
+    async exec<T = any>(sql: string, params?: unknown[]): Promise<T[]> {
+      const start = Date.now()
+      try {
+        return await underlying<T>(sql, params)
+      } catch (error) {
+        state.errors_count += 1
+        throw error
+      } finally {
+        const now = Date.now()
+        state.queries_run += 1
+        state.total_duration_ms += now - start
+        state.last_query_at = now
+      }
+    },
+    metrics(): SessionMetrics {
+      return { ...state }
+    },
+  }
 }
 
 /**

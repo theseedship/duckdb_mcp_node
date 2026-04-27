@@ -154,12 +154,22 @@ export { AVAILABLE_OPS, type AvailableOp } from './tools/available-ops.js'
 // connections must wrap their service via openComputeSession before passing
 // it to graph handlers, otherwise temp tables created by the algorithm are
 // silently lost between CREATE and final SELECT.
+//
+// v1.4.0: sessions opened via openComputeSession also expose metrics()
+// returning {queries_run, total_duration_ms, last_query_at, errors_count}.
 export {
   openComputeSession,
   ensureSession,
   type ComputeSession,
   type DuckDBLike,
+  type SessionMetrics,
 } from './compute-session.js'
+
+// Structured error codes for graph handlers (v1.4.0). Hosts can route
+// fallbacks by inspecting `.code` instead of grepping error messages.
+// `GraphError extends Error` so existing `instanceof Error` and `.message`
+// code keeps working unchanged.
+export { GraphError, type GraphErrorCode } from './errors/graph-errors.js'
 
 // Export graph types for TypeScript users
 export type {

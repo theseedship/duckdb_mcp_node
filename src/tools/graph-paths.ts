@@ -15,6 +15,7 @@ import {
   dropTempTable,
 } from './graph-utils.js'
 import { logger } from '../utils/logger.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * graph.weighted_path — Find paths using one of three modes:
@@ -105,7 +106,7 @@ export async function handleWeightedPath(
     return result
   } catch (error) {
     logger.error('graph.weighted_path failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   } finally {
     await dropTempTable(session, distTable)
     await dropTempTable(session, distNextTable)

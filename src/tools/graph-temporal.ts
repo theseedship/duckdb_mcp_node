@@ -15,6 +15,7 @@ import { openComputeSession, type ComputeSession, type DuckDBLike } from '../com
 import { validateGraphTables, getColumnRefs } from './graph-utils.js'
 import { escapeIdentifier, escapeString } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * graph.temporal_filter — Filter edges by a period column/value, return graph stats.
@@ -84,7 +85,7 @@ export async function handleTemporalFilter(
     }
   } catch (error) {
     logger.error('graph.temporal_filter failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   }
 }
 
@@ -239,6 +240,6 @@ export async function handleComparePeriods(
     }
   } catch (error) {
     logger.error('graph.compare_periods failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   }
 }

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-27
+
+Closes the audit (`DUCKDB-MCP-NODE-AUDIT-2026-04-26`) by shipping the two items that were deferred from v1.3.0. Additive only — no breaking changes.
+
+### Added
+
+- **`GraphError` class with structured `code` enum** — graph handlers now throw `GraphError` (extends `Error`) carrying `.code: 'NO_NODES' | 'NO_EDGES' | 'INVALID_FILTER' | 'INVALID_INPUT' | 'NO_PATH' | 'TIMEOUT' | 'INFRA'` instead of raw `Error`. Hosts can route fallbacks by inspecting `.code` rather than grepping error messages. Backward compatible because `GraphError instanceof Error` and `.message` is preserved.
+  - `validateGraphTables` classifies DuckDB Binder/Catalog/Parser errors against a user-supplied `filter` as `INVALID_FILTER`; everything else stays `INFRA`.
+  - `GraphError.fromUnknown(error, { context: 'filter' | 'query' })` is the static helper handlers use; safe to call on a value already wrapped (no-op).
+- **`ComputeSession.metrics()`** — sessions opened via `openComputeSession` now expose a `metrics()` method returning `{queries_run, total_duration_ms, last_query_at, errors_count}`. Returns a defensive copy. Hosts can inspect a session's lifetime without instrumenting their service. Passthrough sessions (already wrapped) keep their existing metrics object.
+
+### Changed
+
+- All graph handlers (`handlePageRank`, `handleEigenvector`, `handleCommunityDetect`, `handleModularity`, `handleWeightedPath`, `handleTemporalFilter`, `handleComparePeriods`, `handleGraphExport`) wrap their `catch` errors in `GraphError.fromUnknown(error)` before re-throwing.
+
+### Compatibility
+
+- 510 tests pass (was 491), +19 dedicated to v1.4.0.
+- Type-only additions to public API: `GraphError`, `GraphErrorCode`, `SessionMetrics`.
+- `instanceof Error` checks keep working — `GraphError` is a subclass.
+- Existing `error.message`-based code keeps working unchanged.
+
 ## [1.3.0] - 2026-04-26
 
 Audit-driven quickwins from [DUCKDB-MCP-NODE-AUDIT-2026-04-26](../docs/2026/handoffs/) (deposium side). Three additive items, no breaking changes.

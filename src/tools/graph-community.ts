@@ -15,6 +15,7 @@ import {
   dropTempTable,
 } from './graph-utils.js'
 import { logger } from '../utils/logger.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * graph.community_detect — Label propagation
@@ -165,7 +166,7 @@ export async function handleCommunityDetect(
     }
   } catch (error) {
     logger.error('graph.community_detect failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   } finally {
     await dropTempTable(session, compTable)
     await dropTempTable(session, compNextTable)
@@ -312,7 +313,7 @@ export async function handleModularity(
     }
   } catch (error) {
     logger.error('graph.modularity failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   } finally {
     if (createdCommTable) {
       await dropTempTable(session, commTable)

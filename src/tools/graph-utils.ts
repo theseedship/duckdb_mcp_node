@@ -17,6 +17,7 @@
 import { escapeIdentifier } from '../utils/sql-escape.js'
 import { openComputeSession, type ComputeSession, type DuckDBLike } from '../compute-session.js'
 import type { GraphInputBase } from '../types/graph-schemas.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * Generate a unique temp table prefix to avoid collisions.
@@ -77,53 +78,64 @@ export async function validateGraphTables(
   const targetCol = escapeIdentifier(config.target_column)
   const where = config.filter ? ` WHERE ${config.filter}` : ''
 
-  // Verify node table has the id column
-  const nodeCheck = await session.exec<{ cnt: number | string }>(
-    `SELECT COUNT(*) AS cnt FROM ${nodeTable}${where} LIMIT 1`
-  )
-  const nodeCount = Number(nodeCheck[0]?.cnt ?? 0)
-
-  // Verify the node_id column exists by selecting it
-  await session.exec(`SELECT ${nodeIdCol} FROM ${nodeTable} LIMIT 0`)
-
-  // Distinct node count — used by algorithms as N for the (1-d)/N term.
-  // If `distinctNodeCount < nodeCount`, the table has duplicate rows per
-  // node_id; algorithms must read from `nodeSub` (DISTINCT subquery) to
-  // avoid the cascade-amplification bug — see buildNodeSubquery comment.
-  // @since v1.2.2
-  const distinctCheck = await session.exec<{ cnt: number | string }>(
-    `SELECT COUNT(DISTINCT ${nodeIdCol}) AS cnt FROM ${nodeTable}${where}`
-  )
-  const distinctNodeCount = Number(distinctCheck[0]?.cnt ?? 0)
-
-  // Verify edge table has source/target columns
-  const edgeCheck = await session.exec<{ cnt: number | string }>(
-    `SELECT COUNT(*) AS cnt FROM ${edgeTable} LIMIT 1`
-  )
-  const edgeCount = Number(edgeCheck[0]?.cnt ?? 0)
-
-  await session.exec(`SELECT ${sourceCol}, ${targetCol} FROM ${edgeTable} LIMIT 0`)
-
-  // Verify weight column if specified
-  if (config.weight_column) {
-    const weightCol = escapeIdentifier(config.weight_column)
-    await session.exec(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
-  }
-
-  // Opt-in preview of distinct node ids — does NOT run unless caller asks
-  // for it, so default-path callers pay no extra query.
-  // @since v1.3.0
-  let topNodesPreview: Array<string | number> | undefined
-  const previewN = options?.previewNodes
-  if (previewN && previewN > 0 && distinctNodeCount > 0) {
-    const limit = Math.min(previewN, 100)
-    const previewRows = await session.exec<{ node_id: string | number }>(
-      `SELECT DISTINCT ${nodeIdCol} AS node_id FROM ${nodeTable}${where} LIMIT ${limit}`
+  // v1.4.0: classify validation failures so hosts can route fallbacks
+  // without grepping error messages. The single try wraps every probe
+  // query — DuckDB binder/catalog/parser errors against a user filter
+  // become INVALID_FILTER, everything else becomes INFRA.
+  // @since v1.4.0
+  try {
+    // Verify node table has the id column
+    const nodeCheck = await session.exec<{ cnt: number | string }>(
+      `SELECT COUNT(*) AS cnt FROM ${nodeTable}${where} LIMIT 1`
     )
-    topNodesPreview = previewRows.map((r) => r.node_id)
-  }
+    const nodeCount = Number(nodeCheck[0]?.cnt ?? 0)
 
-  return { nodeCount, edgeCount, distinctNodeCount, topNodesPreview }
+    // Verify the node_id column exists by selecting it
+    await session.exec(`SELECT ${nodeIdCol} FROM ${nodeTable} LIMIT 0`)
+
+    // Distinct node count — used by algorithms as N for the (1-d)/N term.
+    // If `distinctNodeCount < nodeCount`, the table has duplicate rows per
+    // node_id; algorithms must read from `nodeSub` (DISTINCT subquery) to
+    // avoid the cascade-amplification bug — see buildNodeSubquery comment.
+    // @since v1.2.2
+    const distinctCheck = await session.exec<{ cnt: number | string }>(
+      `SELECT COUNT(DISTINCT ${nodeIdCol}) AS cnt FROM ${nodeTable}${where}`
+    )
+    const distinctNodeCount = Number(distinctCheck[0]?.cnt ?? 0)
+
+    // Verify edge table has source/target columns
+    const edgeCheck = await session.exec<{ cnt: number | string }>(
+      `SELECT COUNT(*) AS cnt FROM ${edgeTable} LIMIT 1`
+    )
+    const edgeCount = Number(edgeCheck[0]?.cnt ?? 0)
+
+    await session.exec(`SELECT ${sourceCol}, ${targetCol} FROM ${edgeTable} LIMIT 0`)
+
+    // Verify weight column if specified
+    if (config.weight_column) {
+      const weightCol = escapeIdentifier(config.weight_column)
+      await session.exec(`SELECT ${weightCol} FROM ${edgeTable} LIMIT 0`)
+    }
+
+    // Opt-in preview of distinct node ids — does NOT run unless caller asks
+    // for it, so default-path callers pay no extra query.
+    // @since v1.3.0
+    let topNodesPreview: Array<string | number> | undefined
+    const previewN = options?.previewNodes
+    if (previewN && previewN > 0 && distinctNodeCount > 0) {
+      const limit = Math.min(previewN, 100)
+      const previewRows = await session.exec<{ node_id: string | number }>(
+        `SELECT DISTINCT ${nodeIdCol} AS node_id FROM ${nodeTable}${where} LIMIT ${limit}`
+      )
+      topNodesPreview = previewRows.map((r) => r.node_id)
+    }
+
+    return { nodeCount, edgeCount, distinctNodeCount, topNodesPreview }
+  } catch (error) {
+    throw GraphError.fromUnknown(error, {
+      context: config.filter ? 'filter' : 'query',
+    })
+  }
 }
 
 /**

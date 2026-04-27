@@ -20,6 +20,7 @@ import {
   dropTempTable,
 } from './graph-utils.js'
 import { logger } from '../utils/logger.js'
+import { GraphError } from '../errors/graph-errors.js'
 
 /**
  * graph.pagerank — Iterative PageRank with damping factor
@@ -133,7 +134,7 @@ export async function handlePageRank(
     }
   } catch (error) {
     logger.error('graph.pagerank failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   } finally {
     await dropTempTable(session, prTable)
     await dropTempTable(session, outCntTable)
@@ -247,7 +248,7 @@ export async function handleEigenvector(
     }
   } catch (error) {
     logger.error('graph.eigenvector failed', { duration_ms: Date.now() - t0, error })
-    throw error
+    throw GraphError.fromUnknown(error)
   } finally {
     await dropTempTable(session, evTable)
     await dropTempTable(session, evNextTable)
