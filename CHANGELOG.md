@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.3.0...v1.4.0) (2026-04-27)
+
+
+### Features
+
+* v1.4.0 — closes audit (GraphError + ComputeSession.metrics) ([82082c4](https://github.com/theseedship/duckdb_mcp_node/commit/82082c486b9e7a1b9154c7a6e46c68b07cf1d808))
+
 ## [1.1.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.0.1...v1.1.0) (2026-03-12)
 
 ### Features
