@@ -1,10 +1,24 @@
-# DuckPGQ Capability Report — DuckDB 1.5.0
+# DuckPGQ Capability Report — DuckDB 1.5.x
 
-**Date**: 2026-03-12
-**DuckDB**: v1.5.0 "Variegata"
-**DuckPGQ**: aec2e25 (community extension)
+**DuckDB**: v1.5.4 "Variegata" (was validated on v1.5.0 first)
+**DuckPGQ**: `f386a6cf` for 1.5.4 (was `aec2e25` for 1.5.0)
 **Spatial**: loaded (for GEOMETRY/CRS tests)
 **Test script**: `tests/duckpgq-1.5-capabilities.ts`
+
+## Version history
+
+| Date       | DuckDB     | DuckPGQ ref    | Result       | Notes                                                                                                                                                                                                                                                                                                                                |
+| ---------- | ---------- | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-03-12 | v1.5.0     | `aec2e25`      | 15/20 ✅     | initial validation                                                                                                                                                                                                                                                                                                                   |
+| 2026-07-03 | **v1.5.4** | **`f386a6cf`** | **15/20 ✅** | **bump validated — zero regression.** DuckPGQ finally builds+loads on a recent DuckDB (1.5.1/1.5.2/1.5.3 never had a working community binary; see cwida/duckpgq-extension#305/#307). Onager (`onager_pagerank`) is now _present_ on 1.5.4 (absent on 1.5.1) — requires BIGINT src/dst columns. All 510 plugin tests green on 1.5.4. |
+
+The 5 ❌ below are identical across 1.5.0 and 1.5.4 — all are known DuckPGQ limitations or intentional safety guards, not regressions:
+
+- **T4.5 ALL SHORTEST** — not implemented upstream yet
+- **T7.3b WHERE in bounded patterns** — edge variable not bindable in `->{n,m}` (upstream limitation)
+- **T7.5 Onager** — now loads on 1.5.4 but needs BIGINT inputs (usage detail, not a failure)
+- **T7.6 Kleene `*` alone** — intentional infinite-result guard (WALK mode)
+- **T7.7 anonymous edge** — patterns must bind to a variable (by design)
 
 ---
 
@@ -28,9 +42,9 @@ T7.2   bounded            ✅ {1,3} quantifiers
 T7.3a  WHERE 1-hop        ✅ Edge filtering in 1-hop patterns
 T7.3b  WHERE bounded      ❌ Edge variable not accessible in bounded patterns
 T7.4   MATCH+CTE          ✅ CTE wrapping GRAPH_TABLE (no segfault)
-T7.5   Onager             ❌ Extension not available for DuckDB 1.5.0 yet
-T7.6   Kleene * alone     ❌ Still blocked (safety: infinite results on cyclic graphs)
-T7.7   anon edge          ❌ Still requires edge variable binding
+T7.5   Onager             ❌ Present on 1.5.4 (onager_pagerank) but needs BIGINT src/dst
+T7.6   Kleene * alone     ❌ Intentional guard (infinite results on cyclic graphs, WALK mode)
+T7.7   anon edge          ❌ Requires edge variable binding (by design)
 ```
 
 **Score: 15/20 ✅ (75%)**

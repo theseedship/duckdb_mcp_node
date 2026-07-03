@@ -5,7 +5,7 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.1.0** — DuckDB 1.5.0 + DuckPGQ aec2e25 — 469 tests, 0 failures
+**v1.5.0** — DuckDB 1.5.4 + DuckPGQ `f386a6cf` — 510 tests, 0 failures
 
 ## Features
 
@@ -216,15 +216,19 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 
 ### Compatibility Matrix
 
-| DuckDB Version      | DuckPGQ Version | Fixed Paths | Bounded {n,m} | ANY SHORTEST | Kleene (alone) | Status               |
-| ------------------- | --------------- | ----------- | ------------- | ------------ | -------------- | -------------------- |
-| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | ✅             | **Production Ready** |
-| 1.4.1               | 7705c5c         | ✅          | ✅            | ✅           | ❌             | Functional           |
-| **1.5.0** (current) | **aec2e25**     | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**       |
+| DuckDB Version      | DuckPGQ Version | Fixed Paths | Bounded {n,m} | ANY SHORTEST | Kleene (alone) | Status                                                                                                |
+| ------------------- | --------------- | ----------- | ------------- | ------------ | -------------- | ----------------------------------------------------------------------------------------------------- |
+| 1.0.0 - 1.2.2       | Stable          | ✅          | ✅            | ✅           | ✅             | **Production Ready**                                                                                  |
+| 1.4.1               | 7705c5c         | ✅          | ✅            | ✅           | ❌             | Functional                                                                                            |
+| 1.5.0               | aec2e25         | ✅          | ✅            | ✅           | ❌             | Functional                                                                                            |
+| 1.5.1 – 1.5.3       | —               | —           | —             | —            | —              | **No working binary** (1.5.1 SIGSEGVs on LOAD; 1.5.2/1.5.3 never built — cwida/duckpgq-extension#305) |
+| **1.5.4** (current) | **f386a6cf**    | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**                                                                                        |
 
-### What Works (Validated 2026-03-12 — aec2e25 on DuckDB 1.5.0)
+> **1.5.1–1.5.3 gap**: DuckPGQ had no working community binary for these (LOAD segfault). Fixed at 1.5.4 — that's why this package jumps DuckDB 1.5.0 → 1.5.4 directly. See `docs/duckpgq/CAPABILITY_REPORT_1.5.md`.
 
-✅ **Native CSR Algorithms (NEW in 1.5.0 validation):**
+### What Works (Validated 2026-07-03 — f386a6cf on DuckDB 1.5.4; same result as aec2e25 on 1.5.0)
+
+✅ **Native CSR Algorithms:**
 
 - `pagerank(graph, vertices, edges)` — native PageRank table function
 - `weakly_connected_component(graph, vertices, edges)` — WCC table function
@@ -257,7 +261,7 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 - Standalone Kleene `->*`/`->+` — blocked (safety: infinite results on cycles)
 - Anonymous edges `[:Label]` — requires variable binding `[e:Label]`
 - Edge properties in bounded quantifiers `{n,m}` — edge variable not accessible
-- Onager extension — not built for DuckDB 1.5.0 yet
+- Onager extension — now _present_ on 1.5.4 (`onager_pagerank`), requires BIGINT src/dst columns
 
 **Full capability report**: [`docs/duckpgq/CAPABILITY_REPORT_1.5.md`](docs/duckpgq/CAPABILITY_REPORT_1.5.md)
 

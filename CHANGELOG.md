@@ -1,7 +1,18 @@
 # Changelog
 
-## [1.4.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.3.0...v1.4.0) (2026-04-27)
+## [1.5.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.4.0...v1.5.0) (2026-07-03)
 
+### Features
+
+- **duckdb:** Upgrade DuckDB 1.5.0 → 1.5.4 (`@duckdb/node-api@1.5.4-r.1`)
+- **duckpgq:** Community binary `aec2e25` → `f386a6cf` — first working DuckPGQ build on a recent DuckDB since 1.5.0 (1.5.1 SIGSEGV'd, 1.5.2/1.5.3 never built; see cwida/duckpgq-extension#305/#307)
+- 510 tests pass on 1.5.4, zero regressions; DuckPGQ capability report unchanged at 15/20 ✅
+- Onager (`onager_pagerank`) now present on 1.5.4 (BIGINT inputs required)
+- Unlocks downstream: real DuckLake (≥1.5.2) and Quack (≥1.5.3) are now version-reachable
+
+See `docs/CHANGELOG.md` for the full detailed entry.
+
+## [1.4.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.3.0...v1.4.0) (2026-04-27)
 
 ### Features
 

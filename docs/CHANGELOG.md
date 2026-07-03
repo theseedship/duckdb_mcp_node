@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-03
+
+Unlocks the DuckDB engine upgrade that had been blocked for ~4 months by DuckPGQ.
+
+### Upgraded
+
+- **DuckDB 1.5.0 → 1.5.4**: `@duckdb/node-api` bumped `1.5.0-r.1` → `1.5.4-r.1`.
+- **DuckPGQ**: community binary `aec2e25` (1.5.0) → `f386a6cf` (1.5.4).
+
+### Why the jump straight to 1.5.4
+
+DuckPGQ had **no working community binary** for DuckDB 1.5.1, 1.5.2 or 1.5.3:
+
+- 1.5.1 binary SIGSEGVs on `LOAD` (cwida/duckpgq-extension#305 / #307 — root cause: `EXTENSION_STATIC_BUILD` ABI issue in `ExtensionCallbackManager::Register`).
+- 1.5.2 / 1.5.3 were never built on the CDN (404).
+
+The maintainer shipped a working 1.5.4 build on 2026-06-30 (incorporating the OpenSSL-dependency removal from #307). This package therefore skips 1.5.1–1.5.3 entirely.
+
+### Validation
+
+- **510 tests pass on DuckDB 1.5.4, zero regressions.**
+- **DuckPGQ capability report re-run: 15/20 ✅ — identical to 1.5.0.** The 5 ❌ are unchanged known limitations / intentional safety guards (ALL SHORTEST not implemented, WHERE in bounded patterns, standalone Kleene guard, anonymous-edge binding, Onager BIGINT requirement).
+- **Onager** (`onager_pagerank`) is now _present_ on 1.5.4 (was absent on 1.5.1) — requires BIGINT src/dst columns.
+- GEOMETRY + CRS + GeoParquet integration confirmed working on 1.5.4 (picks up 1.5.4's native geometry Parquet stats pruning + GeoArrow CRS fixes).
+
+### Downstream impact
+
+The bump lifts the version wall documented in the deposium plugin-usage audit §F:
+
+- Real **DuckLake** extension (needs DuckDB ≥1.5.2) is now reachable for multi-reader/writer.
+- **Quack** remote protocol (needs ≥1.5.3) becomes technically loadable (still evaluated as not-a-fit — see audit §I).
+
 ## [1.4.0] - 2026-04-27
 
 Closes the audit (`DUCKDB-MCP-NODE-AUDIT-2026-04-26`) by shipping the two items that were deferred from v1.3.0. Additive only — no breaking changes.
