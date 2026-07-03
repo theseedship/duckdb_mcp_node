@@ -2,6 +2,13 @@
 
 ## [1.6.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.5.0...v1.6.0) (2026-07-03)
 
+
+### Features
+
+* v1.6.0 — optional Onager graph analytics + deep doc overhaul ([7a20257](https://github.com/theseedship/duckdb_mcp_node/commit/7a20257a69928b8c95e2efd87fdd9856d801674d))
+
+## [1.6.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.5.0...v1.6.0) (2026-07-03)
+
 ### Features
 
 - **onager:** optional loading of the Onager graph-analytics extension (`ENABLE_ONAGER=true`) — ~65 native graph table functions (betweenness, louvain, dijkstra, link prediction, …) with graceful degradation + `DuckDBService.onagerLoaded` getter
