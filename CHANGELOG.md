@@ -2,6 +2,13 @@
 
 ## [1.5.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.4.0...v1.5.0) (2026-07-03)
 
+
+### Features
+
+* v1.5.0 — bump DuckDB 1.5.0 → 1.5.4 (DuckPGQ unblocked) ([38ebdd7](https://github.com/theseedship/duckdb_mcp_node/commit/38ebdd7b48eda37f3ca20be48c109ae751c3098a))
+
+## [1.5.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.4.0...v1.5.0) (2026-07-03)
+
 ### Features
 
 - **duckdb:** Upgrade DuckDB 1.5.0 → 1.5.4 (`@duckdb/node-api@1.5.4-r.1`)
