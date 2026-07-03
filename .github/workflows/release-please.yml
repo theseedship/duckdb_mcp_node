@@ -1,9 +1,19 @@
 name: Release Please
 
+# DISABLED on push (2026-07-03): this workflow raced with publish.yml,
+# which is the actual release path for this repo (manual version bump in
+# package.json + hand-written CHANGELOG → publish.yml publishes to npm and
+# creates the GitHub release on push). With both active, every release made
+# release-please open a redundant PR that would inject a DUPLICATE version
+# heading into CHANGELOG.md (flagged P1 by Greptile on PR #22) and carried
+# its own `npm publish` step (double-publish risk). PRs #21/#22 were closed
+# as superseded for this reason.
+#
+# Kept manually dispatchable in case the team ever wants to migrate to a
+# release-please-driven flow — in that case, stop hand-bumping package.json
+# and remove the release/publish steps from publish.yml instead.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
