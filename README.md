@@ -261,9 +261,46 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 - Standalone Kleene `->*`/`->+` — blocked (safety: infinite results on cycles)
 - Anonymous edges `[:Label]` — requires variable binding `[e:Label]`
 - Edge properties in bounded quantifiers `{n,m}` — edge variable not accessible
-- Onager extension — now _present_ on 1.5.4 (`onager_pagerank`), requires BIGINT src/dst columns
 
 **Full capability report**: [`docs/duckpgq/CAPABILITY_REPORT_1.5.md`](docs/duckpgq/CAPABILITY_REPORT_1.5.md)
+
+### Onager Graph Analytics (companion community extension)
+
+[Onager](https://github.com/CogitatorTech/onager) is a separate community extension (CogitatorTech, Rust + C++, `0.1.0-alpha.6` — **alpha**) that loads alongside DuckPGQ on DuckDB ≥ 1.5.4 and ships **65 native graph table functions** — a NetworkX-class toolkit in SQL:
+
+| Family (prefix)          | Functions                                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Centrality (`ctr_`)      | pagerank, personalized_pagerank, betweenness, closeness, eigenvector, katz, harmonic, degree, voterank, laplacian, local_reaching                                                     |
+| Community (`cmm_`)       | louvain, label_prop, infomap, girvan_newman, spectral, components                                                                                                                     |
+| Paths (`pth_`)           | dijkstra, bellman_ford, floyd_warshall                                                                                                                                                |
+| Link prediction (`lnk_`) | adamic_adar, jaccard, common_neighbors, pref_attach, resource_alloc                                                                                                                   |
+| Metrics (`mtr_`)         | density, diameter, radius, transitivity, triangles, avg_clustering, avg_path_length, assortativity                                                                                    |
+| Subgraphs (`sub_`)       | ego_graph, induced, k_hop                                                                                                                                                             |
+| Other                    | MST (kruskal/prim), BFS/DFS traversal, parallel variants (`par_`), approximation (`apx_` max*clique/tsp/vertex_cover), generators (`gen*` erdos_renyi/barabasi_albert/watts_strogatz) |
+
+```sql
+INSTALL onager FROM community;
+LOAD onager;
+
+-- Native PageRank straight from an edge table — no property graph needed
+SELECT * FROM onager_ctr_pagerank((SELECT src, dst FROM edges))
+ORDER BY rank DESC LIMIT 10;
+
+-- Louvain communities
+SELECT * FROM onager_cmm_louvain((SELECT src, dst FROM edges));
+
+-- Single-source shortest paths (named parameter required)
+SELECT * FROM onager_pth_dijkstra((SELECT src, dst FROM edges), source = 1);
+```
+
+Validated on DuckDB 1.5.4 (2026-07-03): pagerank, louvain, betweenness, dijkstra, adamic_adar, density all work. **Caveats** (alpha):
+
+- Node ids **must be BIGINT** (`column::BIGINT` if needed)
+- Some functions bind only via **named parameters** (`source = 1`, not positional)
+- Not built for `osx_amd64`, `windows_amd64_mingw`, or WASM
+- API may change between alpha releases — evaluate before depending on it
+
+Our 8 `graph.*` MCP tools remain iterative-SQL (portable, no extension dependency); Onager is a candidate native backend for them and adds net-new capabilities (betweenness, louvain, link prediction, ego/k-hop subgraphs).
 
 ### Example Queries
 

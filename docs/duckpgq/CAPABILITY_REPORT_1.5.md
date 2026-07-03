@@ -202,9 +202,22 @@ Works for vertex-only COLUMNS. Edge properties not accessible in bounded pattern
 
 CTE wrapping a GRAPH_TABLE query works without segfault. This was a known issue in earlier versions (#276, #294).
 
-### ❌ T7.5: Onager Extension
+### ⚠️ T7.5: Onager Extension — WORKS on 1.5.4 (test needs BIGINT cast)
 
-Not available for DuckDB 1.5.0 (HTTP 404). Community extension not yet built for this version.
+**Update 2026-07-03**: Onager (`0.1.0-alpha.6`, [CogitatorTech/onager](https://github.com/CogitatorTech/onager), Rust+C++) now installs and loads on DuckDB 1.5.4 — it was 404 on 1.5.0/1.5.1. The T7.5 ❌ is only because our test table uses INTEGER ids; Onager requires **BIGINT** src/dst.
+
+It ships **65 native graph table functions** (centrality incl. betweenness/katz/closeness, community incl. louvain/infomap, dijkstra/bellman-ford/floyd-warshall, link prediction, graph metrics, MST, ego/k-hop subgraphs, parallel variants, generators). Validated live on 1.5.4:
+
+```sql
+INSTALL onager FROM community; LOAD onager;
+SELECT * FROM onager_ctr_pagerank((SELECT src, dst FROM edges));              -- ✅ (node_id, rank)
+SELECT * FROM onager_cmm_louvain((SELECT src, dst FROM edges));               -- ✅ (node_id, community)
+SELECT * FROM onager_ctr_betweenness((SELECT src, dst FROM edges));           -- ✅
+SELECT * FROM onager_pth_dijkstra((SELECT src, dst FROM edges), source = 1);  -- ✅ named param REQUIRED
+SELECT * FROM onager_lnk_adamic_adar((SELECT src, dst FROM edges));           -- ✅ link prediction
+```
+
+Alpha quirks: BIGINT-only node ids; some functions (dijkstra, k_hop) bind only via named parameters (`source = 1`); excluded platforms `osx_amd64`, `windows_amd64_mingw`, WASM. See README "Onager Graph Analytics" section.
 
 ### ❌ T7.6: Standalone Kleene `->*` / `->+`
 
@@ -239,7 +252,7 @@ Still requires edge variable binding: `[e:Label]` not `[:Label]`.
 3. **Edge properties in bounded quantifiers** — can't filter/access edge weight in `{n,m}` patterns
 4. **Standalone Kleene** — still blocked, use ANY SHORTEST or bounds
 5. **Anonymous edges** — still need explicit variable binding
-6. **Onager** — not available for DuckDB 1.5.0
+6. ~~**Onager** — not available for DuckDB 1.5.0~~ → **available on 1.5.4** (65 native graph functions, alpha — see T7.5)
 
 ### Recommended Next Steps
 
