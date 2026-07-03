@@ -5,7 +5,7 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.5.0** — DuckDB 1.5.4 + DuckPGQ `f386a6cf` — 510 tests, 0 failures
+**v1.6.0** — DuckDB 1.5.4 + DuckPGQ `f386a6cf` + optional Onager graph analytics — 514 tests, 0 failures
 
 ## Features
 
@@ -16,8 +16,9 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 - **Virtual Filesystem**: Direct SQL access via `mcp://` URIs with auto-format detection
 - **Transports**: stdio, WebSocket, TCP (HTTP client-side)
 - **Process Mining**: 3 tools for workflow analysis from Parquet files
-- **DuckLake**: ACID transactions and time travel on Parquet files
+- **DuckLake-style Snapshots**: built-in lightweight snapshots + time travel on Parquet files (self-contained emulation; the official `ducklake` extension is separately installable on DuckDB ≥ 1.5.2)
 - **DuckPGQ**: SQL:2023 property graph queries + native CSR algorithms (PageRank, WCC, clustering)
+- **Onager (opt-in)**: ~65 native graph analytics table functions (betweenness, louvain, dijkstra, link prediction, …) via `ENABLE_ONAGER=true` — alpha extension
 - **Geospatial Graphs**: GEOMETRY + CRS vertex tables work with DuckPGQ graph algorithms
 - **MCP SDK 1.26.0**: Pinned, with elicitation API and connect() guard
 
@@ -113,17 +114,19 @@ npm test              # Run tests
 | `refresh_virtual_table` | Update table data              |
 | `query_hybrid`          | Query across local/remote data |
 
-### DuckLake (ACID + Time Travel)
+### DuckLake-style Snapshots (ACID + Time Travel)
 
 | Tool                   | Description                                |
 | ---------------------- | ------------------------------------------ |
-| `ducklake.attach`      | Attach or create DuckLake catalog          |
+| `ducklake.attach`      | Attach or create snapshot catalog          |
 | `ducklake.snapshots`   | List, view, clone, or rollback snapshots   |
 | `ducklake.time_travel` | Query historical data at any point in time |
 
+> These tools are a **self-contained emulation** (catalog tables + Parquet on S3/MinIO) — they do not require, or use, the official `ducklake` extension. If you need true multi-reader/multi-writer lakehouse semantics, install the official [`ducklake` extension](https://ducklake.select) (DuckDB ≥ 1.5.2, PostgreSQL catalog recommended for concurrency) alongside this package.
+
 ### MotherDuck Cloud
 
-> MotherDuck supports DuckDB 1.4.0–1.4.4. DuckDB 1.5.0 support is expected within weeks (as of March 2026). These tools will activate once MotherDuck supports DuckDB v1.5.x.
+> MotherDuck supports DuckDB clients 1.4.x through **1.5.4** (as of July 2026) — this package runs DuckDB 1.5.4, which is inside the supported window. Check [MotherDuck's version lifecycle](https://motherduck.com/docs/troubleshooting/version-lifecycle-schedules/) for current ranges per region.
 
 | Tool                         | Description                 |
 | ---------------------------- | --------------------------- |
@@ -277,6 +280,8 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 | Metrics (`mtr_`)         | density, diameter, radius, transitivity, triangles, avg_clustering, avg_path_length, assortativity                                                                                    |
 | Subgraphs (`sub_`)       | ego_graph, induced, k_hop                                                                                                                                                             |
 | Other                    | MST (kruskal/prim), BFS/DFS traversal, parallel variants (`par_`), approximation (`apx_` max*clique/tsp/vertex_cover), generators (`gen*` erdos_renyi/barabasi_albert/watts_strogatz) |
+
+**Auto-loading (v1.6.0)**: set `ENABLE_ONAGER=true` (plus `ALLOW_UNSIGNED_EXTENSIONS=true`) and `DuckDBService` installs + loads Onager at startup — check `service.onagerLoaded` at runtime. Loading is graceful: if the binary is unavailable (offline, unsupported platform), the service continues without it. Or load manually:
 
 ```sql
 INSTALL onager FROM community;
@@ -559,18 +564,20 @@ src/
 
 ## Configuration
 
-| Variable                    | Default          | Description                            |
-| --------------------------- | ---------------- | -------------------------------------- |
-| `DUCKDB_MEMORY`             | `4GB`            | DuckDB memory limit                    |
-| `DUCKDB_THREADS`            | `4`              | DuckDB thread count                    |
-| `MCP_SECURITY_MODE`         | `development`    | `development` / `production`           |
-| `MCP_ELICIT_TIMEOUT`        | `30000`          | HITL elicitation timeout (ms)          |
-| `MCP_MAX_QUERY_SIZE`        | `1000000`        | Max SQL query size (chars)             |
-| `MCP_CACHE_DIR`             | `/tmp/mcp-cache` | VFS cache directory                    |
-| `MCP_CACHE_TTL`             | `300000`         | VFS cache TTL (ms)                     |
-| `ENABLE_DUCKPGQ`            | `false`          | Enable DuckPGQ extension               |
-| `ALLOW_UNSIGNED_EXTENSIONS` | `false`          | Required for DuckPGQ                   |
-| `PROCESS_EMBEDDING_DIM`     | `384`            | Embedding dimension for process mining |
+| Variable                    | Default          | Description                                                                      |
+| --------------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `DUCKDB_MEMORY`             | `4GB`            | DuckDB memory limit                                                              |
+| `DUCKDB_THREADS`            | `4`              | DuckDB thread count                                                              |
+| `MCP_SECURITY_MODE`         | `development`    | `development` / `production`                                                     |
+| `MCP_ELICIT_TIMEOUT`        | `30000`          | HITL elicitation timeout (ms)                                                    |
+| `MCP_MAX_QUERY_SIZE`        | `1000000`        | Max SQL query size (chars)                                                       |
+| `MCP_CACHE_DIR`             | `/tmp/mcp-cache` | VFS cache directory                                                              |
+| `MCP_CACHE_TTL`             | `300000`         | VFS cache TTL (ms)                                                               |
+| `ENABLE_DUCKPGQ`            | `false`          | Enable DuckPGQ extension                                                         |
+| `ENABLE_ONAGER`             | `false`          | Enable Onager graph analytics (opt-in, alpha; needs `ALLOW_UNSIGNED_EXTENSIONS`) |
+| `ONAGER_STRICT_MODE`        | `false`          | Throw instead of warn if Onager fails to load                                    |
+| `ALLOW_UNSIGNED_EXTENSIONS` | `false`          | Required for DuckPGQ / Onager                                                    |
+| `PROCESS_EMBEDDING_DIM`     | `384`            | Embedding dimension for process mining                                           |
 
 ## Scripts
 

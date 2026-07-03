@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.5.0...v1.6.0) (2026-07-03)
+
+### Features
+
+- **onager:** optional loading of the Onager graph-analytics extension (`ENABLE_ONAGER=true`) — ~65 native graph table functions (betweenness, louvain, dijkstra, link prediction, …) with graceful degradation + `DuckDBService.onagerLoaded` getter
+- **docs:** deep documentation overhaul — Onager section, DuckLake-emulation honesty note, MotherDuck 1.5.4 support refresh (tools back inside supported window), env-vars table, CLAUDE.md status
+- 514 tests pass (+4 Onager loading tests)
+
+See `docs/CHANGELOG.md` for the full detailed entry.
+
 ## [1.5.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.4.0...v1.5.0) (2026-07-03)
 
 ### Features
@@ -16,7 +26,7 @@ See `docs/CHANGELOG.md` for the full detailed entry.
 
 ### Features
 
-* v1.4.0 — closes audit (GraphError + ComputeSession.metrics) ([82082c4](https://github.com/theseedship/duckdb_mcp_node/commit/82082c486b9e7a1b9154c7a6e46c68b07cf1d808))
+- v1.4.0 — closes audit (GraphError + ComputeSession.metrics) ([82082c4](https://github.com/theseedship/duckdb_mcp_node/commit/82082c486b9e7a1b9154c7a6e46c68b07cf1d808))
 
 ## [1.1.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.0.1...v1.1.0) (2026-03-12)
 

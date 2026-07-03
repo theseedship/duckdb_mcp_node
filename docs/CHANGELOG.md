@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-03
+
+The "Onager era" release: optional native graph analytics + deep documentation overhaul.
+
+### Added
+
+- **Optional Onager extension loading** — set `ENABLE_ONAGER=true` (with `ALLOW_UNSIGNED_EXTENSIONS=true`) and `DuckDBService.initialize()` installs + loads the [Onager](https://github.com/CogitatorTech/onager) community extension: ~65 native graph table functions (centrality incl. betweenness/katz/closeness/voterank, community incl. louvain/infomap, dijkstra/bellman-ford/floyd-warshall, link prediction incl. adamic-adar/jaccard, graph metrics, MST, ego/k-hop subgraphs, parallel variants, generators) callable directly on edge tables without `CREATE PROPERTY GRAPH`.
+  - Opt-IN (unlike DuckPGQ, which is opt-out) because Onager is alpha (`0.1.0-alpha.6`): node ids must be BIGINT, some functions require named parameters (`source = 1`), no builds for `osx_amd64` / `windows_amd64_mingw` / WASM.
+  - New `DuckDBService.onagerLoaded` getter for runtime capability checks.
+  - `ONAGER_STRICT_MODE=true` to throw instead of warn on load failure.
+  - Graceful degradation guaranteed: load failure never breaks the service (4 dedicated tests).
+
+### Documentation overhaul
+
+- **README**: new Onager section (function-family table, validated SQL examples, alpha caveats); DuckLake tools renamed "DuckLake-style Snapshots" with an honesty note (they are a self-contained emulation, not the official `ducklake` extension — link to the real one for lakehouse concurrency); **MotherDuck note refreshed** — MotherDuck now supports DuckDB clients up to **1.5.4** (July 2026), so the `motherduck.*` tools are inside the supported window again; env-vars table completed (`ENABLE_ONAGER`, `ONAGER_STRICT_MODE`).
+- **CLAUDE.md**: project status brought current (was still describing v1.1.0/469 tests).
+- Capability report: Onager T7.5 section rewritten with validated examples.
+
+### Compatibility
+
+- 514 tests pass (was 510), +4 for Onager loading.
+- Additive only: new env vars are off by default; no behavior change without opt-in.
+
 ## [1.5.0] - 2026-07-03
 
 Unlocks the DuckDB engine upgrade that had been blocked for ~4 months by DuckPGQ.

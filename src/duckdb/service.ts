@@ -48,6 +48,16 @@ export class DuckDBService {
   private isInitialized = false
   private virtualFs?: VirtualFilesystem
   private extendedConfig?: Partial<DuckDBServiceConfig>
+  private _onagerLoaded = false
+
+  /**
+   * Whether the Onager graph-analytics extension was successfully loaded.
+   * Only true when ENABLE_ONAGER=true and the community binary loaded.
+   * @since v1.6.0
+   */
+  get onagerLoaded(): boolean {
+    return this._onagerLoaded
+  }
 
   constructor(config?: Partial<DuckDBServiceConfig>) {
     this.config = DuckDBConfigSchema.parse(config || {})
@@ -82,6 +92,14 @@ export class DuckDBService {
       // Load DuckPGQ extension for Property Graph queries (SQL:2023 standard)
       if (this.config.allowUnsignedExtensions && process.env.ENABLE_DUCKPGQ !== 'false') {
         await this.loadDuckPGQ()
+      }
+
+      // Load Onager graph-analytics extension (65 native graph table
+      // functions: centrality, community, paths, link prediction, …).
+      // Opt-IN (unlike DuckPGQ) because Onager is alpha (0.1.0-alpha.x)
+      // and its API may change between releases. @since v1.6.0
+      if (this.config.allowUnsignedExtensions && process.env.ENABLE_ONAGER === 'true') {
+        await this.loadOnager()
       }
 
       // Configure S3 if credentials provided (optional, non-blocking)
@@ -279,6 +297,65 @@ export class DuckDBService {
 
       // In non-strict mode, continue without DuckPGQ
       // Database is still functional for non-graph queries
+    }
+  }
+
+  /**
+   * Load the Onager graph-analytics extension (community).
+   *
+   * Onager (https://github.com/CogitatorTech/onager) ships ~65 native graph
+   * table functions — centrality (pagerank, betweenness, katz, closeness…),
+   * community detection (louvain, infomap, label_prop…), shortest paths
+   * (dijkstra, bellman_ford, floyd_warshall), link prediction (adamic_adar,
+   * jaccard…), graph metrics, MST, ego/k-hop subgraphs and more — callable
+   * directly on edge tables without CREATE PROPERTY GRAPH.
+   *
+   * Opt-in via ENABLE_ONAGER=true because the extension is alpha:
+   * - node ids must be BIGINT (cast with `column::BIGINT`)
+   * - some functions bind only via named parameters (e.g. `source = 1`)
+   * - not built for osx_amd64 / windows_amd64_mingw / WASM
+   *
+   * Environment variables:
+   * - ENABLE_ONAGER: 'true' to install+load (default: off)
+   * - ONAGER_STRICT_MODE: 'true' to throw on load failure (default: warn)
+   *
+   * Requires DuckDB >= 1.5.4 (first version with a published Onager binary
+   * compatible with the current release line).
+   *
+   * @since v1.6.0
+   */
+  private async loadOnager(): Promise<void> {
+    if (!this.connection) {
+      logger.warn('Cannot load Onager: connection not established')
+      return
+    }
+
+    const strictMode = process.env.ONAGER_STRICT_MODE === 'true'
+
+    try {
+      logger.info('Loading Onager graph-analytics extension from DuckDB community repository')
+      await this.connection.run(`
+        INSTALL onager FROM community;
+        LOAD onager;
+      `)
+      this._onagerLoaded = true
+      logger.info(
+        'Onager extension loaded successfully. ~65 native graph table functions available ' +
+          '(onager_ctr_* centrality, onager_cmm_* community, onager_pth_* paths, ' +
+          'onager_lnk_* link prediction, onager_mtr_* metrics, onager_sub_* subgraphs, …). ' +
+          'Note: node ids must be BIGINT; some functions require named parameters.'
+      )
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error)
+      logger.warn(
+        `Failed to load Onager: ${errorMessage}. ` +
+          'Database continues without Onager graph analytics (DuckPGQ and the ' +
+          'iterative-SQL graph tools are unaffected). Onager requires DuckDB >= 1.5.4 ' +
+          'and is not built for all platforms. Set ENABLE_ONAGER=false to suppress.'
+      )
+      if (strictMode) {
+        throw new Error(`Onager strict mode enabled but load failed: ${errorMessage}`)
+      }
     }
   }
 

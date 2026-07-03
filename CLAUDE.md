@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 Native TypeScript port of DuckDB MCP extension. Implements bidirectional MCP server/client with federation capabilities.
 
-**Status**: v1.1.0 (469 tests, 0 failures). DuckDB 1.5.0 + DuckPGQ aec2e25. S1 (test stabilization), S2 (graph tools), and S3 (MCP SDK 1.26.0 + HITL) complete.
+**Status**: v1.6.0 (514 tests, 0 failures). DuckDB 1.5.4 + DuckPGQ `f386a6cf` + optional Onager (`ENABLE_ONAGER=true`). S1 (test stabilization), S2 (graph tools), S3 (MCP SDK 1.26.0 + HITL) complete, plus v1.3.0–v1.4.0 audit quickwins (GraphError, ComputeSession.metrics, AVAILABLE_OPS discovery) and the v1.5.0 DuckDB 1.5.4 unlock.
 
 ## Key Commands
 
