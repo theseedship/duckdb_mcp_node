@@ -636,13 +636,24 @@ describe('VirtualFilesystem', () => {
         ],
       })
 
-      await vfsWithDiscovery.initialize()
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      const envKey = 'MCP_SERVER_AUTO_DISCOVERY'
+      const previousServer = process.env[envKey]
+      process.env[envKey] = 'test-server'
 
-      const stats = vfsWithDiscovery.getStats()
-      expect(stats.discoveredResources).toBeGreaterThan(0)
+      try {
+        await vfsWithDiscovery.initialize()
+        await new Promise((resolve) => setTimeout(resolve, 150))
 
-      await vfsWithDiscovery.destroy()
+        const stats = vfsWithDiscovery.getStats()
+        expect(stats.discoveredResources).toBeGreaterThan(0)
+      } finally {
+        if (previousServer === undefined) {
+          delete process.env[envKey]
+        } else {
+          process.env[envKey] = previousServer
+        }
+        await vfsWithDiscovery.destroy()
+      }
     })
   })
 
