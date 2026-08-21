@@ -52,8 +52,7 @@ jobs:
           npm list @duckdb/node-api || true
 
       - name: Run tests
-        run: npm run test:coverage || true
-        continue-on-error: true
+        run: npm run test:coverage
         env:
           NODE_ENV: test
           CI: true
