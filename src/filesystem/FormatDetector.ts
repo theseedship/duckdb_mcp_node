@@ -7,14 +7,7 @@
  * Supported data formats
  */
 export type DataFormat =
-  | 'csv'
-  | 'json'
-  | 'parquet'
-  | 'arrow'
-  | 'excel'
-  | 'text'
-  | 'binary'
-  | 'unknown'
+  'csv' | 'json' | 'parquet' | 'arrow' | 'excel' | 'text' | 'binary' | 'unknown'
 
 /**
  * DuckDB reader function for each format

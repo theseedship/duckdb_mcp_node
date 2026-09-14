@@ -70,7 +70,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
           scope: '@seed-ship'
 
@@ -79,17 +79,13 @@ jobs:
           npm ci
           npm rebuild @duckdb/node-api
 
-      - name: Run tests
-        run: |
-          # Run tests with proper cleanup
-          npm test -- --forceExit --no-coverage || true
-
-          # If tests fail but build works, we can still publish
-          echo "Tests completed (may have warnings)"
+      - name: Run full quality suite
+        run: npm run check:all
         env:
           NODE_ENV: test
           CI: true
           SUPPRESS_NO_CONFIG_WARNING: true
+          SKIP_NETWORK_TESTS: true
 
       - name: Build
         run: npm run build

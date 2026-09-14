@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
           scope: '@seed-ship'
 
@@ -53,10 +53,10 @@ jobs:
 
       - name: Run full test suite
         run: npm run check:all
-        continue-on-error: true
         env:
           NODE_ENV: test
           CI: true
+          SKIP_NETWORK_TESTS: true
 
       - name: Build
         run: npm run build
@@ -111,20 +111,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Notify success
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ env.VERSION }}';
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: `v${version}`
-            });
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `🎉 Released version ${version}!\n\n📦 npm: https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native/v/${version}\n📝 Release notes: ${release.html_url}`
-            });
+      - name: Summarize release
+        run: |
+          {
+            echo "## Released v${VERSION}"
+            echo
+            echo "- npm: https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native/v/${VERSION}"
+            echo "- GitHub release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+          } >> "$GITHUB_STEP_SUMMARY"

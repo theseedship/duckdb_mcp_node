@@ -1,255 +1,96 @@
-# NPM Publishing Guide
+# npm publishing
 
-## 🚀 Overview
+`@seed-ship/duckdb-mcp-native` is published to the public npm registry by GitHub Actions.
 
-This package is published to npm as `@seed-ship/duckdb-mcp-native` with automatic publishing via GitHub Actions.
+## Normal release path
 
-## 📦 Publishing Methods
-
-### Method 1: Automatic Publishing (Recommended)
-
-Triggers automatically when version changes in package.json on main branch.
+Prepare the release on a branch. For a patch release such as `1.6.1`, update both
+`package.json` and `package-lock.json` without creating a local Git tag:
 
 ```bash
-# 1. Update version locally
-npm version patch  # or minor/major
-
-# 2. Commit and push
-git add package.json package-lock.json
-git commit -m "chore: bump version to x.x.x"
-git push
-
-# 3. GitHub Actions automatically:
-# - Detects version change
-# - Runs tests
-# - Publishes to npm
-# - Creates GitHub release
+npm version patch --no-git-tag-version
 ```
 
-### Method 2: Manual Release with Tags
+Then update the release-facing documentation:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/CHANGELOG.md`
+
+Before opening the pull request, run the same quality gates used for publication:
 
 ```bash
-# 1. Create release with standard-version
-npm run release        # patch release
-npm run release:minor  # minor release
-npm run release:major  # major release
-
-# 2. Push with tags
-git push --follow-tags
-
-# 3. GitHub Actions triggered by tag
-```
-
-### Method 3: Manual Workflow Dispatch
-
-1. Go to Actions tab on GitHub
-2. Select "Release (Manual)" workflow
-3. Click "Run workflow"
-4. Enter version number
-5. Click "Run"
-
-## 🔑 Setup Requirements
-
-### 1. NPM Token Setup
-
-1. **Login to npmjs.com**
-2. **Go to Account Settings → Access Tokens**
-3. **Generate New Token - Two Options:**
-
-   **Option A: Granular Access Token** (Recommended - More Secure)
-   - Click "Generate New Token" → "Granular Access Token"
-   - Name: `github-actions-duckdb-mcp-node`
-   - Expiration: 365 days or "Does not expire"
-   - Packages: Select "All packages" or specifically `@deposium/*`
-   - Permissions: "Read and Write"
-
-   **Option B: Classic Token** (Simpler)
-   - Click "Generate New Token" → "Classic Token"
-   - Type: "Publish"
-   - Name: `github-actions-duckdb-mcp-node`
-
-4. **Copy the token** (starts with `npm_`)
-
-### 2. GitHub Repository Setup
-
-1. **Go to Repository Settings → Secrets and variables → Actions**
-2. **Add New Repository Secret:**
-   - Name: `NPM_TOKEN`
-   - Value: Your npm token
-
-### 3. NPM Organization Setup
-
-For `@deposium` scoped packages:
-
-```bash
-# Ensure you have publish rights
-npm org ls deposium
-
-# Add member if needed (owner only)
-npm org add deposium <username> --role=developer
-```
-
-## 📋 Version Management
-
-### Semantic Versioning
-
-- **Patch** (x.x.1): Bug fixes
-- **Minor** (x.1.0): New features (backward compatible)
-- **Major** (1.0.0): Breaking changes
-
-### Version Commands
-
-```bash
-# View current version
-npm version
-
-# Bump versions
-npm version patch     # 0.1.0 → 0.1.1
-npm version minor     # 0.1.1 → 0.2.0
-npm version major     # 0.2.0 → 1.0.0
-
-# Prerelease versions
-npm version prerelease --preid=beta  # 1.0.0 → 1.0.1-beta.0
-npm version prerelease               # 1.0.1-beta.0 → 1.0.1-beta.1
-```
-
-## 🔄 Workflow Files
-
-### `.github/workflows/publish.yml`
-
-- Triggers on push to main when package.json changes
-- Automatically publishes if version changed
-- Creates GitHub release
-
-### `.github/workflows/release.yml`
-
-- Triggers on git tags (v\*)
-- Manual workflow dispatch option
-- Full test suite before publishing
-
-### `.github/workflows/ci.yml`
-
-- Runs on every push/PR
-- Tests, linting, type checking
-- Dry-run publish on main
-
-## 📝 Pre-Publishing Checklist
-
-Before publishing a new version:
-
-- [ ] All tests passing: `npm test`
-- [ ] Linting clean: `npm run lint`
-- [ ] Types correct: `npm run typecheck`
-- [ ] Build successful: `npm run build`
-- [ ] CHANGELOG updated
-- [ ] README accurate
-- [ ] Version bumped appropriately
-
-## 🚨 First-Time Publishing
-
-If GitHub Actions isn't working, use the manual script:
-
-```bash
-# Set your NPM token
-export NPM_TOKEN='npm_xxxxxxxxxxxx'
-
-# Run initial publish script
-./scripts/initial-publish.sh
-
-# Or publish directly
-npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-npm publish --access public
-```
-
-## 🛠️ Troubleshooting
-
-### GitHub Actions Not Triggering
-
-The workflow only triggers when:
-
-1. Version changes in package.json
-2. Manual trigger via GitHub Actions UI
-
-To force trigger:
-
-1. Go to Actions tab on GitHub
-2. Select "Publish to NPM"
-3. Click "Run workflow"
-4. Check "Force publish" if needed
-
-### "Permission denied" on npm publish
-
-```bash
-# Check authentication
-npm whoami
-
-# Re-authenticate if needed
-npm login --scope=@deposium
-```
-
-### Version already exists
-
-```bash
-# Check published versions
-npm view @seed-ship/duckdb-mcp-native versions
-
-# Bump to next version
-npm version patch
-```
-
-### GitHub Action fails
-
-1. Check NPM_TOKEN secret is set correctly
-2. Ensure token has publish permissions
-3. Verify package.json publishConfig
-
-### Testing publish locally
-
-```bash
-# Dry run (doesn't actually publish)
-npm publish --dry-run
-
-# Check what files will be published
+npm run check:all
+npm run build
 npm pack --dry-run
 ```
 
-## 📊 Package Info
+Open a pull request and wait for CI to pass on the supported Node.js versions. When the
+pull request is merged into `main`, a change to `package.json` triggers
+`.github/workflows/publish.yml`. That workflow:
+
+1. verifies that the version changed from the previous commit;
+2. installs the locked dependencies on Node.js 22;
+3. runs `npm run check:all` and `npm run build`;
+4. verifies npm authentication and skips versions that already exist;
+5. publishes the package with public access;
+6. creates the matching `v<version>` tag and GitHub release.
+
+Do not create or push the release tag as part of the normal path. The publish workflow owns
+that step.
+
+## Repository setup
+
+Create a granular npm access token that can read and write
+`@seed-ship/duckdb-mcp-native`, then store it as the GitHub Actions repository secret
+`NPM_TOKEN`. The npm account that owns the token must have publish access to the
+`@seed-ship` scope.
+
+The workflows pass this secret to npm as `NODE_AUTH_TOKEN`. Never commit a token or a local
+`.npmrc` containing one.
+
+## Alternative release workflows
+
+`.github/workflows/release.yml` supports an explicit `v*` tag or a manual workflow dispatch.
+This is an alternative recovery/manual path, not the normal release path. Its tag or input
+version must exactly match `package.json`, and it runs the full quality suite before
+publishing.
+
+`.github/workflows/release-please.yml` is manual-only. It is retained as a possible migration
+path and is not part of the current release process. Before adopting release-please, remove
+the manual version-bump convention and consolidate the npm publication and GitHub release
+steps so that only one workflow owns them.
+
+The `workflow_dispatch` option on `.github/workflows/publish.yml` can rerun the publication
+workflow for an unpublished package version. Its `force` input bypasses the Git comparison;
+it cannot overwrite a version that already exists on npm.
+
+## Troubleshooting
+
+Check the package version and publication state with:
 
 ```bash
-# View package info
-npm view @seed-ship/duckdb-mcp-native
-
-# View all versions
+node -p "require('./package.json').version"
 npm view @seed-ship/duckdb-mcp-native versions
-
-# View dist-tags
 npm view @seed-ship/duckdb-mcp-native dist-tags
 ```
 
-## 🏷️ Dist Tags
+If authentication fails, verify that the `NPM_TOKEN` repository secret exists, is current,
+has read/write access to the package, and belongs to an npm user allowed to publish under
+`@seed-ship`.
+
+If npm reports that the version already exists, choose a new version. npm package versions
+are immutable and cannot be republished.
+
+To inspect the package contents without publishing:
 
 ```bash
-# Latest stable
-npm install @seed-ship/duckdb-mcp-native@latest
-
-# Beta versions (if available)
-npm install @seed-ship/duckdb-mcp-native@beta
-
-# Specific version
-npm install @seed-ship/duckdb-mcp-native@0.1.0
+npm pack --dry-run
 ```
 
-## 🔒 Security Notes
+## References
 
-- NPM_TOKEN should be **Automation** type
-- Token stored as GitHub Secret
-- Never commit tokens to repository
-- Rotate tokens periodically
-- Use 2FA on npm account
-
-## 📚 References
-
-- [npm Documentation](https://docs.npmjs.com/packages-and-modules/introduction-to-packages-and-modules)
-- [GitHub Actions for npm](https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages)
+- [Publishing Node.js packages with GitHub Actions](https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages)
+- [Creating and viewing access tokens](https://docs.npmjs.com/creating-and-viewing-access-tokens)
+- [About package access](https://docs.npmjs.com/package-access)
 - [Semantic Versioning](https://semver.org/)
-- [npm Organizations](https://docs.npmjs.com/organizations)

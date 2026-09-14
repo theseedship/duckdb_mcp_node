@@ -30,13 +30,7 @@
  */
 
 export type GraphErrorCode =
-  | 'NO_NODES'
-  | 'NO_EDGES'
-  | 'INVALID_FILTER'
-  | 'INVALID_INPUT'
-  | 'NO_PATH'
-  | 'TIMEOUT'
-  | 'INFRA'
+  'NO_NODES' | 'NO_EDGES' | 'INVALID_FILTER' | 'INVALID_INPUT' | 'NO_PATH' | 'TIMEOUT' | 'INFRA'
 
 export class GraphError extends Error {
   public readonly code: GraphErrorCode

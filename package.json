@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -132,9 +132,9 @@
     "prepare": "husky",
     "prepublishOnly": "npm run build",
     "prepublish:full": "npm run check:all && npm run build",
-    "release": "echo 'Please use GitHub release-please workflow instead'",
-    "release:minor": "echo 'Please use GitHub release-please workflow instead'",
-    "release:major": "echo 'Please use GitHub release-please workflow instead'"
+    "release": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'",
+    "release:minor": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'",
+    "release:major": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'"
   },
   "keywords": [
     "duckdb",
@@ -161,31 +161,31 @@
   "homepage": "https://github.com/theseedship/duckdb_mcp_node#readme",
   "dependencies": {
     "@duckdb/node-api": "1.5.4-r.1",
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "axios": "^1.13.1",
-    "dotenv": "^17.2.3",
-    "ws": "^8.18.3",
-    "zod": "^4.1.13"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "axios": "^1.20.0",
+    "dotenv": "^17.4.2",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@types/node": "^22.19.2",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^8.49.0",
-    "@typescript-eslint/parser": "^8.49.0",
-    "@vitest/coverage-v8": "^4.0.15",
-    "@vitest/ui": "^4.0.15",
-    "eslint": "^9.39.2",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/ui": "^4.1.11",
+    "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "happy-dom": "^20.0.11",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=20.0.0"

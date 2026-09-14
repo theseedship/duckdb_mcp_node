@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-09-14
+
+### Changed
+
+- Update MCP SDK to 1.30.0, Axios to 1.20.0, dotenv to 17.4.2, ws to 8.21.3, and Zod to 4.6.5.
+- Refresh compatible development dependencies and the lockfile, including Vitest/UI/coverage 4.1.11 and fixes for vulnerable transitive dependencies.
+- Keep `@duckdb/node-api` pinned to `1.5.4-r.1` for DuckPGQ compatibility; retain TypeScript 5.9 and ESLint 9. ESLint 9 is now outside upstream support; migration to ESLint 10 is deferred from this dependency-maintenance patch.
+
+### Fixed
+
+- Publish and manual-release workflows use Node.js 22 and stop when quality checks fail.
+- Refresh README compatibility details and the publishing guide for the package-version bump workflow.
+
+### Validation
+
+- 514 tests passed and 24 skipped on each of Node.js 20.19.5, 22.19.0, and 24.19.0; coverage thresholds passed on Node.js 24.
+- Native Linux DuckPGQ (`f386a6c`) and Onager (`eaaf2ea`) loading, graph matching, shortest paths, and PageRank checks passed on DuckDB 1.5.4.
+- MCP SDK 1.30.0 stdio initialization, discovery of 40 tools, and a SQL call passed.
+- Full and production lockfile audits reported zero vulnerabilities on 2026-09-14; package exports and build verified locally.
+
 ## [1.6.0] - 2026-07-03
 
 The "Onager era" release: optional native graph analytics + deep documentation overhaul.
