@@ -2,172 +2,98 @@ name: Publish to NPM
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'package.json'
+      - '.github/workflows/publish.yml'
+      - '.github/scripts/stage-npm.mjs'
   workflow_dispatch:
+  workflow_call:
     inputs:
-      force:
-        description: 'Force publish even if version unchanged'
+      version:
+        description: 'Expected package version for a tag or manual release'
         required: false
-        type: boolean
-        default: false
+        type: string
+    secrets:
+      NPM_TOKEN:
+        required: true
 
 permissions:
   contents: write
-  packages: write
+
+concurrency:
+  group: npm-stage-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
-  check-version:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.version.outputs.changed }}
-      version: ${{ steps.version.outputs.version }}
-
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Check if version changed
-        id: version
-        run: |
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT_VERSION"
-          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-          # Check if force publish requested
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.force }}" == "true" ]; then
-            echo "Force publish requested"
-            echo "changed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Get previous version
-          git checkout HEAD~1
-          PREVIOUS_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "0.0.0")
-          echo "Previous version: $PREVIOUS_VERSION"
-
-          # Check if changed
-          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
-            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "Version unchanged"
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
-
-  publish:
-    needs: check-version
-    if: needs.check-version.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
           scope: '@seed-ship'
 
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.17.0
+
       - name: Install dependencies
-        run: |
-          npm ci
-          npm rebuild @duckdb/node-api
+        run: npm ci
+
+      - name: Validate publication workflow
+        run: node --test .github/scripts/stage-npm.test.mjs
 
       - name: Run full quality suite
         run: npm run check:all
         env:
           NODE_ENV: test
           CI: true
-          SUPPRESS_NO_CONFIG_WARNING: true
           SKIP_NETWORK_TESTS: true
 
-      - name: Build
-        run: npm run build
-
-      - name: Check npm authentication
+      - name: Build package
         run: |
-          echo "Checking npm authentication..."
-          npm whoami || (echo "❌ Authentication failed. Check NPM_TOKEN secret." && exit 1)
+          npm run build
+          git restore -- test-data/process
+
+      - name: Stage package for npm approval
+        id: stage
+        run: node .github/scripts/stage-npm.mjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EXPECTED_VERSION: ${{ inputs.version }}
 
-      - name: Publish to npm
-        run: |
-          # Check if this version already exists
-          echo "Checking if version ${{ needs.check-version.outputs.version }} is already published..."
-          if npm view @seed-ship/duckdb-mcp-native@${{ needs.check-version.outputs.version }} > /dev/null 2>&1; then
-            echo "⚠️ Version ${{ needs.check-version.outputs.version }} already published"
-            exit 0  # Don't fail, just skip
-          fi
-
-          # Publish with public access for scoped packages
-          echo "📦 Publishing version ${{ needs.check-version.outputs.version }} to npm..."
-          npm publish --access public
-          echo "✅ Successfully published to npm!"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        run: |
-          # Create the release using GitHub CLI
-          VERSION="${{ needs.check-version.outputs.version }}"
-          TAG="v${VERSION}"
-
-          # Check if tag already exists
-          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
-            echo "✅ Tag ${TAG} already exists, skipping tag creation"
-          else
-            # Create and push tag
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git config --global user.name "github-actions[bot]"
-            git tag -a "${TAG}" -m "Release ${TAG}"
-            git push origin "${TAG}"
-          fi
-
-          # Create release body
-          cat > release-notes.md << EOF
-          ## 🚀 Published to npm
-
-          Package: [@seed-ship/duckdb-mcp-native](https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native)
-          Version: ${VERSION}
-
-          ### Installation
-          \`\`\`bash
-          npm install @seed-ship/duckdb-mcp-native@${VERSION}
-          \`\`\`
-
-          ### Changes
-          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for details.
-          EOF
-
-          # Check if release already exists
-          if gh release view "${TAG}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            echo "✅ Release ${TAG} already exists, skipping release creation"
-          else
-            # Create release using GitHub CLI
-            gh release create "${TAG}" \
-              --repo "${{ github.repository }}" \
-              --title "v${VERSION}" \
-              --notes-file release-notes.md \
-              || echo "⚠️ Release creation failed, but package was published to npm"
-          fi
+      - name: Create GitHub release metadata
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Comment on commit
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ needs.check-version.outputs.version }}';
-            await github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: `✅ Successfully published version ${version} to npm!\n\nInstall with: \`npm install @seed-ship/duckdb-mcp-native@${version}\``
-            })
+          VERSION: ${{ steps.stage.outputs.version }}
+          NPM_STATE: ${{ steps.stage.outputs.state }}
+          STAGE_ID: ${{ steps.stage.outputs.stage_id }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            exit 0
+          fi
+          {
+            echo "## npm distribution"
+            echo
+            if [ "$NPM_STATE" = published ]; then
+              echo "Version ${VERSION} is available on npm."
+            else
+              echo "Version ${VERSION} was submitted to npm Staged Packages (ID: ${STAGE_ID})."
+              echo "Installation becomes available after a maintainer approves it with 2FA on npmjs.com."
+            fi
+            echo
+            echo 'See docs/CHANGELOG.md for the changes.'
+          } > release-notes.md
+          release_flags=()
+          if [[ "$VERSION" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$TAG" --notes-file release-notes.md "${release_flags[@]}"
