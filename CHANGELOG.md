@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2] (2026-09-14)
+
+### Release
+
+- Retry npm publication after 1.6.1 was rejected by the registry; 1.6.1 was not published to npm.
+- Version and documentation update only; dependencies and runtime code are unchanged from the validated 1.6.1 candidate. DuckDB remains pinned to `1.5.4-r.1`.
+
 ## [1.6.1] (2026-09-14)
 
 ### Fixes

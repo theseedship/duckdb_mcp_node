@@ -5,7 +5,7 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.6.1** — Dependency maintenance release: MCP SDK 1.30.0, DuckDB 1.5.4 + DuckPGQ `f386a6cf`, and optional Onager graph analytics.
+**v1.6.2** — Dependency maintenance release: MCP SDK 1.30.0, DuckDB 1.5.4 + DuckPGQ `f386a6cf`, and optional Onager graph analytics.
 
 ## Features
 

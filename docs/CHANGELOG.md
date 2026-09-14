@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-09-14
+
+### Release
+
+- Retry npm publication after the registry rejected 1.6.1 with `E_STAGE_REQUIRED`; 1.6.1 was not published to npm.
+- Bump package and lockfile versions and refresh current-version documentation. Dependencies and runtime code are unchanged from the tested 1.6.1 candidate; keep `@duckdb/node-api` exactly at `1.5.4-r.1`.
+
 ## [1.6.1] - 2026-09-14
 
 ### Changed
