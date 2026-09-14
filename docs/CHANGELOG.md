@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update MCP SDK to 1.30.0, Axios to 1.20.0, dotenv to 17.4.2, ws to 8.21.3, and Zod to 4.6.5.
 - Refresh compatible development dependencies and the lockfile, including Vitest/UI/coverage 4.1.11 and fixes for vulnerable transitive dependencies.
-- Keep `@duckdb/node-api` pinned to `1.5.4-r.1` for DuckPGQ compatibility; retain TypeScript 5.9 and ESLint 9.
+- Keep `@duckdb/node-api` pinned to `1.5.4-r.1` for DuckPGQ compatibility; retain TypeScript 5.9 and ESLint 9. ESLint 9 is now outside upstream support; migration to ESLint 10 is deferred from this dependency-maintenance patch.
 
 ### Fixed
 

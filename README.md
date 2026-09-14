@@ -24,14 +24,14 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 ## Version and Compatibility
 
-| Component                   | Version in the lockfile                   |
-| --------------------------- | ----------------------------------------- |
-| `@duckdb/node-api`          | **`1.5.4-r.1` (exact pin; DuckDB 1.5.4)** |
-| DuckPGQ community extension | `f386a6cf` on DuckDB 1.5.4                |
-| `@modelcontextprotocol/sdk` | 1.30.0                                    |
-| Axios / dotenv / ws / Zod   | 1.20.0 / 17.4.2 / 8.21.3 / 4.6.5          |
+| Component                   | Locked or validated version                               |
+| --------------------------- | --------------------------------------------------------- |
+| `@duckdb/node-api`          | **`1.5.4-r.1` (exact pin; DuckDB 1.5.4)**                 |
+| DuckPGQ community extension | `f386a6cf` validated on DuckDB 1.5.4; not revision-pinned |
+| `@modelcontextprotocol/sdk` | 1.30.0                                                    |
+| Axios / dotenv / ws / Zod   | 1.20.0 / 17.4.2 / 8.21.3 / 4.6.5                          |
 
-DuckDB stays on 1.5.4: upgrading its Node API requires a matching DuckPGQ binary for the target DuckDB version and platform, followed by native graph-query validation. Keep the exact `@duckdb/node-api` pin when updating other dependencies.
+DuckDB stays on 1.5.4: upgrading its Node API requires a matching DuckPGQ binary for the target DuckDB version and platform, followed by native graph-query validation. Keep the exact `@duckdb/node-api` pin when updating other dependencies. DuckPGQ is installed separately with `INSTALL duckpgq FROM community`: `f386a6cf` identifies the revision used for release validation, not a revision locked by this package. A fresh installation may obtain a newer community build for the same engine and platform.
 
 Validation for 1.6.1: **514 tests passed, 24 skipped** on Node 20.19.5, 22.19.0, and 24.19.0. Linux native checks passed for DuckPGQ graph matching, shortest paths, PageRank, and Onager PageRank; an MCP stdio client initialized, listed 40 tools, and executed SQL. The lockfile audit reported no vulnerabilities on 2026-09-14.
 
