@@ -2,7 +2,7 @@ name: Release Please
 
 # DISABLED on push (2026-07-03): this workflow raced with publish.yml,
 # which is the actual release path for this repo (manual version bump in
-# package.json + hand-written CHANGELOG → publish.yml publishes to npm and
+# package.json + hand-written CHANGELOG → publish.yml stages the package and
 # creates the GitHub release on push). With both active, every release made
 # release-please open a redundant PR that would inject a DUPLICATE version
 # heading into CHANGELOG.md (flagged P1 by Greptile on PR #22) and carried
@@ -28,24 +28,3 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: node
-
-      # The logic below handles the npm publication
-      - uses: actions/checkout@v4
-        if: ${{ steps.release.outputs.release_created }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-        if: ${{ steps.release.outputs.release_created }}
-
-      - run: npm ci
-        if: ${{ steps.release.outputs.release_created }}
-
-      - run: npm run build
-        if: ${{ steps.release.outputs.release_created }}
-
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        if: ${{ steps.release.outputs.release_created }}

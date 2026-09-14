@@ -1,96 +1,41 @@
 # npm publishing
 
-`@seed-ship/duckdb-mcp-native` is published to the public npm registry by GitHub Actions.
+GitHub Actions builds `@seed-ship/duckdb-mcp-native` and submits it to **Staged Packages** on npmjs.com. A maintainer then clicks **Approve** and confirms with 2FA. Approval makes the version available for installation; no local command is required.
 
 ## Normal release path
 
-Prepare the release on a branch. For a patch release such as `1.6.1`, update both
-`package.json` and `package-lock.json` without creating a local Git tag:
+1. Bump `package.json` and `package-lock.json` with `npm version patch --no-git-tag-version`, then update the README and both changelogs.
+2. Merge the release PR after CI passes.
+3. The **Publish to NPM** workflow installs Node.js 22 and npm 11.17.0, runs the quality checks, builds the package, and executes `npm stage publish`.
+4. Open **Staged Packages** on npmjs.com, review the package/version shown in the workflow summary, click **Approve**, and confirm with 2FA.
 
-```bash
-npm version patch --no-git-tag-version
-```
+The workflow uses the existing GitHub secret `NPM_TOKEN`. It never attempts direct npm publication or automatic approval. Staged publishing requires npm >= 11.15.0 and Node.js >= 22.14.0.
 
-Then update the release-facing documentation:
+## Retries and version state
 
-- `README.md`
-- `CHANGELOG.md`
-- `docs/CHANGELOG.md`
+Use **Actions → Publish to NPM → Run workflow** to retry the current version. A new version is not needed after an authorization failure.
 
-Before opening the pull request, run the same quality gates used for publication:
+- If the version is already public, the workflow reports that fact and skips staging.
+- If it is already staged with the expected npm tag, the workflow reuses that stage and prints its ID.
+- Otherwise, the workflow stages it. Registry authentication or network failures remain blocking.
 
-```bash
-npm run check:all
-npm run build
-npm pack --dry-run
-```
+A staged version is not yet installable. The job summary distinguishes **staged** from **published** and gives the manual approval instructions. An npm version already published or staged cannot be overwritten.
 
-Open a pull request and wait for CI to pass on the supported Node.js versions. When the
-pull request is merged into `main`, a change to `package.json` triggers
-`.github/workflows/publish.yml`. That workflow:
+On `main` or a version tag, GitHub release metadata is created with an explicit npm status. A GitHub tag or release alone does not mean the version is publicly available on npm. Metadata created before approval records that the package was submitted and that installation requires approval.
 
-1. verifies that the version changed from the previous commit;
-2. installs the locked dependencies on Node.js 22;
-3. runs `npm run check:all` and `npm run build`;
-4. verifies npm authentication and skips versions that already exist;
-5. publishes the package with public access;
-6. creates the matching `v<version>` tag and GitHub release.
+## Other workflow entry points
 
-Do not create or push the release tag as part of the normal path. The publish workflow owns
-that step.
+**Release (Manual)** still accepts a `v*` tag or a manual version input matching `package.json`; it delegates to the same staging workflow. Release Please is a manual migration tool and no longer contains a separate npm publication step.
+
+A change to `package.json`, the staging workflow, or its helper on `main` triggers the normal workflow. Retries are serialized to avoid simultaneous submissions.
 
 ## Repository setup
 
-Create a granular npm access token that can read and write
-`@seed-ship/duckdb-mcp-native`, then store it as the GitHub Actions repository secret
-`NPM_TOKEN`. The npm account that owns the token must have publish access to the
-`@seed-ship` scope.
+Store a granular npm token with package write access in the GitHub Actions secret `NPM_TOKEN`. The workflow passes it as `NODE_AUTH_TOKEN`. Keep tokens out of source files and logs.
 
-The workflows pass this secret to npm as `NODE_AUTH_TOKEN`. Never commit a token or a local
-`.npmrc` containing one.
-
-## Alternative release workflows
-
-`.github/workflows/release.yml` supports an explicit `v*` tag or a manual workflow dispatch.
-This is an alternative recovery/manual path, not the normal release path. Its tag or input
-version must exactly match `package.json`, and it runs the full quality suite before
-publishing.
-
-`.github/workflows/release-please.yml` is manual-only. It is retained as a possible migration
-path and is not part of the current release process. Before adopting release-please, remove
-the manual version-bump convention and consolidate the npm publication and GitHub release
-steps so that only one workflow owns them.
-
-The `workflow_dispatch` option on `.github/workflows/publish.yml` can rerun the publication
-workflow for an unpublished package version. Its `force` input bypasses the Git comparison;
-it cannot overwrite a version that already exists on npm.
-
-## Troubleshooting
-
-Check the package version and publication state with:
-
-```bash
-node -p "require('./package.json').version"
-npm view @seed-ship/duckdb-mcp-native versions
-npm view @seed-ship/duckdb-mcp-native dist-tags
-```
-
-If authentication fails, verify that the `NPM_TOKEN` repository secret exists, is current,
-has read/write access to the package, and belongs to an npm user allowed to publish under
-`@seed-ship`.
-
-If npm reports that the version already exists, choose a new version. npm package versions
-are immutable and cannot be republished.
-
-To inspect the package contents without publishing:
-
-```bash
-npm pack --dry-run
-```
+The maintainer approving the staged package needs npm publish permissions and 2FA. The CI token does not perform that approval.
 
 ## References
 
-- [Publishing Node.js packages with GitHub Actions](https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages)
-- [Creating and viewing access tokens](https://docs.npmjs.com/creating-and-viewing-access-tokens)
-- [About package access](https://docs.npmjs.com/package-access)
-- [Semantic Versioning](https://semver.org/)
+- [npm staged publishing](https://docs.npmjs.com/staged-publishing/)
+- [npm stage commands](https://docs.npmjs.com/cli/v11/commands/npm-stage/)

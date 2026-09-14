@@ -2,120 +2,20 @@ name: Release (Manual)
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.0.0)'
+        description: 'Release version matching package.json (e.g., 1.6.2)'
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          registry-url: 'https://registry.npmjs.org'
-          scope: '@seed-ship'
-
-      - name: Validate version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            echo "Manual release version: $VERSION"
-          else
-            VERSION=${GITHUB_REF#refs/tags/v}
-            echo "Tag release version: $VERSION"
-          fi
-
-          # Check if version matches package.json
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "Error: Tag/input version ($VERSION) doesn't match package.json ($PACKAGE_VERSION)"
-            exit 1
-          fi
-
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          npm rebuild @duckdb/node-api
-
-      - name: Run full test suite
-        run: npm run check:all
-        env:
-          NODE_ENV: test
-          CI: true
-          SKIP_NETWORK_TESTS: true
-
-      - name: Build
-        run: npm run build
-
-      - name: Generate changelog
-        run: |
-          # Extract changelog for this version
-          npm install -g conventional-changelog-cli
-          conventional-changelog -p angular -i CHANGELOG_RELEASE.md -s -r 1
-
-      - name: Check npm authentication
-        run: npm whoami
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to npm
-        run: |
-          # Check if already published
-          if npm view @seed-ship/duckdb-mcp-native@${{ env.VERSION }} > /dev/null 2>&1; then
-            echo "⚠️ Version ${{ env.VERSION }} already published to npm"
-          else
-            npm publish --access public
-            echo "✅ Published version ${{ env.VERSION }} to npm"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: v${{ env.VERSION }}
-          body_path: CHANGELOG_RELEASE.md
-          files: |
-            dist/**/*.js
-            dist/**/*.d.ts
-            package.json
-            README.md
-          draft: false
-          prerelease: ${{ contains(env.VERSION, '-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update npm tags
-        run: |
-          # Add dist-tag for prerelease versions
-          if [[ "${{ env.VERSION }}" == *"-"* ]]; then
-            TAG=$(echo "${{ env.VERSION }}" | sed 's/.*-\([^.]*\).*/\1/')
-            npm dist-tag add @seed-ship/duckdb-mcp-native@${{ env.VERSION }} $TAG
-            echo "Added dist-tag: $TAG"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Summarize release
-        run: |
-          {
-            echo "## Released v${VERSION}"
-            echo
-            echo "- npm: https://www.npmjs.com/package/@seed-ship/duckdb-mcp-native/v/${VERSION}"
-            echo "- GitHub release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/publish.yml
+    with:
+      version: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+    secrets: inherit

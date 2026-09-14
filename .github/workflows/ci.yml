@@ -34,6 +34,9 @@ jobs:
           # Force rebuild native bindings for CI environment
           npm rebuild @duckdb/node-api
 
+      - name: Validate publication workflow
+        run: node --test .github/scripts/stage-npm.test.mjs
+
       - name: Run type checking
         run: npm run typecheck
 
