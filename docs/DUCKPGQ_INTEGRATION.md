@@ -44,13 +44,16 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 | 1.0.0 - 1.2.2       | Stable          | ✅          | ✅           | ✅            | ✅                | **Fully Supported** |
 | 1.3.x               | Partial         | ✅          | ⚠️           | ⚠️            | ⚠️                | **Limited**         |
 | 1.4.x               | 7705c5c         | ✅          | ✅           | ✅            | ❌                | Functional          |
-| **1.5.0** (current) | **aec2e25**     | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
+| 1.5.0               | aec2e25         | ✅          | ✅           | ✅            | ❌                | Historical          |
+| **1.5.4** (current) | **f386a6cf**    | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
 
-**Current Package**: This project uses `@duckdb/node-api 1.5.0-r.1` (DuckDB 1.5.0)
+**Current Package (1.6.1)**: `@duckdb/node-api` remains pinned exactly to `1.5.4-r.1` (DuckDB 1.5.4), with DuckPGQ community revision `f386a6cf`. Dependency updates must preserve this pair until a compatible binary is verified for the replacement engine and each supported platform.
+
+Native Linux checks on 2026-09-14 confirmed graph matching, ANY SHORTEST paths, and DuckPGQ PageRank on this pair. Optional Onager (`eaaf2ea`) also loaded and its PageRank query passed with BIGINT vertex identifiers. The broader feature matrix is documented in the [DuckDB 1.5 capability report](duckpgq/CAPABILITY_REPORT_1.5.md).
 
 ### Version-Specific Notes
 
-#### DuckDB 1.4.x (Current) - Validated 2025-10-20
+#### DuckDB 1.4.x (Historical) - Validated 2025-10-20
 
 - **Status**: DuckPGQ 7705c5c IS available from community repository ✅
 - **Installation**: Automatic with `ALLOW_UNSIGNED_EXTENSIONS=true`

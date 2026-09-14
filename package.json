@@ -1,6 +1,6 @@
 {
   "name": "@seed-ship/duckdb-mcp-native",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Native Node.js/TypeScript implementation of DuckDB MCP extension",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -132,9 +132,9 @@
     "prepare": "husky",
     "prepublishOnly": "npm run build",
     "prepublish:full": "npm run check:all && npm run build",
-    "release": "echo 'Please use GitHub release-please workflow instead'",
-    "release:minor": "echo 'Please use GitHub release-please workflow instead'",
-    "release:major": "echo 'Please use GitHub release-please workflow instead'"
+    "release": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'",
+    "release:minor": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'",
+    "release:major": "echo 'See docs/NPM_PUBLISHING.md: bump the package version, then merge to main'"
   },
   "keywords": [
     "duckdb",

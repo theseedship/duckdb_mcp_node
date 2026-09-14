@@ -13,7 +13,7 @@ Thank you for your interest in contributing to DuckDB MCP Native! We welcome con
 
 ### Prerequisites
 
-- Node.js >= 18.0.0 (use `.nvmrc` with nvm)
+- Node.js 22 for development (package runtime requires Node.js >= 20.0.0)
 - npm >= 9.0.0
 
 ### Setup

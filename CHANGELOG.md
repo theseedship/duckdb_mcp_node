@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.1] (2026-09-14)
+
+### Fixes
+
+- Refresh MCP SDK (1.30.0), Axios, dotenv, ws, Zod, and compatible development dependencies; retain the exact `@duckdb/node-api@1.5.4-r.1` pin for DuckPGQ.
+- Use Node.js 22 and blocking quality checks for npm publication.
+- Update the README, compatibility documentation, and release instructions.
+
+Validation: 514 tests passed and 24 skipped on Node.js 20, 22, and 24; native DuckPGQ/Onager and MCP stdio checks passed. Lockfile audits reported zero vulnerabilities.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for details.
+
 ## [1.6.0](https://github.com/theseedship/duckdb_mcp_node/compare/v1.5.0...v1.6.0) (2026-07-03)
 
 ### Features

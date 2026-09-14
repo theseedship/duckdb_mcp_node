@@ -194,10 +194,10 @@ Unlike the C++ MCPFS approach, we use direct mapping:
 
 ## Testing Status
 
-- **Unit Tests**: 23 passing, 84 skipped (ESM mocking issues)
-- **Integration Tests**: Limited
-- **Coverage**: ~7-15% (needs improvement)
-- **CI/CD**: Passing with Node 18, 20, 22
+- **Local validation for 1.6.1**: 27 test files passed; 514 tests passed and 24 skipped on Node.js 20, 22, and 24.
+- **Native and protocol checks**: Linux DuckPGQ/Onager graph checks and a real MCP stdio SQL round trip passed.
+- **Coverage**: Configured thresholds passed on Node.js 24.
+- **CI configuration**: Node.js 20 and 22; npm publication uses Node.js 22. These local results do not assert a GitHub Actions run.
 
 ## Contributing
 

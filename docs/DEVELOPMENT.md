@@ -1,5 +1,9 @@
 # Development Guide
 
+Use Node.js 22 for development and publication. Package 1.6.1 was also tested on Node.js 20.19.5 and 24.19.0. The lockfile uses TypeScript 5.9.3, ESLint 9.39.5, and Vitest 4.1.11. Install it with `npm ci`.
+
+Run `CI=true SKIP_NETWORK_TESTS=true npm run check:all` and `npm run build` before release. See [NPM Publishing](NPM_PUBLISHING.md) for versioning and the automatic publication trigger.
+
 ## Testing
 
 ### Quick Test
