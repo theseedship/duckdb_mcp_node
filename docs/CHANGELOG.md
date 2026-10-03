@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strengthen the production SQL security policy in the server and library entrypoints. `MCP_SECURITY_MODE=production` now defaults to `MCP_SANDBOX=strict`, disabling external data access in DuckDB, including local files, HTTP and S3.
 - Make initialization and configuration locking fail closed, validate explicit policy settings, and add regression coverage.
 - Refresh compatible transitive dependencies to address registry audit findings.
-- Thank you to the security researcher who reported the issue through coordinated disclosure.
+- Thank you to **Zureno** for reporting the issue through coordinated disclosure.
 
 ### Upgrade notes
 

@@ -7,7 +7,7 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 **v1.7.0** — Security hardening update. DuckDB remains pinned to 1.5.4.
 
-> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank the security researcher who reported this issue through coordinated disclosure.
+> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
 ```bash
 npm install @seed-ship/duckdb-mcp-native@1.7.0
