@@ -573,7 +573,7 @@ In either hardened mode, extension auto-install/auto-load and persistent secrets
 
 `strict` intentionally disables external imports/exports and S3. Both hardened modes reject `mcp://` queries before VFS preprocessing: the current VFS imports through local cache files. Other disk-backed imports may also fail. In-memory SQL remains available; integrations needing external data must choose their policy explicitly.
 
-The sandbox governs DuckDB operations, not arbitrary Node.js code, independently configured MCP connections, or the behavior of trusted native extensions loaded at startup. Applications embedding the library must explicitly enable `MCP_SECURITY_MODE=production` or `sandbox: 'strict'`; `NODE_ENV=production` alone does not enable protection.
+The sandbox governs DuckDB operations, not arbitrary Node.js code, independently configured MCP connections, or the behavior of trusted native extensions loaded at startup. Applications embedding the library must explicitly enable `MCP_SECURITY_MODE=production` or `sandbox: 'strict'`; `NODE_ENV=production` alone does not enable protection. The policy is applied by this package's `DuckDBService`: applications supplying their own DuckDB service or connection must enforce their policy on that instance. Importing tool handlers or `ComputeSession` does not harden a caller-owned connection.
 
 > The keyword-based HITL gate below only covers selected destructive DML/DDL/DCL statements. It is not a complete SQL authorization boundary. File/network access is blocked by the production engine sandbox regardless of a HITL confirmation.
 
