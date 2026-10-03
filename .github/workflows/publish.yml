@@ -45,6 +45,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare sandbox network tests
+        run: node .github/scripts/prepare-sandbox-tests.mjs
+
+      - name: Verify sandbox network isolation
+        run: npm test -- --coverage.enabled=false src/duckdb/service.sandbox-network.test.ts
+        env:
+          DUCKDB_SANDBOX_NETWORK_TESTS: '1'
+          NODE_ENV: test
+          CI: true
+
       - name: Validate publication workflow
         run: node --test .github/scripts/stage-npm.test.mjs
 

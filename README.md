@@ -5,13 +5,21 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.6.2** — Dependency maintenance release: MCP SDK 1.30.0, DuckDB 1.5.4 + DuckPGQ `f386a6cf`, and optional Onager graph analytics.
+**v1.7.0** — Security hardening update. DuckDB remains pinned to 1.5.4.
+
+> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
+
+```bash
+npm install @seed-ship/duckdb-mcp-native@1.7.0
+```
+
+For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.0` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
 
 ## Features
 
 - **32+ MCP Tools**: SQL queries, schema inspection, CSV/Parquet loading, federation, graph algorithms, process mining, data helpers
 - **8 Graph Algorithm Tools**: PageRank, eigenvector, community detection, modularity, weighted paths, temporal analysis, period comparison, multi-format export
-- **HITL Security**: Production mode asks user confirmation before destructive SQL via MCP elicitation API
+- **Layered Security**: production mode disables external access in DuckDB (including local files, HTTP and S3) and gates destructive SQL via HITL elicitation
 - **Federation**: Distributed queries across multiple MCP servers with `mcp://` URIs
 - **Virtual Filesystem**: Direct SQL access via `mcp://` URIs with auto-format detection
 - **Transports**: stdio, WebSocket, TCP (HTTP client-side)
@@ -540,12 +548,34 @@ await handlers['ducklake.snapshots']({
 
 ## Security
 
+Security is layered: an **engine-level sandbox** (the primary control, enforced inside DuckDB) plus **HITL elicitation** for destructive DML.
+
 ### Modes
 
-- **development** (default): All queries allowed
-- **production**: Destructive SQL triggers HITL elicitation
+- **development** (default): no engine sandbox; destructive SQL is not gated
+- **production**: engine sandbox on (`strict`) + destructive SQL triggers HITL elicitation
 
-Set via `MCP_SECURITY_MODE=production`
+Set via `MCP_SECURITY_MODE=production`. It is read directly — **never inferred from `NODE_ENV`** — so a process can set `NODE_ENV=production` without silently changing DuckDB's access policy.
+
+### Engine sandbox (`MCP_SANDBOX`)
+
+The DuckDB instance is hardened _after_ trusted extensions and S3 credentials are provisioned, before it becomes ready for queries. This applies to library-mode consumers too. The level resolves from the constructor's `sandbox` option, then `MCP_SANDBOX`, then the mode default. Invalid explicit levels fail initialization.
+
+| Level         | Effect                                                                                                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `off`         | No engine hardening (legacy behaviour). Default in development. Use only with trusted SQL.                                                     |
+| `strict`      | `enable_external_access=false` blocks external file access, including local files, HTTP and S3. **Default in production.**                     |
+| `no-local-fs` | Explicit compatibility option: disables `LocalFileSystem` and `HTTPFileSystem`, but retains preconfigured S3 access. **Not an SSRF boundary.** |
+
+In either hardened mode, extension auto-install/auto-load and persistent secrets are disabled, and configuration is locked (`lock_configuration=true`). Initialization fails closed if any required setting fails. `INSTALL` / `LOAD` / `ATTACH` are additionally blocked as SQL statements.
+
+**S3 compatibility requires trusted SQL and restricted network egress.** `no-local-fs` retains network capabilities and must not be used as network isolation for untrusted SQL, even with configuration locking. Use `strict` when external access must be prohibited.
+
+`strict` intentionally disables external imports/exports and S3. Both hardened modes reject `mcp://` queries before VFS preprocessing: the current VFS imports through local cache files. Other disk-backed imports may also fail. In-memory SQL remains available; integrations needing external data must choose their policy explicitly.
+
+The sandbox governs DuckDB operations, not arbitrary Node.js code, independently configured MCP connections, or the behavior of trusted native extensions loaded at startup. Applications embedding the library must explicitly enable `MCP_SECURITY_MODE=production` or `sandbox: 'strict'`; `NODE_ENV=production` alone does not enable protection. The policy is applied by this package's `DuckDBService`: applications supplying their own DuckDB service or connection must enforce their policy on that instance. Importing tool handlers or `ComputeSession` does not harden a caller-owned connection.
+
+> The keyword-based HITL gate below only covers selected destructive DML/DDL/DCL statements. It is not a complete SQL authorization boundary. File/network access is blocked by the production engine sandbox regardless of a HITL confirmation.
 
 ### HITL Elicitation
 
@@ -584,6 +614,7 @@ src/
 | `DUCKDB_MEMORY`             | `4GB`            | DuckDB memory limit                                                              |
 | `DUCKDB_THREADS`            | `4`              | DuckDB thread count                                                              |
 | `MCP_SECURITY_MODE`         | `development`    | `development` / `production`                                                     |
+| `MCP_SANDBOX`               | _(mode-derived)_ | Engine sandbox: `off` / `no-local-fs` / `strict` (overrides the mode default)    |
 | `MCP_ELICIT_TIMEOUT`        | `30000`          | HITL elicitation timeout (ms)                                                    |
 | `MCP_MAX_QUERY_SIZE`        | `1000000`        | Max SQL query size (chars)                                                       |
 | `MCP_CACHE_DIR`             | `/tmp/mcp-cache` | VFS cache directory                                                              |

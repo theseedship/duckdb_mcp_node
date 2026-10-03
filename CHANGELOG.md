@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0] (pending coordinated release)
+
+### Security
+
+- Strengthen the production SQL security policy and initialization safeguards.
+- Upgrade from 1.6.2 or earlier, enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` for untrusted SQL, and restart the process.
+- Strict mode disables external data access, including S3. Review the compatibility notes before upgrading.
+- Refresh compatible transitive dependencies for registry audit fixes.
+- Thanks to **Zureno** for coordinated disclosure.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for upgrade notes. npm installation is available only after staged-package approval.
+
 ## [1.6.2] (2026-09-14)
 
 ### Release

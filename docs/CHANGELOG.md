@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - Pending coordinated release
+
+### Security
+
+- Strengthen the production SQL security policy in the server and library entrypoints. `MCP_SECURITY_MODE=production` now defaults to `MCP_SANDBOX=strict`, disabling external data access in DuckDB, including local files, HTTP and S3.
+- Make initialization and configuration locking fail closed, validate explicit policy settings, and add regression coverage.
+- Refresh compatible transitive dependencies to address registry audit findings.
+- Thank you to **Zureno** for reporting the issue through coordinated disclosure.
+
+### Upgrade notes
+
+- Users of 1.6.2 and earlier should upgrade, enable production or strict mode for untrusted SQL, and restart their application or MCP client. `NODE_ENV=production` alone does not enable this protection.
+- `no-local-fs` is an explicit compatibility option for trusted SQL with independently restricted network access; it is not network isolation. The development default remains `off`.
+- Strict mode disables external imports, exports and S3. Both hardened modes disable disk-backed `mcp://` imports. In-memory SQL remains available.
+- Publication uses npm staged approval. This version becomes installable only after a maintainer approves the staged package with 2FA.
+
 ## [1.6.2] - 2026-09-14
 
 ### Release

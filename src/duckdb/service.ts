@@ -13,6 +13,18 @@ const DuckDBConfigSchema = z.object({
   memory: z.string().default('4GB'),
   threads: z.number().default(4),
   allowUnsignedExtensions: z.boolean().default(false),
+  // Engine-level sandbox posture. Controls which DuckDB filesystems / external
+  // access are disabled AFTER extensions + S3 are set up.
+  //  - 'off'         : no engine hardening (legacy behaviour)
+  //  - 'no-local-fs' : disable LocalFileSystem + HTTPFileSystem (blocks arbitrary
+  //                    local file read/write and raw HTTPFileSystem access). S3
+  //                    remains available and may reach other network endpoints.
+  //  - 'strict'      : enable_external_access=false (blocks ALL external access,
+  //                    including S3/httpfs) — for pure-compute deployments
+  // When unset, resolves from MCP_SANDBOX, else defaults to 'strict' iff
+  // MCP_SECURITY_MODE=production. NEVER keyed on NODE_ENV (would silently break
+  // library-mode consumers that set NODE_ENV but not MCP_SECURITY_MODE).
+  sandbox: z.enum(['off', 'no-local-fs', 'strict']).optional(),
   s3Config: z
     .object({
       endpoint: z.string().optional(),
@@ -46,9 +58,12 @@ export class DuckDBService {
   private connection: DuckDBConnection | null = null
   private config: DuckDBConfig
   private isInitialized = false
+  private initializationPromise: Promise<void> | null = null
+  private closingPromise: Promise<void> | null = null
   private virtualFs?: VirtualFilesystem
   private extendedConfig?: Partial<DuckDBServiceConfig>
   private _onagerLoaded = false
+  private _sandboxLevel: 'off' | 'no-local-fs' | 'strict' = 'off'
 
   /**
    * Whether the Onager graph-analytics extension was successfully loaded.
@@ -57,6 +72,14 @@ export class DuckDBService {
    */
   get onagerLoaded(): boolean {
     return this._onagerLoaded
+  }
+
+  /**
+   * The engine-level sandbox posture actually applied to this instance.
+   * 'off' until initialize() runs. @since v1.7.0
+   */
+  get sandboxLevel(): 'off' | 'no-local-fs' | 'strict' {
+    return this._sandboxLevel
   }
 
   constructor(config?: Partial<DuckDBServiceConfig>) {
@@ -68,15 +91,34 @@ export class DuckDBService {
    * Initialize DuckDB instance and connection
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) {
-      return
-    }
+    // A new generation must not overlap asynchronous VFS teardown.
+    while (this.closingPromise) await this.closingPromise
+    if (this.initializationPromise) return this.initializationPromise
+    if (this.isInitialized) return
 
+    const initialization = this.initializeConnection()
+    this.initializationPromise = initialization
     try {
+      await initialization
+    } finally {
+      this.initializationPromise = null
+    }
+  }
+
+  private async initializeConnection(): Promise<void> {
+    try {
+      // Validate the selected posture before allocating any engine resources.
+      const sandboxLevel = this.resolveSandboxLevel()
       // Create DuckDB instance with configuration
-      const instanceConfig: any = {
+      const instanceConfig: Record<string, string> = {
         max_memory: this.config.memory,
         threads: this.config.threads.toString(),
+      }
+
+      // Secret Manager settings become immutable after the first secret is used.
+      // Apply this before trusted S3 provisioning can initialize that manager.
+      if (sandboxLevel !== 'off') {
+        instanceConfig.allow_persistent_secrets = 'false'
       }
 
       if (this.config.allowUnsignedExtensions) {
@@ -85,9 +127,6 @@ export class DuckDBService {
 
       this.instance = await DuckDBInstance.create(':memory:', instanceConfig)
       this.connection = await this.instance.connect()
-
-      // Mark as initialized once connection is ready
-      this.isInitialized = true
 
       // Load DuckPGQ extension for Property Graph queries (SQL:2023 standard)
       if (this.config.allowUnsignedExtensions && process.env.ENABLE_DUCKPGQ !== 'false') {
@@ -118,9 +157,169 @@ export class DuckDBService {
       if (this.extendedConfig?.virtualFilesystem?.enabled) {
         await this.initializeVirtualFilesystem()
       }
+
+      // Engine-level security hardening. MUST run last — after extensions (which
+      // need INSTALL/LOAD) and trusted S3 credential provisioning have completed,
+      // because the sandbox disables external capabilities and the lock is
+      // one-way within the session.
+      await this.applyEngineHardening(sandboxLevel)
+      this.isInitialized = true
     } catch (error) {
+      // Never retain a usable connection after rejected initialization.
+      await this.releaseResources()
       logger.error('Failed to initialize DuckDB:', error)
       throw error
+    }
+  }
+
+  /**
+   * Resolve the effective sandbox level. Explicit config/env wins; otherwise
+   * hardened iff MCP_SECURITY_MODE=production. Deliberately NOT keyed on
+   * NODE_ENV. @since v1.7.0
+   */
+  private resolveSandboxLevel(): 'off' | 'no-local-fs' | 'strict' {
+    const explicit = this.config.sandbox ?? process.env.MCP_SANDBOX
+    if (explicit !== undefined) return DuckDBConfigSchema.shape.sandbox.unwrap().parse(explicit)
+    return process.env.MCP_SECURITY_MODE === 'production' ? 'strict' : 'off'
+  }
+
+  /**
+   * Apply engine-level sandboxing to the live connection. Validated on DuckDB
+   * 1.5.4: disabling LocalFileSystem+HTTPFileSystem blocks arbitrary local file
+   * read/write and raw HTTP reads, but S3FileSystem can still access network
+   * endpoints. This compatibility posture is not an SSRF boundary. 'strict'
+   * uses enable_external_access=false (a one-way latch) to block all external
+   * access. lock_configuration=true then prevents injected SQL from re-opening
+   * the gate (e.g. SET s3_endpoint / SET disabled_filesystems). @since v1.7.0
+   */
+  private async applyEngineHardening(level: 'off' | 'no-local-fs' | 'strict'): Promise<void> {
+    if (!this.connection) throw new Error('Database connection unavailable during hardening')
+    if (level === 'off') {
+      this._sandboxLevel = level
+      return
+    }
+
+    try {
+      // Trusted provisioning is complete. Do not let later SQL implicitly install code.
+      await this.connection.run('SET autoinstall_known_extensions=false')
+      await this.connection.run('SET autoload_known_extensions=false')
+      if (level === 'strict') {
+        if (this.config.s3Config?.accessKey) {
+          logger.warn(
+            'MCP_SANDBOX=strict disables all external access; configured S3/httpfs will be unreachable'
+          )
+        }
+        await this.connection.run('SET enable_external_access=false')
+      } else {
+        // no-local-fs: block local disk + raw http(s); keep S3FileSystem.
+        await this.connection.run(`SET disabled_filesystems='LocalFileSystem,HTTPFileSystem'`)
+      }
+      // Seal the configuration so a later statement cannot relax it.
+      await this.connection.run('SET lock_configuration=true')
+      this._sandboxLevel = level
+    } catch (error) {
+      // Hardening must fail CLOSED: if we cannot apply the sandbox we asked for,
+      // refuse to initialize rather than silently run wide open.
+      logger.error(`Failed to apply security sandbox (level=${level}):`, error)
+      throw new Error(
+        `Failed to apply security sandbox (level=${level}): ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      )
+    }
+  }
+
+  /**
+   * Defense-in-depth statement gate, enforced in every query path (so it also
+   * covers library-mode consumers that bypass the MCP server's HITL handler).
+   * The engine sandbox is the primary control; this blocks code-loading /
+   * external-attach statements that the engine may still permit. @since v1.7.0
+   */
+  private enforceSandboxPolicy(sql: string): void {
+    if (this._sandboxLevel === 'off') return
+    // Inspect statement-leading tokens only. Keywords in data, quoted identifiers
+    // or comments are harmless; the engine remains the primary security control.
+    let statementStart = true
+    let i = 0
+    while (i < sql.length) {
+      if (/\s/.test(sql[i])) {
+        i++
+        continue
+      }
+      if (sql.startsWith('--', i)) {
+        const end = sql.slice(i + 2).search(/[\r\n]/)
+        i = end < 0 ? sql.length : i + 2 + end + 1
+        continue
+      }
+      if (sql.startsWith('/*', i)) {
+        let depth = 1
+        i += 2
+        while (i < sql.length && depth > 0) {
+          if (sql.startsWith('/*', i)) {
+            depth++
+            i += 2
+          } else if (sql.startsWith('*/', i)) {
+            depth--
+            i += 2
+          } else i++
+        }
+        continue
+      }
+      if (sql[i] === ';') {
+        statementStart = true
+        i++
+        continue
+      }
+      if (sql[i] === "'" || sql[i] === '"') {
+        const quote = sql[i++]
+        // DuckDB E'...' literals additionally allow backslash escapes.
+        const escapeLiteral =
+          quote === "'" &&
+          /[eE]/.test(sql[i - 2] || '') &&
+          (i < 3 || !/[a-zA-Z0-9_]/.test(sql[i - 3]))
+        while (i < sql.length) {
+          if (escapeLiteral && sql[i] === '\\') {
+            i += 2
+            continue
+          }
+          if (sql[i] === quote) {
+            if (sql[i + 1] === quote) {
+              i += 2
+              continue
+            }
+            i++
+            break
+          }
+          i++
+        }
+        statementStart = false
+        continue
+      }
+      if (sql[i] === '$') {
+        const delimiter = sql.slice(i).match(/^\$(?:[a-zA-Z_][a-zA-Z0-9_]*)?\$/)?.[0]
+        if (delimiter) {
+          const end = sql.indexOf(delimiter, i + delimiter.length)
+          i = end < 0 ? sql.length : end + delimiter.length
+          statementStart = false
+          continue
+        }
+      }
+      const token = sql.slice(i).match(/^[a-zA-Z_][a-zA-Z0-9_]*/)?.[0]
+      if (token) {
+        const operation = token.toUpperCase()
+        // DuckDB also accepts FORCE INSTALL as an extension-loading statement.
+        if (statementStart && operation === 'FORCE') {
+          i += token.length
+          continue
+        }
+        if (statementStart && ['INSTALL', 'LOAD', 'ATTACH'].includes(operation)) {
+          throw new Error(
+            `Operation ${operation} is blocked by security sandbox (level=${this._sandboxLevel})`
+          )
+        }
+        i += token.length
+      } else i++
+      statementStart = false
     }
   }
 
@@ -150,8 +349,12 @@ export class DuckDBService {
    * Execute a SQL query with Virtual Filesystem support
    */
   async executeQueryWithVFS<T = any>(sql: string, params?: any[]): Promise<T[]> {
-    // If VFS is enabled, preprocess the query
-    if (this.virtualFs) {
+    this.ensureReady()
+    this.enforceSandboxPolicy(sql)
+    // VFS fetches and writes cache files in Node, outside DuckDB's sandbox.
+    // Disable that preprocessing entirely for hardened engines: harmless URI
+    // text stays ordinary SQL, while real external reads face the engine policy.
+    if (this._sandboxLevel === 'off' && this.virtualFs) {
       sql = await this.virtualFs.processQuery(sql)
     }
 
@@ -408,7 +611,7 @@ export class DuckDBService {
       )
     `
 
-    await this.executeQuery(sql)
+    await this.connection.run(sql)
     // S3 configuration applied successfully
   }
 
@@ -416,15 +619,16 @@ export class DuckDBService {
    * Execute a SQL query and return results
    */
   async executeQuery<T = any>(sql: string, _params?: any[]): Promise<T[]> {
-    if (!this.isInitialized || !this.connection) {
-      throw new Error('Database not initialized. Call initialize() first.')
-    }
+    const connection = this.ensureReady()
+
+    // Defense-in-depth: enforced in all query paths, including library mode.
+    this.enforceSandboxPolicy(sql)
 
     // Start timing
     const startTime = performance.now()
 
     try {
-      const result = await this.connection.run(sql)
+      const result = await connection.run(sql)
       const rows = await result.getRowObjectsJson()
 
       // Record metrics
@@ -616,19 +820,64 @@ export class DuckDBService {
   /**
    * Close the database connection
    */
+  private ensureReady(): DuckDBConnection {
+    if (this.closingPromise || !this.isInitialized || !this.connection) {
+      throw new Error('Database not initialized. Call initialize() first.')
+    }
+    return this.connection
+  }
+
   async close(): Promise<void> {
-    if (this.connection) {
+    if (this.closingPromise) return this.closingPromise
+    // Publish the close barrier before any cleanup callbacks can run. Concurrent
+    // closes share it; later initialize() calls wait for the entire teardown.
+    const closing = Promise.resolve().then(async () => {
+      if (this.initializationPromise) {
+        try {
+          await this.initializationPromise
+        } catch {
+          /* initialization already cleaned up */
+        }
+      }
+      await this.releaseResources()
+    })
+    this.closingPromise = closing
+    try {
+      await closing
+    } finally {
+      this.closingPromise = null
+    }
+  }
+
+  private async releaseResources(): Promise<void> {
+    const virtualFs = this.virtualFs
+    const connection = this.connection
+    const instance = this.instance
+    this.virtualFs = undefined
+    this.connection = null
+    this.instance = null
+    this.isInitialized = false
+    this._sandboxLevel = 'off'
+    this._onagerLoaded = false
+    if (virtualFs) {
+      try {
+        await virtualFs.destroy()
+      } catch {
+        /* preserve initialization errors */
+      }
+    }
+    if (connection) {
       try {
         // Properly disconnect the DuckDB connection
-        this.connection.disconnectSync()
+        connection.disconnectSync()
       } catch {
         // Silently ignore disconnect errors during cleanup
       }
-
-      // Nullify references for garbage collection
-      this.connection = null
-      this.instance = null
-      this.isInitialized = false
+    }
+    try {
+      instance?.closeSync()
+    } catch {
+      // Preserve the original initialization error if native cleanup fails.
     }
   }
 
@@ -636,7 +885,7 @@ export class DuckDBService {
    * Check if the service is initialized
    */
   isReady(): boolean {
-    return this.isInitialized && this.connection !== null
+    return !this.closingPromise && this.isInitialized && this.connection !== null
   }
 
   /**
@@ -670,16 +919,31 @@ export class DuckDBService {
 
 // Singleton instance for convenience
 let duckDBInstance: DuckDBService | null = null
+let singletonConfig: DuckDBConfig | undefined
 
 /**
  * Get or create a singleton DuckDB service instance
  */
 export async function getDuckDBService(config?: Partial<DuckDBConfig>): Promise<DuckDBService> {
   if (!duckDBInstance) {
-    duckDBInstance = new DuckDBService(config)
-    await duckDBInstance.initialize()
+    // Keep the selected security posture across transient failures. Retry
+    // callers may omit config or supply only the fields they need to correct.
+    // Snapshot validated engine settings while retaining extended service options.
+    const requestedConfig = { ...singletonConfig, ...config }
+    const selectedConfig = { ...requestedConfig, ...DuckDBConfigSchema.parse(requestedConfig) }
+    duckDBInstance = new DuckDBService(selectedConfig)
+    singletonConfig = selectedConfig
   }
-  return duckDBInstance
+  const candidate = duckDBInstance
+  try {
+    await candidate.initialize()
+    return candidate
+  } catch (error) {
+    // A retry may supply corrected constructor settings. Other waiters from an
+    // older failed generation must not discard a newer singleton.
+    if (duckDBInstance === candidate) duckDBInstance = null
+    throw error
+  }
 }
 
 /**
