@@ -11,7 +11,7 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 - **32+ MCP Tools**: SQL queries, schema inspection, CSV/Parquet loading, federation, graph algorithms, process mining, data helpers
 - **8 Graph Algorithm Tools**: PageRank, eigenvector, community detection, modularity, weighted paths, temporal analysis, period comparison, multi-format export
-- **HITL Security**: Production mode asks user confirmation before destructive SQL via MCP elicitation API
+- **Layered Security**: production mode sandboxes the DuckDB engine (blocks arbitrary local file read/write and http(s) SSRF while keeping S3) and gates destructive SQL via HITL elicitation
 - **Federation**: Distributed queries across multiple MCP servers with `mcp://` URIs
 - **Virtual Filesystem**: Direct SQL access via `mcp://` URIs with auto-format detection
 - **Transports**: stdio, WebSocket, TCP (HTTP client-side)
@@ -540,12 +540,28 @@ await handlers['ducklake.snapshots']({
 
 ## Security
 
+Security is layered: an **engine-level sandbox** (the primary control, enforced inside DuckDB) plus **HITL elicitation** for destructive DML.
+
 ### Modes
 
-- **development** (default): All queries allowed
-- **production**: Destructive SQL triggers HITL elicitation
+- **development** (default): no engine sandbox; destructive SQL is not gated
+- **production**: engine sandbox on (`no-local-fs`) + destructive SQL triggers HITL elicitation
 
-Set via `MCP_SECURITY_MODE=production`
+Set via `MCP_SECURITY_MODE=production`. It is read directly — **never inferred from `NODE_ENV`** — so a process can set `NODE_ENV=production` without silently changing DuckDB's access policy.
+
+### Engine sandbox (`MCP_SANDBOX`)
+
+The DuckDB instance is hardened _after_ extensions and S3 are provisioned, so the policy holds even for library-mode consumers that embed the tool handlers directly (bypassing the MCP server). The level resolves from `MCP_SANDBOX`, else defaults from the mode above.
+
+| Level         | Effect                                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `off`         | No engine hardening (legacy behaviour). Default in development.                                                                                 |
+| `no-local-fs` | Disables `LocalFileSystem` + `HTTPFileSystem` — blocks arbitrary local file read/write and `http(s)` SSRF, **keeps S3**. Default in production. |
+| `strict`      | `enable_external_access=false` — blocks _all_ external access, including S3/httpfs. For pure-compute deployments.                               |
+
+After hardening, the configuration is locked (`lock_configuration=true`) so injected SQL cannot re-open it (e.g. `SET s3_endpoint`). `INSTALL` / `LOAD` / `ATTACH` are additionally blocked at the statement layer in any hardened level.
+
+> **Note:** the keyword-based HITL gate below covers destructive **DML only**. Arbitrary file / network access (`read_text`, `read_csv`, `COPY … TO`, …) is governed by the engine sandbox above, not by HITL.
 
 ### HITL Elicitation
 
@@ -584,6 +600,7 @@ src/
 | `DUCKDB_MEMORY`             | `4GB`            | DuckDB memory limit                                                              |
 | `DUCKDB_THREADS`            | `4`              | DuckDB thread count                                                              |
 | `MCP_SECURITY_MODE`         | `development`    | `development` / `production`                                                     |
+| `MCP_SANDBOX`               | _(mode-derived)_ | Engine sandbox: `off` / `no-local-fs` / `strict` (overrides the mode default)    |
 | `MCP_ELICIT_TIMEOUT`        | `30000`          | HITL elicitation timeout (ms)                                                    |
 | `MCP_MAX_QUERY_SIZE`        | `1000000`        | Max SQL query size (chars)                                                       |
 | `MCP_CACHE_DIR`             | `/tmp/mcp-cache` | VFS cache directory                                                              |

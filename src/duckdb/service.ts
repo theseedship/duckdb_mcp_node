@@ -13,6 +13,17 @@ const DuckDBConfigSchema = z.object({
   memory: z.string().default('4GB'),
   threads: z.number().default(4),
   allowUnsignedExtensions: z.boolean().default(false),
+  // Engine-level sandbox posture. Controls which DuckDB filesystems / external
+  // access are disabled AFTER extensions + S3 are set up.
+  //  - 'off'         : no engine hardening (legacy behaviour)
+  //  - 'no-local-fs' : disable LocalFileSystem + HTTPFileSystem (blocks arbitrary
+  //                    local file read/write and http(s) SSRF) while keeping S3
+  //  - 'strict'      : enable_external_access=false (blocks ALL external access,
+  //                    including S3/httpfs) — for pure-compute deployments
+  // When unset, resolves from MCP_SANDBOX, else defaults to 'no-local-fs' iff
+  // MCP_SECURITY_MODE=production. NEVER keyed on NODE_ENV (would silently break
+  // library-mode consumers that set NODE_ENV but not MCP_SECURITY_MODE).
+  sandbox: z.enum(['off', 'no-local-fs', 'strict']).optional(),
   s3Config: z
     .object({
       endpoint: z.string().optional(),
@@ -49,6 +60,7 @@ export class DuckDBService {
   private virtualFs?: VirtualFilesystem
   private extendedConfig?: Partial<DuckDBServiceConfig>
   private _onagerLoaded = false
+  private _sandboxLevel: 'off' | 'no-local-fs' | 'strict' = 'off'
 
   /**
    * Whether the Onager graph-analytics extension was successfully loaded.
@@ -57,6 +69,14 @@ export class DuckDBService {
    */
   get onagerLoaded(): boolean {
     return this._onagerLoaded
+  }
+
+  /**
+   * The engine-level sandbox posture actually applied to this instance.
+   * 'off' until initialize() runs. @since v1.7.0
+   */
+  get sandboxLevel(): 'off' | 'no-local-fs' | 'strict' {
+    return this._sandboxLevel
   }
 
   constructor(config?: Partial<DuckDBServiceConfig>) {
@@ -118,9 +138,99 @@ export class DuckDBService {
       if (this.extendedConfig?.virtualFilesystem?.enabled) {
         await this.initializeVirtualFilesystem()
       }
+
+      // Engine-level security hardening. MUST run last — after extensions (which
+      // need INSTALL/LOAD) and S3 provisioning (CREATE SECRET writes to the local
+      // secret store) have completed, because the sandbox disables exactly those
+      // capabilities and the lock is one-way within the session.
+      await this.applyEngineHardening()
     } catch (error) {
       logger.error('Failed to initialize DuckDB:', error)
       throw error
+    }
+  }
+
+  /**
+   * Resolve the effective sandbox level. Explicit config/env wins; otherwise
+   * hardened iff MCP_SECURITY_MODE=production. Deliberately NOT keyed on
+   * NODE_ENV. @since v1.7.0
+   */
+  private resolveSandboxLevel(): 'off' | 'no-local-fs' | 'strict' {
+    const explicit = this.config.sandbox ?? process.env.MCP_SANDBOX
+    if (explicit === 'off' || explicit === 'no-local-fs' || explicit === 'strict') {
+      return explicit
+    }
+    return process.env.MCP_SECURITY_MODE === 'production' ? 'no-local-fs' : 'off'
+  }
+
+  /**
+   * Apply engine-level sandboxing to the live connection. Validated on DuckDB
+   * 1.5.4: disabling LocalFileSystem+HTTPFileSystem blocks arbitrary local file
+   * read/write and http(s) SSRF while leaving S3FileSystem functional; 'strict'
+   * uses enable_external_access=false (a one-way latch) to block all external
+   * access. lock_configuration=true then prevents injected SQL from re-opening
+   * the gate (e.g. SET s3_endpoint / SET disabled_filesystems). @since v1.7.0
+   */
+  private async applyEngineHardening(): Promise<void> {
+    if (!this.connection) return
+    const level = this.resolveSandboxLevel()
+    this._sandboxLevel = level
+    if (level === 'off') return
+
+    try {
+      if (level === 'strict') {
+        if (this.config.s3Config?.accessKey) {
+          logger.warn(
+            'MCP_SANDBOX=strict disables all external access; configured S3/httpfs will be unreachable'
+          )
+        }
+        await this.connection.run('SET enable_external_access=false')
+      } else {
+        // no-local-fs: block local disk + raw http(s); keep S3FileSystem.
+        try {
+          await this.connection.run(`SET disabled_filesystems='LocalFileSystem,HTTPFileSystem'`)
+        } catch {
+          // Fall back to at least blocking the unconditional local-file vector.
+          await this.connection.run(`SET disabled_filesystems='LocalFileSystem'`)
+        }
+      }
+      // Seal the configuration so a later statement cannot relax it.
+      try {
+        await this.connection.run('SET lock_configuration=true')
+      } catch (lockError) {
+        logger.warn('Could not lock DuckDB configuration after hardening:', lockError)
+      }
+    } catch (error) {
+      // Hardening must fail CLOSED: if we cannot apply the sandbox we asked for,
+      // refuse to initialize rather than silently run wide open.
+      logger.error(`Failed to apply security sandbox (level=${level}):`, error)
+      throw new Error(
+        `Failed to apply security sandbox (level=${level}): ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      )
+    }
+  }
+
+  /**
+   * Defense-in-depth statement gate, enforced in every query path (so it also
+   * covers library-mode consumers that bypass the MCP server's HITL handler).
+   * The engine sandbox is the primary control; this blocks code-loading /
+   * external-attach statements that the engine may still permit. @since v1.7.0
+   */
+  private enforceSandboxPolicy(sql: string): void {
+    if (this._sandboxLevel === 'off') return
+    const blocked: Array<[RegExp, string]> = [
+      [/\bINSTALL\b/i, 'INSTALL'],
+      [/\bLOAD\b/i, 'LOAD'],
+      [/\bATTACH\b/i, 'ATTACH'],
+    ]
+    for (const [pattern, op] of blocked) {
+      if (pattern.test(sql)) {
+        throw new Error(
+          `Operation ${op} is blocked by security sandbox (level=${this._sandboxLevel})`
+        )
+      }
     }
   }
 
@@ -419,6 +529,9 @@ export class DuckDBService {
     if (!this.isInitialized || !this.connection) {
       throw new Error('Database not initialized. Call initialize() first.')
     }
+
+    // Defense-in-depth: enforced in all query paths, including library mode.
+    this.enforceSandboxPolicy(sql)
 
     // Start timing
     const startTime = performance.now()
