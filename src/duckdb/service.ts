@@ -59,6 +59,7 @@ export class DuckDBService {
   private config: DuckDBConfig
   private isInitialized = false
   private initializationPromise: Promise<void> | null = null
+  private closingPromise: Promise<void> | null = null
   private virtualFs?: VirtualFilesystem
   private extendedConfig?: Partial<DuckDBServiceConfig>
   private _onagerLoaded = false
@@ -90,6 +91,8 @@ export class DuckDBService {
    * Initialize DuckDB instance and connection
    */
   async initialize(): Promise<void> {
+    // A new generation must not overlap asynchronous VFS teardown.
+    while (this.closingPromise) await this.closingPromise
     if (this.initializationPromise) return this.initializationPromise
     if (this.isInitialized) return
 
@@ -349,15 +352,9 @@ export class DuckDBService {
     this.ensureReady()
     this.enforceSandboxPolicy(sql)
     // VFS fetches and writes cache files in Node, outside DuckDB's sandbox.
-    // Hardened engines cannot read these local cache files: reject before any
-    // host-side effects instead of fetching data for a query that cannot run.
-    if (this._sandboxLevel !== 'off' && /mcp:\/\//i.test(sql)) {
-      throw new Error(
-        `MCP virtual filesystem access is blocked by security sandbox (level=${this._sandboxLevel})`
-      )
-    }
-    // If VFS is enabled, preprocess the query
-    if (this.virtualFs) {
+    // Disable that preprocessing entirely for hardened engines: harmless URI
+    // text stays ordinary SQL, while real external reads face the engine policy.
+    if (this._sandboxLevel === 'off' && this.virtualFs) {
       sql = await this.virtualFs.processQuery(sql)
     }
 
@@ -824,59 +821,71 @@ export class DuckDBService {
    * Close the database connection
    */
   private ensureReady(): DuckDBConnection {
-    if (!this.isInitialized || !this.connection) {
+    if (this.closingPromise || !this.isInitialized || !this.connection) {
       throw new Error('Database not initialized. Call initialize() first.')
     }
     return this.connection
   }
 
   async close(): Promise<void> {
-    if (this.initializationPromise) {
-      try {
-        await this.initializationPromise
-      } catch {
-        /* initialization already cleaned up */
+    if (this.closingPromise) return this.closingPromise
+    // Publish the close barrier before any cleanup callbacks can run. Concurrent
+    // closes share it; later initialize() calls wait for the entire teardown.
+    const closing = Promise.resolve().then(async () => {
+      if (this.initializationPromise) {
+        try {
+          await this.initializationPromise
+        } catch {
+          /* initialization already cleaned up */
+        }
       }
+      await this.releaseResources()
+    })
+    this.closingPromise = closing
+    try {
+      await closing
+    } finally {
+      this.closingPromise = null
     }
-    await this.releaseResources()
   }
 
   private async releaseResources(): Promise<void> {
+    const virtualFs = this.virtualFs
+    const connection = this.connection
+    const instance = this.instance
+    this.virtualFs = undefined
+    this.connection = null
+    this.instance = null
     this.isInitialized = false
     this._sandboxLevel = 'off'
     this._onagerLoaded = false
-    if (this.virtualFs) {
+    if (virtualFs) {
       try {
-        await this.virtualFs.destroy()
+        await virtualFs.destroy()
       } catch {
         /* preserve initialization errors */
       }
-      this.virtualFs = undefined
     }
-    if (this.connection) {
+    if (connection) {
       try {
         // Properly disconnect the DuckDB connection
-        this.connection.disconnectSync()
+        connection.disconnectSync()
       } catch {
         // Silently ignore disconnect errors during cleanup
       }
-
-      // Nullify references for garbage collection
-      this.connection = null
     }
     try {
-      this.instance?.closeSync()
+      instance?.closeSync()
     } catch {
       // Preserve the original initialization error if native cleanup fails.
     }
-    this.instance = null
   }
 
   /**
    * Check if the service is initialized
    */
   isReady(): boolean {
-    return this.isInitialized && this.connection !== null
+    return !this.closingPromise && this.isInitialized && this.connection !== null
   }
 
   /**
@@ -918,8 +927,16 @@ export async function getDuckDBService(config?: Partial<DuckDBConfig>): Promise<
   if (!duckDBInstance) {
     duckDBInstance = new DuckDBService(config)
   }
-  await duckDBInstance.initialize()
-  return duckDBInstance
+  const candidate = duckDBInstance
+  try {
+    await candidate.initialize()
+    return candidate
+  } catch (error) {
+    // A retry may supply corrected constructor settings. Other waiters from an
+    // older failed generation must not discard a newer singleton.
+    if (duckDBInstance === candidate) duckDBInstance = null
+    throw error
+  }
 }
 
 /**
