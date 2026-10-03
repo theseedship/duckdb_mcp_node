@@ -5,23 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-10-03
-
-Security hardening release.
+## [1.7.0] - Pending coordinated release
 
 ### Security
 
-- **Engine-level sandbox (`MCP_SANDBOX`)** — the DuckDB instance is now hardened _inside the engine_ after extensions and S3 are provisioned, closing a gap where the production "HITL" gate only matched destructive DML keywords and left DuckDB's file-system and network primitives (`read_text`/`read_csv`/`read_blob`/`read_parquet`, `COPY … TO`, `ATTACH`, `INSTALL`/`LOAD`) ungated.
-  - `no-local-fs` (default in `MCP_SECURITY_MODE=production`): disables `LocalFileSystem` + `HTTPFileSystem` (blocks arbitrary local file read/write and `http(s)` SSRF) while keeping `S3FileSystem` functional.
-  - `strict` (opt-in): `enable_external_access=false` — blocks all external access including S3.
-  - Configuration is locked (`lock_configuration=true`) after hardening; `INSTALL`/`LOAD`/`ATTACH` are additionally blocked at the statement layer, enforced in every query path (so library-mode consumers are covered too).
-  - The posture is read from `MCP_SECURITY_MODE` / `MCP_SANDBOX` and **never inferred from `NODE_ENV`**, so setting `NODE_ENV=production` cannot silently change the access policy of an embedding consumer.
-  - New `DuckDBService.sandboxLevel` getter; new `sandbox` config field.
+- Strengthen the production SQL security policy in the server and library entrypoints. `MCP_SECURITY_MODE=production` now defaults to `MCP_SANDBOX=strict`, disabling external data access in DuckDB, including local files, HTTP and S3.
+- Make initialization and configuration locking fail closed, validate explicit policy settings, and add regression coverage.
+- Refresh compatible transitive dependencies to address registry audit findings.
+- Thank you to the security researcher who reported the issue through coordinated disclosure.
 
-### Compatibility
+### Upgrade notes
 
-- 525 tests pass (was 514), +11 for the sandbox (replaying local-read / local-write / SSRF vectors and level resolution).
-- Non-breaking for consumers that do not set `MCP_SECURITY_MODE` (default stays `off`).
+- Users of 1.6.2 and earlier should upgrade, enable production or strict mode for untrusted SQL, and restart their application or MCP client. `NODE_ENV=production` alone does not enable this protection.
+- `no-local-fs` is an explicit compatibility option for trusted SQL with independently restricted network access; it is not network isolation. The development default remains `off`.
+- Strict mode disables external imports, exports and S3. Both hardened modes disable disk-backed `mcp://` imports. In-memory SQL remains available.
+- Publication uses npm staged approval. This version becomes installable only after a maintainer approves the staged package with 2FA.
 
 ## [1.6.2] - 2026-09-14
 

@@ -1,134 +1,150 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DuckDBService } from './service.js'
+import { DuckDBService, type DuckDBServiceConfig } from './service.js'
 
-/**
- * Regression tests for the engine-level security sandbox (CVE / GHSA fix).
- *
- * These replay the three vectors from the disclosure and assert they are
- * blocked under the hardened sandbox, while normal queries keep working.
- * See SECURITY-DISCLOSURE-2026-10-03.md.
- */
 describe('DuckDBService security sandbox', () => {
   let dir: string
   let canary: string
-  const savedEnv = {
-    mode: process.env.MCP_SECURITY_MODE,
-    sandbox: process.env.MCP_SANDBOX,
-    node: process.env.NODE_ENV,
-  }
+  let services: DuckDBService[]
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'sbx-'))
     canary = join(dir, 'canary.txt')
     writeFileSync(canary, 'CANARY_OK')
-    delete process.env.MCP_SECURITY_MODE
-    delete process.env.MCP_SANDBOX
-    delete process.env.NODE_ENV
+    services = []
+    vi.stubEnv('MCP_SECURITY_MODE', undefined)
+    vi.stubEnv('MCP_SANDBOX', undefined)
+    vi.stubEnv('NODE_ENV', undefined)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.all(services.map((svc) => svc.close()))
+    vi.unstubAllEnvs()
     rmSync(dir, { recursive: true, force: true })
-    process.env.MCP_SECURITY_MODE = savedEnv.mode
-    process.env.MCP_SANDBOX = savedEnv.sandbox
-    process.env.NODE_ENV = savedEnv.node
-    if (savedEnv.mode === undefined) delete process.env.MCP_SECURITY_MODE
-    if (savedEnv.sandbox === undefined) delete process.env.MCP_SANDBOX
-    if (savedEnv.node === undefined) delete process.env.NODE_ENV
   })
 
-  async function mk(config: Record<string, unknown>): Promise<DuckDBService> {
+  async function mk(config: Partial<DuckDBServiceConfig> = {}): Promise<DuckDBService> {
     const svc = new DuckDBService(config)
+    services.push(svc)
     await svc.initialize()
     return svc
   }
 
-  describe("level 'no-local-fs' (default production posture)", () => {
-    it('blocks arbitrary local file READ (CWE-22)', async () => {
-      const svc = await mk({ sandbox: 'no-local-fs' })
-      expect(svc.sandboxLevel).toBe('no-local-fs')
-      await expect(svc.executeQuery(`SELECT content FROM read_text('${canary}')`)).rejects.toThrow(
-        /disabled/i
-      )
+  describe.each(['strict', 'no-local-fs'] as const)('%s', (sandbox) => {
+    it('blocks local reads through text and blob readers', async () => {
+      const svc = await mk({ sandbox })
+      for (const reader of ['read_text', 'read_blob']) {
+        await expect(
+          svc.executeQuery(`SELECT content FROM ${reader}('${canary}')`)
+        ).rejects.toThrow(/disabled/i)
+      }
     })
 
-    it('blocks arbitrary local file WRITE / COPY TO (CWE-73 → RCE)', async () => {
-      const svc = await mk({ sandbox: 'no-local-fs' })
+    it('blocks COPY TO and leaves the target absent', async () => {
+      const svc = await mk({ sandbox })
+      const target = join(dir, 'out.csv')
+      await expect(svc.executeQuery(`COPY (SELECT 1 AS a) TO '${target}'`)).rejects.toThrow(
+        /disabled/i
+      )
+      expect(existsSync(target)).toBe(false)
+    })
+
+    it('blocks a file read within a multi-statement query', async () => {
+      const svc = await mk({ sandbox })
       await expect(
-        svc.executeQuery(`COPY (SELECT 1 AS a) TO '${join(dir, 'out.csv')}'`)
+        svc.executeQuery(`SELECT 1; SELECT content FROM read_text('${canary}')`)
       ).rejects.toThrow(/disabled/i)
     })
 
-    it('blocks http(s) SSRF reads (CWE-918)', async () => {
-      const svc = await mk({ sandbox: 'no-local-fs' })
-      // Safety property: the request must not be reachable (disabled FS, or
-      // httpfs refuses to load). No real network call is asserted.
-      await expect(
-        svc.executeQuery(`SELECT * FROM read_csv_auto('http://169.254.169.254/x') LIMIT 0`)
-      ).rejects.toThrow()
+    it('blocks code-loading and attachment statements including comments', async () => {
+      const svc = await mk({ sandbox })
+      for (const sql of [
+        'INSTALL httpfs',
+        'LOAD httpfs',
+        "ATTACH ':memory:' AS x",
+        '/* before */ LOAD httpfs',
+        'SELECT 1; -- next statement\n INSTALL httpfs',
+      ]) {
+        await expect(svc.executeQuery(sql)).rejects.toThrow(/sandbox/i)
+      }
     })
 
-    it('blocks INSTALL / LOAD / ATTACH via the statement gate', async () => {
-      const svc = await mk({ sandbox: 'no-local-fs' })
-      await expect(svc.executeQuery(`INSTALL httpfs`)).rejects.toThrow(/sandbox/i)
-      await expect(svc.executeQuery(`LOAD httpfs`)).rejects.toThrow(/sandbox/i)
-      await expect(svc.executeQuery(`ATTACH 'x.db' AS x`)).rejects.toThrow(/sandbox/i)
-    })
-
-    it('still runs normal in-memory queries', async () => {
-      const svc = await mk({ sandbox: 'no-local-fs' })
-      const rows = await svc.executeQuery<{ x: number }>(`SELECT 42 AS x`)
-      expect(rows[0].x).toBe(42)
-    })
-  })
-
-  describe("level 'strict' (opt-in full lockdown)", () => {
-    it('blocks local file access', async () => {
-      const svc = await mk({ sandbox: 'strict' })
-      expect(svc.sandboxLevel).toBe('strict')
+    it('keeps the required engine policy locked', async () => {
+      const svc = await mk({ sandbox })
+      expect(
+        await svc.executeScalar("SELECT current_setting('lock_configuration') AS locked")
+      ).toEqual({ locked: true })
+      for (const sql of [
+        'SET lock_configuration=false',
+        'RESET lock_configuration',
+        'SET enable_external_access=true',
+        "SET disabled_filesystems=''",
+        'SET autoload_known_extensions=true',
+        'SET autoinstall_known_extensions=true',
+        'SET allow_persistent_secrets=true',
+      ]) {
+        await expect(svc.executeQuery(sql)).rejects.toThrow()
+      }
       await expect(svc.executeQuery(`SELECT content FROM read_text('${canary}')`)).rejects.toThrow(
         /disabled/i
       )
     })
 
-    it('still runs normal in-memory queries', async () => {
-      const svc = await mk({ sandbox: 'strict' })
-      const rows = await svc.executeQuery<{ x: number }>(`SELECT 1 AS x`)
-      expect(rows[0].x).toBe(1)
+    it('supports in-memory table creation and queries', async () => {
+      const svc = await mk({ sandbox })
+      await svc.executeQuery('CREATE TABLE example AS SELECT 42 AS value')
+      expect(await svc.executeQuery('SELECT * FROM example')).toEqual([{ value: 42 }])
     })
   })
 
-  describe("level 'off' (legacy dev default)", () => {
-    it('leaves local file read enabled (no sandbox requested)', async () => {
-      const svc = await mk({ sandbox: 'off' })
-      expect(svc.sandboxLevel).toBe('off')
-      const rows = await svc.executeQuery<{ content: string }>(
-        `SELECT content FROM read_text('${canary}')`
+  it('strict blocks HTTP and S3 readers at the engine', async () => {
+    const svc = await mk({ sandbox: 'strict' })
+    // External access is rejected before extension loading or any network I/O.
+    for (const path of ['http://127.0.0.1:1/canary.csv', 's3://sandbox/canary.csv']) {
+      await expect(svc.executeQuery(`SELECT * FROM read_csv('${path}')`)).rejects.toThrow(
+        /disabled/i
       )
-      expect(rows[0].content).toContain('CANARY_OK')
-    })
+    }
   })
 
-  describe('level resolution (NODE_ENV footgun guard)', () => {
-    it('hardens to no-local-fs when MCP_SECURITY_MODE=production', async () => {
-      process.env.MCP_SECURITY_MODE = 'production'
-      const svc = await mk({})
-      expect(svc.sandboxLevel).toBe('no-local-fs')
-    })
+  it('off retains legacy local-file support', async () => {
+    const svc = await mk({ sandbox: 'off' })
+    expect(svc.sandboxLevel).toBe('off')
+    expect(await svc.executeQuery(`SELECT content FROM read_text('${canary}')`)).toEqual([
+      { content: 'CANARY_OK' },
+    ])
+  })
 
-    it('does NOT harden when only NODE_ENV=production (MCP_SECURITY_MODE unset)', async () => {
-      process.env.NODE_ENV = 'production'
-      const svc = await mk({})
-      expect(svc.sandboxLevel).toBe('off')
-    })
+  it('production defaults to strict and blocks the local read vector', async () => {
+    vi.stubEnv('MCP_SECURITY_MODE', 'production')
+    const svc = await mk()
+    expect(svc.sandboxLevel).toBe('strict')
+    await expect(svc.executeQuery(`SELECT content FROM read_text('${canary}')`)).rejects.toThrow(
+      /disabled/i
+    )
+  })
 
-    it('explicit MCP_SANDBOX overrides the mode default', async () => {
-      process.env.MCP_SECURITY_MODE = 'production'
-      process.env.MCP_SANDBOX = 'off'
-      const svc = await mk({})
-      expect(svc.sandboxLevel).toBe('off')
-    })
+  it('NODE_ENV alone does not change the legacy default', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const svc = await mk()
+    expect(svc.sandboxLevel).toBe('off')
+  })
+
+  it('explicit MCP_SANDBOX overrides the production mode default', async () => {
+    vi.stubEnv('MCP_SECURITY_MODE', 'production')
+    vi.stubEnv('MCP_SANDBOX', 'off')
+    expect((await mk()).sandboxLevel).toBe('off')
+  })
+
+  it('constructor sandbox takes precedence over the environment', async () => {
+    vi.stubEnv('MCP_SANDBOX', 'off')
+    expect((await mk({ sandbox: 'strict' })).sandboxLevel).toBe('strict')
+  })
+
+  it('an invalid sandbox environment cannot silently disable hardening', async () => {
+    vi.stubEnv('MCP_SANDBOX', 'strcit')
+    await expect(mk()).rejects.toThrow()
   })
 })
