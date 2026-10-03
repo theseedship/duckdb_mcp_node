@@ -251,7 +251,6 @@ describe('DuckDBService initialization security boundary', () => {
       isolated.getDuckDBService({ sandbox: 'strict', memory: 'invalid-memory-limit', threads: 1 })
     ).rejects.toThrow()
     const recovered = await isolated.getDuckDBService({
-      sandbox: 'strict',
       memory: '128MB',
       threads: 1,
     })
@@ -342,7 +341,7 @@ describe('DuckDBService initialization security boundary', () => {
     await expect(
       getDuckDBService({ sandbox: 'strict', memory: '128MB', threads: 1 })
     ).rejects.toThrow(/injected singleton failure/i)
-    const first = getDuckDBService({ sandbox: 'strict', memory: '128MB', threads: 1 })
+    const first = getDuckDBService()
     await entered.promise
     let secondSettled = false
     const second = getDuckDBService().then((result) => {

@@ -919,13 +919,20 @@ export class DuckDBService {
 
 // Singleton instance for convenience
 let duckDBInstance: DuckDBService | null = null
+let singletonConfig: DuckDBConfig | undefined
 
 /**
  * Get or create a singleton DuckDB service instance
  */
 export async function getDuckDBService(config?: Partial<DuckDBConfig>): Promise<DuckDBService> {
   if (!duckDBInstance) {
-    duckDBInstance = new DuckDBService(config)
+    // Keep the selected security posture across transient failures. Retry
+    // callers may omit config or supply only the fields they need to correct.
+    // Snapshot validated engine settings while retaining extended service options.
+    const requestedConfig = { ...singletonConfig, ...config }
+    const selectedConfig = { ...requestedConfig, ...DuckDBConfigSchema.parse(requestedConfig) }
+    duckDBInstance = new DuckDBService(selectedConfig)
+    singletonConfig = selectedConfig
   }
   const candidate = duckDBInstance
   try {
