@@ -45,13 +45,14 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 | 1.3.x               | Partial         | ✅          | ⚠️           | ⚠️            | ⚠️                | **Limited**         |
 | 1.4.x               | 7705c5c         | ✅          | ✅           | ✅            | ❌                | Functional          |
 | 1.5.0               | aec2e25         | ✅          | ✅           | ✅            | ❌                | Historical          |
-| **1.5.4** (current) | **f386a6cf**    | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
+| 1.5.4               | f386a6cf        | ✅          | ✅           | ✅            | ❌                | Previous            |
+| **1.5.6** (current) | **61f5d082**    | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
 
-**Current Package (1.6.2)**: `@duckdb/node-api` remains pinned exactly to `1.5.4-r.1` (DuckDB 1.5.4). DuckPGQ revision `f386a6cf` was used for release validation; it is not pinned in the package or npm lockfile. By default, the runtime executes `INSTALL duckpgq FROM community` without a revision, so a fresh installation may obtain a different community build for the same DuckDB engine and platform. `DUCKPGQ_VERSION`, when supplied with the community source, is forwarded as an explicit `VERSION` request; the package does not set it automatically.
+**Current Package (1.7.0)**: `@duckdb/node-api` is pinned exactly to `1.5.6-r.2` (DuckDB 1.5.6). DuckPGQ revision `61f5d082` was used for release validation; it is not pinned in the package or npm lockfile. By default, the runtime executes `INSTALL duckpgq FROM community` without a revision, so a fresh installation may obtain a different community build for the same DuckDB engine and platform. `DUCKPGQ_VERSION`, when supplied with the community source, is forwarded as an explicit `VERSION` request; the package does not set it automatically.
 
 Keep the DuckDB engine pin until a matching DuckPGQ binary and native graph queries are verified for the replacement engine and each supported platform.
 
-Native Linux checks on 2026-09-14 confirmed graph matching, ANY SHORTEST paths, and DuckPGQ PageRank on this pair. Optional Onager (`eaaf2ea`) also loaded and its PageRank query passed with BIGINT vertex identifiers. The broader feature matrix is documented in the [DuckDB 1.5 capability report](duckpgq/CAPABILITY_REPORT_1.5.md).
+Native Linux checks on 2026-10-22 on this pair (DuckDB 1.5.6 + DuckPGQ `61f5d082`) ran the 20-item capability suite: 15/20 passing, with results identical to DuckDB 1.5.4 + `f386a6cf`. Optional Onager (`ab472a7`, `0.4.0`) also loaded and its PageRank query passed with BIGINT vertex identifiers. Earlier native Linux checks on 2026-09-14 (DuckDB 1.5.4 + `f386a6cf`, Onager `eaaf2ea`) confirmed graph matching, ANY SHORTEST paths, and DuckPGQ PageRank. The broader feature matrix is documented in the [DuckDB 1.5 capability report](duckpgq/CAPABILITY_REPORT_1.5.md).
 
 ### Version-Specific Notes
 

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **DuckDB 1.5.4 → 1.5.6**: `@duckdb/node-api` bumped `1.5.4-r.1` → `1.5.6-r.2` (exact pin retained). The lockfile change is limited to `@duckdb/node-api`, `@duckdb/node-bindings` and its eight platform packages.
+- **DuckPGQ**: the community build for DuckDB 1.5.x is `61f5d082` (was `f386a6cf` on 1.5.4). The three commits between the two refs change only the DuckDB and CI-tools submodule pins, the CI workflow version tags and `.gitignore`; they contain no extension source change.
+- **Onager** (optional, `ENABLE_ONAGER=true`): `INSTALL onager FROM community` resolves to `ab472a7` (`onager_version()` = `0.4.0`) on DuckDB 1.5.6. On the day of the check the same install resolved `eaaf2ea` (`0.3.0`) on DuckDB 1.5.4.
+- Documentation: README and `docs/DUCKPGQ_INTEGRATION.md` compatibility tables, the `CLAUDE.md` status line and the code comment recording the engine used to validate the sandbox are current for 1.5.6; a dated 1.5.6 section is appended to `docs/duckpgq/CAPABILITY_REPORT_1.5.md` (the 1.5.4 and 1.5.0 history is unchanged).
+
+### Validation
+
+Linux x64, DuckDB `v1.5.6`:
+
+- Full suite: 564 tests passed, 26 skipped, 0 failed on Node.js 20.20.0, 22.22.0 and 24.19.0, identical to the DuckDB 1.5.4 baseline taken on the same commit (Node.js 22.22.0). Typecheck, lint (0 errors), format check and build pass on Node.js 22.22.0.
+- Engine sandbox (`MCP_SANDBOX`, added in 1.7.0): the `service.sandbox`, `service.sandbox-network` (localhost canary, with the official `httpfs` for `v1.5.6` provisioned by `.github/scripts/prepare-sandbox-tests.mjs`), `service.lifecycle`, `service` and `service-onager` tests pass 65/65 with a per-test result list identical to 1.5.4. A differential probe of 40 engine-level vectors at each of the three sandbox levels found no behavioural difference; only an internal catalog sequence number and a directory path inside one error message differ.
+- DuckPGQ capability suite (`tests/duckpgq-1.5-capabilities.ts`): 15/20 ✅ with the same five ❌, and every result row identical to 1.5.4. The companion scripts `test:duckpgq`, `test:duckpgq:syntax` and `test:duckpgq:failures` produce output identical to 1.5.4.
+- Onager through `DuckDBService` (`ENABLE_ONAGER=true`): loads (`onagerLoaded === true`) and the pagerank, louvain, betweenness, dijkstra, adamic_adar and density queries return rows. With an unloadable Onager binary the service stays usable, and `ONAGER_STRICT_MODE=true` rejects initialization, as documented.
+- Not validated: platforms other than Linux x64 (the DuckPGQ and Onager 1.5.6 binaries exist for the same platforms as the 1.5.4 ones, which is availability only) and MotherDuck compatibility with DuckDB 1.5.6.
+
+See [CAPABILITY_REPORT_1.5.md](duckpgq/CAPABILITY_REPORT_1.5.md) for the item-by-item comparison.
+
 ## [1.7.0] - Pending coordinated release
 
 ### Security

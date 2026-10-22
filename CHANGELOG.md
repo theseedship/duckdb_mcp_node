@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **duckdb:** Upgrade DuckDB 1.5.4 → 1.5.6 (`@duckdb/node-api` `1.5.4-r.1` → `1.5.6-r.2`, exact pin retained).
+- **duckpgq:** The community build for DuckDB 1.5.x is now `61f5d082` (was `f386a6cf` on 1.5.4); the capability report stays at 15/20 ✅ with identical results.
+- 564 tests pass and 26 are skipped on 1.5.6, the same counts as on 1.5.4; the engine sandbox (`MCP_SANDBOX`) tests behave identically.
+- **onager:** The community build resolved for 1.5.6 is `0.4.0` (`ab472a7`); `onagerLoaded` and the documented graceful degradation are unchanged.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the validation details.
+
 ## [1.7.0] (pending coordinated release)
 
 ### Security

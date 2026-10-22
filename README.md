@@ -5,7 +5,7 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.7.0** — Security hardening update. DuckDB remains pinned to 1.5.4.
+**v1.7.0** — Security hardening update. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
 
 > **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
@@ -34,14 +34,16 @@ For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7
 
 | Component                   | Locked or validated version                               |
 | --------------------------- | --------------------------------------------------------- |
-| `@duckdb/node-api`          | **`1.5.4-r.1` (exact pin; DuckDB 1.5.4)**                 |
-| DuckPGQ community extension | `f386a6cf` validated on DuckDB 1.5.4; not revision-pinned |
+| `@duckdb/node-api`          | **`1.5.6-r.2` (exact pin; DuckDB 1.5.6)**                 |
+| DuckPGQ community extension | `61f5d082` validated on DuckDB 1.5.6; not revision-pinned |
 | `@modelcontextprotocol/sdk` | 1.30.0                                                    |
 | Axios / dotenv / ws / Zod   | 1.20.0 / 17.4.2 / 8.21.3 / 4.6.5                          |
 
-DuckDB stays on 1.5.4: upgrading its Node API requires a matching DuckPGQ binary for the target DuckDB version and platform, followed by native graph-query validation. Keep the exact `@duckdb/node-api` pin when updating other dependencies. DuckPGQ is installed separately with `INSTALL duckpgq FROM community`: `f386a6cf` identifies the revision used for release validation, not a revision locked by this package. A fresh installation may obtain a newer community build for the same engine and platform.
+DuckDB is pinned to 1.5.6 (bumped from 1.5.4): upgrading its Node API requires a matching DuckPGQ binary for the target DuckDB version and platform, followed by native graph-query validation. Keep the exact `@duckdb/node-api` pin when updating other dependencies. DuckPGQ is installed separately with `INSTALL duckpgq FROM community`: `61f5d082` identifies the revision used for release validation on DuckDB 1.5.6 (`f386a6cf` on DuckDB 1.5.4), not a revision locked by this package. A fresh installation may obtain a newer community build for the same engine and platform.
 
 Validation for 1.6.1: **514 tests passed, 24 skipped** on Node 20.19.5, 22.19.0, and 24.19.0. Linux native checks passed for DuckPGQ graph matching, shortest paths, PageRank, and Onager PageRank; an MCP stdio client initialized, listed 40 tools, and executed SQL. The lockfile audit reported no vulnerabilities on 2026-09-14.
+
+Validation for the DuckDB 1.5.6 bump (2026-10-22, Linux x64): **564 tests passed, 26 skipped, 0 failed** on Node 20.20.0, 22.22.0 and 24.19.0 (the DuckDB 1.5.4 baseline on the same commit: 564 passed, 26 skipped on Node 22.22.0); the engine sandbox tests pass with identical per-test results; the DuckPGQ capability suite passes 15/20 with results identical to 1.5.4; Onager `0.4.0` loaded and its pagerank, louvain, betweenness, dijkstra, adamic_adar and density queries passed. Other platforms were not natively validated.
 
 See the [release notes](docs/CHANGELOG.md) and [publishing guide](docs/NPM_PUBLISHING.md).
 
@@ -149,7 +151,7 @@ npm test              # Run tests
 
 ### MotherDuck Cloud
 
-> MotherDuck supports DuckDB clients 1.4.x through **1.5.4** (as of July 2026) — this package runs DuckDB 1.5.4, which is inside the supported window. Check [MotherDuck's version lifecycle](https://motherduck.com/docs/troubleshooting/version-lifecycle-schedules/) for current ranges per region.
+> MotherDuck supported DuckDB clients 1.4.x through **1.5.4** (as of July 2026). This package now runs DuckDB 1.5.6, which has **not** been checked against MotherDuck's supported window: verify [MotherDuck's version lifecycle](https://motherduck.com/docs/troubleshooting/version-lifecycle-schedules/) for current ranges per region before relying on the `motherduck.*` tools.
 
 | Tool                         | Description                 |
 | ---------------------------- | --------------------------- |
@@ -248,11 +250,13 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 | 1.4.1               | 7705c5c         | ✅          | ✅            | ✅           | ❌             | Functional                                                                                            |
 | 1.5.0               | aec2e25         | ✅          | ✅            | ✅           | ❌             | Functional                                                                                            |
 | 1.5.1 – 1.5.3       | —               | —           | —             | —            | —              | **No working binary** (1.5.1 SIGSEGVs on LOAD; 1.5.2/1.5.3 never built — cwida/duckpgq-extension#305) |
-| **1.5.4** (current) | **f386a6cf**    | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**                                                                                        |
+| 1.5.4               | f386a6cf        | ✅          | ✅            | ✅           | ❌             | Functional (previous)                                                                                 |
+| 1.5.5               | —               | —           | —             | —            | —              | **No binary found** (HTTP 404 on linux_amd64 when checked 2026-10-22)                                 |
+| **1.5.6** (current) | **61f5d082**    | **✅**      | **✅**        | **✅**       | **❌**         | **Functional**                                                                                        |
 
-> **1.5.1–1.5.3 gap**: DuckPGQ had no working community binary for these (LOAD segfault). Fixed at 1.5.4 — that's why this package jumps DuckDB 1.5.0 → 1.5.4 directly. See `docs/duckpgq/CAPABILITY_REPORT_1.5.md`.
+> **1.5.1–1.5.3 gap**: DuckPGQ had no working community binary for these (LOAD segfault). Fixed at 1.5.4 — that's why this package jumped DuckDB 1.5.0 → 1.5.4 directly, and then 1.5.4 → 1.5.6 (no DuckPGQ linux_amd64 binary was found for 1.5.5). See `docs/duckpgq/CAPABILITY_REPORT_1.5.md`.
 
-### What Works (Validated 2026-07-03 — f386a6cf on DuckDB 1.5.4; same result as aec2e25 on 1.5.0)
+### What Works (Validated 2026-10-22 — 61f5d082 on DuckDB 1.5.6; same results as f386a6cf on 1.5.4 and aec2e25 on 1.5.0)
 
 ✅ **Native CSR Algorithms:**
 
@@ -292,7 +296,7 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 
 ### Onager Graph Analytics (companion community extension)
 
-[Onager](https://github.com/CogitatorTech/onager) is a separate community extension (CogitatorTech, Rust + C++, `0.1.0-alpha.6` — **alpha**) that loads alongside DuckPGQ on DuckDB ≥ 1.5.4 and ships **65 native graph table functions** — a NetworkX-class toolkit in SQL:
+[Onager](https://github.com/CogitatorTech/onager) is a separate community extension (CogitatorTech, Rust + C++; `0.4.0` on DuckDB 1.5.6, `0.1.0-alpha.6` when first validated on 1.5.4 — pre-1.0, treat as **alpha**) that loads alongside DuckPGQ on DuckDB ≥ 1.5.4 and ships **65 native graph table functions** — a NetworkX-class toolkit in SQL:
 
 | Family (prefix)          | Functions                                                                                                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -321,7 +325,7 @@ SELECT * FROM onager_cmm_louvain((SELECT src, dst FROM edges));
 SELECT * FROM onager_pth_dijkstra((SELECT src, dst FROM edges), source = 1);
 ```
 
-Validated on DuckDB 1.5.4 (2026-07-03): pagerank, louvain, betweenness, dijkstra, adamic_adar, density all work. **Caveats** (alpha):
+Validated on DuckDB 1.5.4 (2026-07-03): pagerank, louvain, betweenness, dijkstra, adamic_adar, density all work. Re-validated on DuckDB 1.5.6 (2026-10-22, Onager `0.4.0`): the same six functions work. **Caveats** (alpha):
 
 - Node ids **must be BIGINT** (`column::BIGINT` if needed)
 - Some functions bind only via **named parameters** (`source = 1`, not positional)
