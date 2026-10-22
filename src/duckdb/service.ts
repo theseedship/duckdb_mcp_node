@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { performance } from 'perf_hooks'
 import { escapeIdentifier, escapeString, escapeFilePath } from '../utils/sql-escape.js'
 import { logger } from '../utils/logger.js'
+import { isProductionSecurityMode } from '../utils/security-mode.js'
 import { VirtualFilesystem, VirtualFilesystemConfig } from '../filesystem/index.js'
 import { ResourceRegistry } from '../federation/ResourceRegistry.js'
 import { MCPConnectionPool } from '../federation/ConnectionPool.js'
@@ -178,9 +179,61 @@ export class DuckDBService {
    * NODE_ENV. @since v1.7.0
    */
   private resolveSandboxLevel(): 'off' | 'no-local-fs' | 'strict' {
+    // Always validate the mode, even when an explicit sandbox level wins.
+    const productionMode = isProductionSecurityMode()
     const explicit = this.config.sandbox ?? process.env.MCP_SANDBOX
     if (explicit !== undefined) return DuckDBConfigSchema.shape.sandbox.unwrap().parse(explicit)
-    return process.env.MCP_SECURITY_MODE === 'production' ? 'strict' : 'off'
+    return productionMode ? 'strict' : 'off'
+  }
+
+  /**
+   * Loading httpfs imports ambient AWS_* / DUCKDB_S3_* environment variables into
+   * global s3_* settings, which SQL can read back with current_setting(). Reset
+   * them before the configuration is locked; the explicit s3Config secret is
+   * unaffected. @since v1.7.2
+   */
+  private async clearEnvDerivedS3Settings(level: 'no-local-fs' | 'strict'): Promise<void> {
+    if (!this.connection) return
+    const names = [
+      's3_access_key_id',
+      's3_secret_access_key',
+      's3_session_token',
+      's3_region',
+      's3_endpoint',
+    ]
+    const result = await this.connection.run(
+      `SELECT name FROM duckdb_settings() WHERE name IN (${names.map((n) => `'${n}'`).join(', ')})`
+    )
+    for (const row of await result.getRowObjectsJson()) {
+      await this.connection.run(`RESET ${String(row.name)}`)
+    }
+    await this.clearProxyCredentials(level)
+  }
+
+  /**
+   * DuckDB also imports HTTP_PROXY / http_proxy (userinfo included) from the
+   * environment. RESET restores that env-derived default, so the settings are
+   * overwritten instead. In 'strict' no network is reachable, so the proxy is
+   * always cleared; in 'no-local-fs' it is cleared only when it carries
+   * credentials. @since v1.7.2
+   */
+  private async clearProxyCredentials(level: 'no-local-fs' | 'strict'): Promise<void> {
+    if (!this.connection) return
+    const result = await this.connection.run(
+      `SELECT name, value FROM duckdb_settings() WHERE name IN ('http_proxy', 'http_proxy_username', 'http_proxy_password')`
+    )
+    const rows = await result.getRowObjectsJson()
+    const proxy = String(rows.find((row) => row.name === 'http_proxy')?.value ?? '')
+    const hasCredentials = rows.some(
+      (row) => row.name !== 'http_proxy' && String(row.value ?? '') !== ''
+    )
+    if (level !== 'strict' && !proxy.includes('@') && !hasCredentials) return
+    for (const row of rows) {
+      await this.connection.run(`SET ${String(row.name)}=''`)
+    }
+    if (level !== 'strict') {
+      logger.warn('A proxy with credentials was found in the environment and has been cleared')
+    }
   }
 
   /**
@@ -203,6 +256,7 @@ export class DuckDBService {
       // Trusted provisioning is complete. Do not let later SQL implicitly install code.
       await this.connection.run('SET autoinstall_known_extensions=false')
       await this.connection.run('SET autoload_known_extensions=false')
+      await this.clearEnvDerivedS3Settings(level)
       if (level === 'strict') {
         if (this.config.s3Config?.accessKey) {
           logger.warn(
@@ -240,9 +294,18 @@ export class DuckDBService {
     // Inspect statement-leading tokens only. Keywords in data, quoted identifiers
     // or comments are harmless; the engine remains the primary security control.
     let statementStart = true
+    // True right after a statement-leading EXPLAIN (and its ANALYZE/VERBOSE or
+    // parenthesised options): the wrapped statement is still statement-leading.
+    let explainPrefix = false
+    // Depth of parentheses opened right after EXPLAIN. Strings, comments and
+    // nested parentheses inside them are lexed like DuckDB does, so a ')' that
+    // sits in a comment cannot end the options early.
+    let explainParenDepth = 0
     let i = 0
     while (i < sql.length) {
-      if (/\s/.test(sql[i])) {
+      // DuckDB's lexer skips invisible format characters as whitespace; so must
+      // the gate (the non-ASCII branch below also covers them). @since v1.7.2
+      if (/[\s\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/.test(sql[i])) {
         i++
         continue
       }
@@ -267,6 +330,18 @@ export class DuckDBService {
       }
       if (sql[i] === ';') {
         statementStart = true
+        explainPrefix = false
+        explainParenDepth = 0
+        i++
+        continue
+      }
+      if (explainPrefix && sql[i] === '(') {
+        explainParenDepth++
+        i++
+        continue
+      }
+      if (explainParenDepth > 0 && sql[i] === ')') {
+        explainParenDepth--
         i++
         continue
       }
@@ -292,7 +367,10 @@ export class DuckDBService {
           }
           i++
         }
-        statementStart = false
+        if (explainParenDepth === 0) {
+          statementStart = false
+          explainPrefix = false
+        }
         continue
       }
       if (sql[i] === '$') {
@@ -300,7 +378,10 @@ export class DuckDBService {
         if (delimiter) {
           const end = sql.indexOf(delimiter, i + delimiter.length)
           i = end < 0 ? sql.length : end + delimiter.length
-          statementStart = false
+          if (explainParenDepth === 0) {
+            statementStart = false
+            explainPrefix = false
+          }
           continue
         }
       }
@@ -308,7 +389,20 @@ export class DuckDBService {
       if (token) {
         const operation = token.toUpperCase()
         // DuckDB also accepts FORCE INSTALL as an extension-loading statement.
+        if (explainParenDepth > 0) {
+          i += token.length
+          continue
+        }
         if (statementStart && operation === 'FORCE') {
+          i += token.length
+          continue
+        }
+        if (statementStart && operation === 'EXPLAIN') {
+          explainPrefix = true
+          i += token.length
+          continue
+        }
+        if (explainPrefix && ['ANALYZE', 'ANALYSE', 'VERBOSE'].includes(operation)) {
           i += token.length
           continue
         }
@@ -318,8 +412,17 @@ export class DuckDBService {
           )
         }
         i += token.length
+      } else if (explainParenDepth > 0) {
+        i++
+        continue
+      } else if (statementStart && sql.charCodeAt(i) > 127) {
+        // Unknown non-ASCII character before the first token: ignore it rather
+        // than letting it hide a following keyword (fail closed).
+        i++
+        continue
       } else i++
       statementStart = false
+      explainPrefix = false
     }
   }
 

@@ -27,6 +27,7 @@ import { dataHelperToolDefinitions, dataHelperToolHandlers } from '../tools/data
 import { graphToolDefinitions, graphToolHandlers } from '../tools/graph-tools.js'
 import { SpaceContext, SpaceContextFactory } from '../context/SpaceContext.js'
 import { logger } from '../utils/logger.js'
+import { isProductionSecurityMode } from '../utils/security-mode.js'
 import { getMetricsCollector } from '../monitoring/MetricsCollector.js'
 import { FederationManager } from '../federation/index.js'
 import { isServerAllowed, loadAuthConfig } from './server-auth.config.js'
@@ -545,7 +546,7 @@ class DuckDBMCPServer {
         }
 
         // Validate security in production mode with HITL elicitation
-        if (process.env.MCP_SECURITY_MODE === 'production' && 'sql' in args) {
+        if (isProductionSecurityMode() && 'sql' in args) {
           const sql = args.sql as string
           // Check query size (always enforced)
           const maxSize = parseInt(process.env.MCP_MAX_QUERY_SIZE || '1000000')

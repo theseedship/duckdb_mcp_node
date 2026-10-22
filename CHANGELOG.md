@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.7.2] (2026-10-22)
+
+### Security
+
+Fixes for weaknesses in the 1.7.0 sandbox, found by an internal review after 1.7.1. Upgrade from 1.7.0 and 1.7.1.
+
+- **Credentials readable by SQL (1.7.0, 1.7.1).** When S3 was configured and `AWS_*`, `DUCKDB_S3_*` or `HTTP_PROXY` variables were present in the process environment, SQL could read those values back with `current_setting()`, even in `strict` mode. They are now reset before the configuration is locked. If untrusted SQL could reach such a deployment, rotate those credentials.
+- **Statement gate gaps (1.7.0, 1.7.1).** `INSTALL` / `LOAD` / `ATTACH` could slip past the lexical gate behind invisible characters or an `EXPLAIN` prefix. The engine settings still blocked file, network and extension effects, so these were gate gaps rather than confirmed sandbox escapes. The gate is fixed; it remains defence in depth.
+- **`MCP_SECURITY_MODE` typos (1.7.0, 1.7.1).** `Production`, ` production` or `production\r` were silently treated as development, leaving the sandbox and the confirmation gate off. These now count as production.
+- **`json_to_parquet` (1.7.0, 1.7.1)** created missing directories (directories only) at a caller-chosen path even with a sandbox active. It no longer does.
+- Documentation: the statement-gate wording was too absolute and the temporary-directory behaviour of `strict` was undocumented; both are corrected.
+
+### Upgrade notes: startup can now fail
+
+- Any `MCP_SECURITY_MODE` other than `production`, `development` or empty (for example `prod`, `true`, `staging`), and the misspelled variable `MCP_SECURITY_MODEL`, now stop the server and `DuckDBService.initialize()` with a clear error. Before, such deployments ran with no protection and no message. Set the value to `production`.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for details.
+
 ## [1.7.1] (2026-10-22)
 
 ### Changed

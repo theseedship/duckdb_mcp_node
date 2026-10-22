@@ -5,15 +5,15 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.7.1** — DuckDB 1.5.6 update on top of the 1.7.0 security hardening. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
+**v1.7.2** — Security hardening follow-up to 1.7.0, on DuckDB 1.5.6. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
 
-> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.1 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
+> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.2 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
 ```bash
-npm install @seed-ship/duckdb-mcp-native@1.7.1
+npm install @seed-ship/duckdb-mcp-native@1.7.2
 ```
 
-For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.1` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
+For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.2` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
 
 ## Features
 
@@ -559,7 +559,7 @@ Security is layered: an **engine-level sandbox** (the primary control, enforced 
 - **development** (default): no engine sandbox; destructive SQL is not gated
 - **production**: engine sandbox on (`strict`) + destructive SQL triggers HITL elicitation
 
-Set via `MCP_SECURITY_MODE=production`. It is read directly — **never inferred from `NODE_ENV`** — so a process can set `NODE_ENV=production` without silently changing DuckDB's access policy.
+Set via `MCP_SECURITY_MODE=production`. It is read directly — **never inferred from `NODE_ENV`** — so a process can set `NODE_ENV=production` without silently changing DuckDB's access policy. The value is case-insensitive and surrounding whitespace is ignored (`Production`, `production\r`); any other value (or the misspelled variable `MCP_SECURITY_MODEL`) is rejected at startup, because a typo would otherwise leave every protection off.
 
 ### Engine sandbox (`MCP_SANDBOX`)
 
@@ -571,13 +571,13 @@ The DuckDB instance is hardened _after_ trusted extensions and S3 credentials ar
 | `strict`      | `enable_external_access=false` blocks external file access, including local files, HTTP and S3. **Default in production.**                     |
 | `no-local-fs` | Explicit compatibility option: disables `LocalFileSystem` and `HTTPFileSystem`, but retains preconfigured S3 access. **Not an SSRF boundary.** |
 
-In either hardened mode, extension auto-install/auto-load and persistent secrets are disabled, and configuration is locked (`lock_configuration=true`). Initialization fails closed if any required setting fails. `INSTALL` / `LOAD` / `ATTACH` are additionally blocked as SQL statements.
+In either hardened mode, extension auto-install/auto-load and persistent secrets are disabled, and configuration is locked (`lock_configuration=true`). Initialization fails closed if any required setting fails. `INSTALL` / `LOAD` / `ATTACH` are additionally refused by a lexical statement gate; this is defence in depth, and the engine settings above are the primary control. Credentials that DuckDB imports from the process environment (S3 and proxy settings) are reset before the lock; only the explicit `s3Config` secret is kept. Even in `strict`, DuckDB keeps access to its own temporary directory (`.tmp` under the working directory).
 
 **S3 compatibility requires trusted SQL and restricted network egress.** `no-local-fs` retains network capabilities and must not be used as network isolation for untrusted SQL, even with configuration locking. Use `strict` when external access must be prohibited.
 
 `strict` intentionally disables external imports/exports and S3. Both hardened modes reject `mcp://` queries before VFS preprocessing: the current VFS imports through local cache files. Other disk-backed imports may also fail. In-memory SQL remains available; integrations needing external data must choose their policy explicitly.
 
-The sandbox governs DuckDB operations, not arbitrary Node.js code, independently configured MCP connections, or the behavior of trusted native extensions loaded at startup. Applications embedding the library must explicitly enable `MCP_SECURITY_MODE=production` or `sandbox: 'strict'`; `NODE_ENV=production` alone does not enable protection. The policy is applied by this package's `DuckDBService`: applications supplying their own DuckDB service or connection must enforce their policy on that instance. Importing tool handlers or `ComputeSession` does not harden a caller-owned connection.
+The sandbox governs DuckDB operations, not arbitrary Node.js code, independently configured MCP connections, or the behavior of trusted native extensions loaded at startup. Applications embedding the library must explicitly enable `MCP_SECURITY_MODE=production` or `sandbox: 'strict'`; `NODE_ENV=production` alone does not enable protection. The policy is applied by this package's `DuckDBService`: applications supplying their own DuckDB service or connection must enforce their policy on that instance. Importing tool handlers or `ComputeSession` does not harden a caller-owned connection. Work done in Node rather than in DuckDB is outside the engine sandbox; `json_to_parquet` therefore no longer creates missing directories when a sandbox is active.
 
 > The keyword-based HITL gate below only covers selected destructive DML/DDL/DCL statements. It is not a complete SQL authorization boundary. File/network access is blocked by the production engine sandbox regardless of a HITL confirmation.
 
