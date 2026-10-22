@@ -5,15 +5,15 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.7.2** — Security hardening follow-up to 1.7.0, on DuckDB 1.5.6. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
+**v1.7.3** — Maintenance release on DuckDB 1.5.6 (forward-compatible credential reset, test tooling update). DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
 
-> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.2 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
+> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.3 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
 ```bash
-npm install @seed-ship/duckdb-mcp-native@1.7.2
+npm install @seed-ship/duckdb-mcp-native@1.7.3
 ```
 
-For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.2` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
+For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.3` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
 
 ## Features
 

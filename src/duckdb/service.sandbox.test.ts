@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DuckDBService, type DuckDBServiceConfig } from './service.js'
+import { DuckDBConnection } from '@duckdb/node-api'
 
 describe('DuckDBService security sandbox', () => {
   let dir: string
@@ -233,5 +234,52 @@ describe('DuckDBService security sandbox', () => {
         expect(JSON.stringify(rows)).not.toContain('PROXYPW123')
       })
     }
+  })
+
+  describe('environment-derived S3 settings are reset unconditionally (v1.7.3)', () => {
+    // DuckDB 2.0 stops listing the legacy s3_* settings in duckdb_settings()
+    // while current_setting() still returns the imported values, so the reset
+    // must not depend on the listing. Without httpfs loaded the RESETs fail
+    // with "not in the catalog" and must be ignored, not skipped.
+    for (const level of ['strict', 'no-local-fs'] as const) {
+      it(`${level}: issues RESET for all five legacy settings before locking`, async () => {
+        const run = vi.spyOn(DuckDBConnection.prototype, 'run')
+        try {
+          const svc = await mk({ sandbox: level })
+          expect(svc.sandboxLevel).toBe(level)
+          const statements = run.mock.calls.map((call) => String(call[0]).trim())
+          for (const name of [
+            's3_access_key_id',
+            's3_secret_access_key',
+            's3_session_token',
+            's3_region',
+            's3_endpoint',
+          ]) {
+            const at = statements.indexOf(`RESET ${name}`)
+            expect(at, `RESET ${name} was not issued`).toBeGreaterThanOrEqual(0)
+            expect(at).toBeLessThan(statements.indexOf('SET lock_configuration=true'))
+          }
+        } finally {
+          run.mockRestore()
+        }
+      })
+    }
+
+    it('fails closed when a RESET fails for another reason', async () => {
+      const original = DuckDBConnection.prototype.run
+      const run = vi.spyOn(DuckDBConnection.prototype, 'run').mockImplementation(async function (
+        this: DuckDBConnection,
+        sql: string,
+        ...rest: any[]
+      ) {
+        if (String(sql).trim() === 'RESET s3_region') throw new Error('simulated engine failure')
+        return original.call(this, sql, ...rest)
+      })
+      try {
+        await expect(mk({ sandbox: 'strict' })).rejects.toThrow(/simulated engine failure/)
+      } finally {
+        run.mockRestore()
+      }
+    })
   })
 })

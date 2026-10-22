@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-10-22
+
+### Changed
+
+- **Forward-compatible credential reset.** `clearEnvDerivedS3Settings` issues `RESET` for the five legacy `s3_*` settings unconditionally (errors ignored when `httpfs` is not loaded, in which case nothing was imported) instead of resetting only the names returned by `duckdb_settings()`. Verified on DuckDB 2.0.0: the legacy names are absent from `duckdb_settings()` after `LOAD httpfs`, yet `current_setting('s3_access_key_id')` still returns the `AWS_ACCESS_KEY_ID` value, and an unconditional `RESET` clears it. On DuckDB 1.5.6 the behaviour and the tests are unchanged.
+- **Dev dependencies:** `vitest`, `@vitest/coverage-v8`, `@vitest/ui` 4.1.11 → 4.1.12 (fixes GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp in `@vitest/mocker`). Runtime dependencies are unchanged.
+- **DuckPGQ load diagnostics:** the "DuckDB 1.4.x" compatibility message (hard-coded since 2025) is replaced by a version-neutral one triggered by an HTTP 404 from the community repository.
+
+### Validation
+
+Linux x64, DuckDB `v1.5.6`: 615 passed, 27 skipped (unchanged), sandbox-network canary 3/3, `stage-npm` 9/9, `check:all`, build, `npm pack` → 1.7.3; `npm audit` reports 0 vulnerabilities at every level.
+
 ## [1.7.2] - 2026-10-22
 
 ### Security
