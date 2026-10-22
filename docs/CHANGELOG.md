@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-10-22
+
+### Security
+
+Fixes for weaknesses in the 1.7.0 sandbox, found by an internal review after 1.7.1 (a red-team pass with independent verification of each finding). No exploitation is known to us. Upgrade from 1.7.0 and 1.7.1.
+
+- **Credentials readable by SQL (1.7.0, 1.7.1; medium).** Loading `httpfs` for the configured S3 secret makes DuckDB import `AWS_*` / `DUCKDB_S3_*` environment variables into global `s3_*` settings, and it imports `HTTP_PROXY` (user information included) into `http_proxy`. SQL could read them with `current_setting()` / `duckdb_settings()` in every hardened level, because `lock_configuration` and `enable_external_access` do not hide settings. They are now reset before the configuration is locked (`RESET` for S3 settings; the proxy is overwritten, because `RESET` restores the environment-derived default). In `strict` the proxy is always cleared; in `no-local-fs` only when it carries credentials, with a warning. The explicit `s3Config` secret is unchanged. **If untrusted SQL could reach a deployment that had such variables set, rotate those credentials.**
+- **Statement gate gaps (1.7.0, 1.7.1; low).** `INSTALL` / `LOAD` / `ATTACH` could pass the lexical gate behind invisible format characters or an `EXPLAIN` prefix. In our tests the engine settings still refused the effects on files, network and extension loading, so these were gate gaps, not confirmed escapes. The gate now covers these forms. It remains defence in depth.
+- **`MCP_SECURITY_MODE` handling (1.7.0, 1.7.1; low).** The value was compared with `=== 'production'` in two places (engine sandbox and confirmation gate), so `Production`, ` production` or `production\r` (CRLF env files) silently meant development. The value is now case-insensitive and trimmed, and a single parser is shared by both places.
+- **`json_to_parquet` (1.7.0, 1.7.1; low).** It created missing parent directories with Node before any SQL ran, so the engine sandbox could not govern it (directories only; the write itself was refused). It no longer creates directories when a sandbox is active.
+- Documentation: the statement-gate sentence was unconditional and is corrected; `strict` keeps DuckDB's own temporary directory (`.tmp` under the working directory), now documented.
+
+### Upgrade notes: startup can now fail
+
+- An unrecognized `MCP_SECURITY_MODE` (anything other than `production`, `development` or empty, for example `prod`, `true`, `staging`) now throws at startup, in `DuckDBService.initialize()` and in the server. So does setting the misspelled `MCP_SECURITY_MODEL` without `MCP_SECURITY_MODE`. Previously these deployments ran with every production protection off and no message. The check also applies when an explicit `MCP_SANDBOX` / `sandbox` option is given.
+
+### Validation
+
+Linux x64, DuckDB `v1.5.6`: 614 passed, 27 skipped (51 new tests, one of them gated by `DUCKDB_SANDBOX_NETWORK_TESTS=1`: gate forms at both hardened levels, mode parsing, environment and proxy credentials with a localhost canary, `json_to_parquet`); the new tests fail on the 1.7.1 code. `check:all` and `npm audit --audit-level=high` pass. The change was independently reviewed before release, which caught and fixed a gate regression in an earlier draft.
+
 ## [1.7.1] - 2026-10-22
 
 ### Changed

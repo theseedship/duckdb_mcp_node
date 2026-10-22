@@ -95,4 +95,19 @@ describe.skipIf(!networkTests)('sandbox with loaded httpfs and a localhost canar
     await expect(protectedService.executeQuery(sql)).rejects.toThrow(/disabled/i)
     expect(requests).toEqual([])
   })
+  it('does not expose ambient AWS_* credentials through settings in hardened levels', async () => {
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'ENVCANARYKEYID0000')
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'ENVCANARYSECRETVALUE0000')
+    vi.stubEnv('AWS_SESSION_TOKEN', 'ENVCANARYSESSIONTOKEN')
+    const settingsSql = `SELECT name, value FROM duckdb_settings() WHERE name LIKE 's3_%'`
+
+    // Control: without a sandbox the harness really sees the imported values.
+    const control = await mk('off')
+    expect(JSON.stringify(await control.executeQuery(settingsSql))).toContain('ENVCANARY')
+
+    for (const level of ['strict', 'no-local-fs'] as const) {
+      const svc = await mk(level)
+      expect(JSON.stringify(await svc.executeQuery(settingsSql))).not.toContain('ENVCANARY')
+    }
+  })
 })

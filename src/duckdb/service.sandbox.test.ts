@@ -147,4 +147,91 @@ describe('DuckDBService security sandbox', () => {
     vi.stubEnv('MCP_SANDBOX', 'strcit')
     await expect(mk()).rejects.toThrow()
   })
+  describe('statement gate hardening (v1.7.2)', () => {
+    const blocked = [
+      ['zero-width space', '\u200BINSTALL httpfs'],
+      ['word joiner', 'SELECT 1;\u2060LOAD httpfs'],
+      ['BOM', "\uFEFFATTACH ':memory:' AS x"],
+      ['FORCE with invisible char', 'FORCE\u200B INSTALL httpfs'],
+      ['EXPLAIN prefix', 'EXPLAIN INSTALL httpfs'],
+      ['EXPLAIN ANALYZE prefix', 'explain analyze LOAD httpfs'],
+      ['EXPLAIN options prefix', "EXPLAIN (FORMAT JSON) ATTACH ':memory:' AS x"],
+      ['unknown non-ASCII char', '\u00A4INSTALL httpfs'],
+      [
+        'EXPLAIN options with a parenthesis in a comment',
+        "EXPLAIN (ANALYZE /* ) ' */ ) SELECT 1; ATTACH ':memory:' AS zz; SELECT 'x'",
+      ],
+      [
+        'EXPLAIN options with a parenthesis in a comment, then LOAD',
+        'EXPLAIN (/* ) */ FORMAT JSON) LOAD httpfs',
+      ],
+      ['EXPLAIN options, comment, then LOAD', 'EXPLAIN (ANALYZE) /* ) */ LOAD httpfs'],
+    ]
+    for (const level of ['strict', 'no-local-fs'] as const) {
+      for (const [name, sql] of blocked) {
+        it(`${level}: blocks ${name}`, async () => {
+          const svc = await mk({ sandbox: level })
+          await expect(svc.executeQuery(sql)).rejects.toThrow(/sandbox/i)
+        })
+      }
+    }
+
+    it('does not block legitimate queries that mention the keywords', async () => {
+      const svc = await mk({ sandbox: 'strict' })
+      const rows = await svc.executeQuery<Record<string, unknown>>(
+        `SELECT 'install load attach' AS "load", 1 AS attach_count`
+      )
+      expect(rows[0].load).toBe('install load attach')
+      await expect(svc.executeQuery('EXPLAIN SELECT 1')).resolves.toBeDefined()
+      await expect(svc.executeQuery('SELECT 1 AS x /* \u200B */')).resolves.toBeDefined()
+    })
+  })
+
+  describe('MCP_SECURITY_MODE normalization (v1.7.2)', () => {
+    for (const value of [
+      'Production',
+      'PRODUCTION',
+      ' production',
+      'production\r',
+      'production\r\n',
+    ]) {
+      it(`treats ${JSON.stringify(value)} as production`, async () => {
+        process.env.MCP_SECURITY_MODE = value
+        const svc = await mk({})
+        expect(svc.sandboxLevel).toBe('strict')
+      })
+    }
+
+    it('keeps development unhardened', async () => {
+      process.env.MCP_SECURITY_MODE = 'development'
+      const svc = await mk({})
+      expect(svc.sandboxLevel).toBe('off')
+    })
+
+    it('refuses to initialize with an unrecognized mode, even with an explicit sandbox level', async () => {
+      for (const value of ['prod', '1', 'production\u200b']) {
+        process.env.MCP_SECURITY_MODE = value
+        await expect(mk({})).rejects.toThrow(/MCP_SECURITY_MODE/)
+        await expect(mk({ sandbox: 'off' })).rejects.toThrow(/MCP_SECURITY_MODE/)
+      }
+    })
+  })
+
+  describe('proxy credentials from the environment (v1.7.2)', () => {
+    afterEach(() => {
+      delete process.env.HTTP_PROXY
+      delete process.env.http_proxy
+    })
+
+    for (const level of ['strict', 'no-local-fs'] as const) {
+      it(`${level}: proxy credentials are not readable through settings`, async () => {
+        process.env.HTTP_PROXY = 'http://proxyuser:PROXYPW123@127.0.0.1:9'
+        const svc = await mk({ sandbox: level })
+        const rows = await svc.executeQuery(
+          `SELECT name, value FROM duckdb_settings() WHERE name LIKE 'http_proxy%'`
+        )
+        expect(JSON.stringify(rows)).not.toContain('PROXYPW123')
+      })
+    }
+  })
 })
