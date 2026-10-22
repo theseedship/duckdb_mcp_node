@@ -649,8 +649,8 @@ export class DuckDBService {
       logger.info(
         `DuckPGQ SQL/PGQ grammar enabled on DuckDB ${engineVersion} (active_grammar_extensions)`
       )
-    } catch (error: any) {
-      const errorMessage = error?.message || String(error)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       logger.warn(
         `Failed to enable the DuckPGQ SQL/PGQ grammar (SET active_grammar_extensions): ${errorMessage}. ` +
           'Database will continue without graph features.'

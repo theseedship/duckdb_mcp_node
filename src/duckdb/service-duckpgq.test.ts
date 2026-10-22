@@ -22,7 +22,8 @@
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
-import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api'
+import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
+import { shouldSkipNetworkTests } from '../test/test-utils.js'
 import { DuckDBService, type DuckDBServiceConfig } from './service.js'
 import { logger } from '../utils/logger.js'
 
@@ -93,6 +94,9 @@ describe('DuckPGQ SQL/PGQ grammar opt-in', () => {
 
   beforeAll(async () => {
     resetEnv()
+    // The probe installs DuckPGQ from the community repository (network). Honour
+    // the CI flag like the other network-dependent suites.
+    if (shouldSkipNetworkTests()) return
     // duckdb_extensions() scans local directories, so it is unavailable once the
     // sandbox is applied: probe with an unhardened instance.
     const probe = new DuckDBService({
@@ -241,5 +245,27 @@ describe('DuckPGQ SQL/PGQ grammar opt-in', () => {
       await expect(svc.initialize()).rejects.toThrow(/strict mode.*injected grammar failure/i)
       expect(svc.isReady()).toBe(false)
     })
+  })
+
+  it('does not attempt the grammar opt-in when the extension failed to load', async () => {
+    const original = DuckDBConnection.prototype.run
+    const run = vi.spyOn(DuckDBConnection.prototype, 'run').mockImplementation(async function (
+      this: DuckDBConnection,
+      sql: string,
+      ...rest: any[]
+    ) {
+      if (/^\s*(FORCE\s+)?INSTALL\s+duckpgq|^\s*LOAD\s+duckpgq/i.test(String(sql))) {
+        throw new Error('simulated: no DuckPGQ binary')
+      }
+      return original.call(this, sql, ...rest)
+    })
+    try {
+      const svc = await create({ allowUnsignedExtensions: true, sandbox: 'off' })
+      await svc.initialize()
+      const statements = run.mock.calls.map((call) => String(call[0]))
+      expect(statements.some((sql) => /active_grammar_extensions/.test(sql))).toBe(false)
+    } finally {
+      run.mockRestore()
+    }
   })
 })

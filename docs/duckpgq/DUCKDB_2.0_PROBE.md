@@ -1,21 +1,21 @@
 # DuckDB 2.0 Compatibility Probe
 
 > **EXPERIMENTAL BRANCH.** This document describes branch `exp/duckdb-2.0` (created from `origin/main` =
-> v1.7.0, `e58160d`). It is a **compatibility probe, not a release candidate**, and it is not meant to
+> v1.7.0, `e58160d`; rebased on v1.7.3, `ca84d11`, on 2026-10-22 — see section 10). It is a **compatibility probe, not a release candidate**, and it is not meant to
 > be merged as is. Nothing here changes the supported engine of the published package, which stays
 > DuckDB 1.5.4. Every number below comes from a command run on 2026-10-22 on Linux x64 (WSL2),
 > Node 22.22.0 unless stated otherwise. Raw logs live outside the repository.
 
 ## 1. Summary
 
-| Question                                  | Answer                                                                                                                                                                                                                                                                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Does the code build against node-api 2.0? | Yes. `tsc` needs no change: the package uses six node-api members (`DuckDBInstance.create/connect/closeSync`, `run`, `getRowObjectsJson`, `disconnectSync`).                                                                                                                                                       |
-| Do the existing tests pass on DuckDB 2.0? | 564 passed, 26 skipped, 0 failed (identical to the 1.5.4 baseline) with the default config. With the opt-in CI network step: 2 failures (stale test precondition, section 4).                                                                                                                                      |
-| Is there a real functional break?         | **Yes, one: DuckPGQ.** On 2.0 the SQL/PGQ grammar is opt-in per connection. Without `SET active_grammar_extensions = ['duckpgq']`, `CREATE PROPERTY GRAPH` and `GRAPH_TABLE` fail with a Parser Error even though `LOAD duckpgq` succeeds and the service logs "loaded successfully". No existing test catches it. |
-| Does the sandbox still hold?              | Yes. `service.sandbox.test.ts` (19), `service.lifecycle.test.ts` (31) and `service.sandbox-network.test.ts` (2, after a precondition fix) pass on 2.0.0, and an end-to-end MCP run in `MCP_SECURITY_MODE=production` blocks `read_text('/etc/hostname')` while `GRAPH_TABLE` works.                                |
-| Onager?                                   | No 2.0.0 build exists (HTTP 404 on all 8 platform URLs). `ENABLE_ONAGER=true` degrades as documented: warn and `onagerLoaded === false`, or throw with `ONAGER_STRICT_MODE=true`.                                                                                                                                  |
-| Patch size                                | `src/duckdb/service.ts`: +52 lines (version-gated opt-in). One test precondition changed (+6/-2). 1 new test file (6 tests), 1 new manual capability script, this document.                                                                                                                                        |
+| Question                                  | Answer                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Does the code build against node-api 2.0? | Yes. `tsc` needs no change: the package uses six node-api members (`DuckDBInstance.create/connect/closeSync`, `run`, `getRowObjectsJson`, `disconnectSync`).                                                                                                                                                                                                   |
+| Do the existing tests pass on DuckDB 2.0? | 564 passed, 26 skipped, 0 failed (identical to the 1.5.4 baseline) with the default config. With the opt-in CI network step: 2 failures (stale test precondition, section 4).                                                                                                                                                                                  |
+| Is there a real functional break?         | **Yes, one: DuckPGQ.** On 2.0 the SQL/PGQ grammar is opt-in per connection. Without `SET active_grammar_extensions = ['duckpgq']`, `CREATE PROPERTY GRAPH` and `GRAPH_TABLE` fail with a Parser Error even though `LOAD duckpgq` succeeds and the service logs "loaded successfully". No existing test catches it.                                             |
+| Does the sandbox still hold?              | For everything tested so far, yes (not a general proof; see sections 9 and 10). `service.sandbox.test.ts` (19), `service.lifecycle.test.ts` (31) and `service.sandbox-network.test.ts` (2, after a precondition fix) pass on 2.0.0, and an end-to-end MCP run in `MCP_SECURITY_MODE=production` blocks `read_text('/etc/hostname')` while `GRAPH_TABLE` works. |
+| Onager?                                   | No 2.0.0 build exists (HTTP 404 on all 8 platform URLs). `ENABLE_ONAGER=true` degrades as documented: warn and `onagerLoaded === false`, or throw with `ONAGER_STRICT_MODE=true`.                                                                                                                                                                              |
+| Patch size                                | `src/duckdb/service.ts`: +52 lines (version-gated opt-in). One test precondition changed (+6/-2). 1 new test file (6 tests), 1 new manual capability script, this document.                                                                                                                                                                                    |
 
 ## 2. Method and environment
 
@@ -350,3 +350,33 @@ npm run build
 # capability comparison (run once per engine version)
 npx tsx tests/duckpgq-2.0-capabilities.ts
 ```
+
+## 10. Rebase on v1.7.3 (2026-10-22, evening)
+
+The branch was rebased on `origin/main` = v1.7.3 (`ca84d11`), which brings the 1.7.2 sandbox hardening
+and the 1.7.3 forward-compatible credential reset. Re-run on DuckDB 2.0.0 with the CI network step
+(`DUCKDB_SANDBOX_NETWORK_TESTS=1`):
+
+- Full suite: all green after one test change. The 1.7.2 test "does not expose ambient AWS_* credentials"
+  used `duckdb_settings()` as its **control**, and 2.0 no longer lists the legacy `s3_*` names there; the
+  control now uses `current_setting()`, which works on both engines. The protection itself holds on 2.0
+  **only because of 1.7.3**: the 1.7.2 listing-based reset was a no-op on 2.0 (verified: `current_setting('s3_access_key_id')`
+  still returned the `AWS_ACCESS_KEY_ID` value until an unconditional `RESET`).
+- New 2.0 statements against `DuckDBService` at `strict` and `no-local-fs`, with a localhost listener
+  that received **0 requests**: `CONNECT 'quack:127.0.0.1:<port>'` → blocked by the engine
+  ("Loading external extensions is disabled" / "LocalFileSystem has been disabled"); `INSTALL x FROM r`
+  → statement gate; `SET allow_extension_repositories` → locked; `CREATE SECRET ... IN connection`
+  → secret type unavailable (httpfs not loaded; with httpfs it is still subject to `enable_external_access`);
+  `ATTACH 'http://...'` → gate; `read_text('http://...')` → engine; `CALL enable_logging('HTTP')` → locked;
+  `SET active_grammar_extensions` after the lock → locked (so the opt-in **must** stay before hardening).
+  `CREATE EXTENSION REPOSITORY r FROM '...'` was a parse error with the syntax tried; the setting that
+  enables repositories is locked anyway. This is evidence for the listed statements, not a proof of the
+  sandbox on 2.0; the full red-team pass of 1.7.0 was not repeated on 2.0.
+- Review items from the first probe addressed: `shouldSkipNetworkTests()` honoured in the probe
+  `beforeAll`; a test pins the `if (extensionLoaded)` guard (no grammar `SET` when the extension failed
+  to load); `catch (error: unknown)` in `enableDuckPGQGrammar`. Still open: the "loaded successfully"
+  log precedes the opt-in on 2.x; this document ships in the npm tarball via `docs/**/*.md` if the
+  branch is ever merged as is (rename to a capability report first); Onager still has no 2.0 build.
+- Benchmark (synthetic graph, deposium-shaped queries): no DuckPGQ speed-up on 2.0 (1-hop 1.6–1.8×
+  slower, `CREATE PROPERTY GRAPH` 5–15× slower, others within noise); plain SQL joins ~1.6× faster.
+  Details in the maintainer's local `DUCKDB-2.0-ANALYSIS-2026-10-22.md`.

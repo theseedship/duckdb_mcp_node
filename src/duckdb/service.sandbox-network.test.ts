@@ -110,8 +110,9 @@ describe.skipIf(!networkTests)('sandbox with loaded httpfs and a localhost canar
     const directSql = `SELECT current_setting('s3_access_key_id') AS k, current_setting('s3_secret_access_key') AS s, current_setting('s3_session_token') AS t`
 
     // Control: without a sandbox the harness really sees the imported values.
+    // (duckdb_settings() lists the legacy names on 1.5.x only, so the control
+    // uses current_setting(), which works on every engine.)
     const control = await mk('off')
-    expect(JSON.stringify(await control.executeQuery(settingsSql))).toContain('ENVCANARY')
     expect(JSON.stringify(await control.executeQuery(directSql))).toContain('ENVCANARY')
 
     for (const level of ['strict', 'no-local-fs'] as const) {
