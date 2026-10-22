@@ -56,9 +56,13 @@ describe.skipIf(!networkTests)('sandbox with loaded httpfs and a localhost canar
     await svc.initialize()
     // The httpfs-specific setting exists only after the extension is loaded.
     // duckdb_extensions() itself scans local directories and is sandboxed.
+    // `httpfs_client_implementation` is listed on DuckDB 1.x and 2.x; the legacy
+    // `s3_region` setting is no longer listed since DuckDB 2.0 (SET still accepts it).
     expect(
-      await svc.executeQuery("SELECT name FROM duckdb_settings() WHERE name='s3_region'")
-    ).toEqual([{ name: 's3_region' }])
+      await svc.executeQuery(
+        "SELECT name FROM duckdb_settings() WHERE name='httpfs_client_implementation'"
+      )
+    ).toEqual([{ name: 'httpfs_client_implementation' }])
     return svc
   }
 
