@@ -208,8 +208,15 @@ export class DuckDBService {
     for (const name of names) {
       try {
         await this.connection.run(`RESET ${name}`)
-      } catch {
-        // httpfs not loaded: the setting does not exist and holds nothing.
+      } catch (error) {
+        // Only an unknown setting is harmless (httpfs not loaded, so nothing was
+        // imported). Any other failure must fail closed, like the rest of hardening.
+        const message = error instanceof Error ? error.message : String(error)
+        if (
+          !/not in the catalog|unrecognized configuration parameter|does not exist/i.test(message)
+        ) {
+          throw error
+        }
       }
     }
     await this.clearProxyCredentials(level)

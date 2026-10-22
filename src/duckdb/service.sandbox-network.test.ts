@@ -101,13 +101,20 @@ describe.skipIf(!networkTests)('sandbox with loaded httpfs and a localhost canar
     vi.stubEnv('AWS_SESSION_TOKEN', 'ENVCANARYSESSIONTOKEN')
     const settingsSql = `SELECT name, value FROM duckdb_settings() WHERE name LIKE 's3_%'`
 
+    // current_setting() is the read path that survives on DuckDB 2.0, where the
+    // legacy names are no longer listed by duckdb_settings().
+    const directSql = `SELECT current_setting('s3_access_key_id') AS k, current_setting('s3_secret_access_key') AS s, current_setting('s3_session_token') AS t`
+
     // Control: without a sandbox the harness really sees the imported values.
     const control = await mk('off')
     expect(JSON.stringify(await control.executeQuery(settingsSql))).toContain('ENVCANARY')
+    expect(JSON.stringify(await control.executeQuery(directSql))).toContain('ENVCANARY')
 
     for (const level of ['strict', 'no-local-fs'] as const) {
       const svc = await mk(level)
       expect(JSON.stringify(await svc.executeQuery(settingsSql))).not.toContain('ENVCANARY')
+      const direct = await svc.executeQuery<{ k: unknown; s: unknown; t: unknown }>(directSql)
+      expect(direct).toEqual([{ k: null, s: null, t: null }])
     }
   })
 })
