@@ -20,4 +20,22 @@ describe('json_to_parquet under the engine sandbox', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('does not create directories before initialization or after close', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'jtp-'))
+    try {
+      const svc = new DuckDBService({ sandbox: 'strict' })
+      const target = join(root, 'early', 'out.parquet')
+      await handleJsonToParquet({ json_data: [{ a: 1 }], output_path: target }, svc)
+      expect(existsSync(join(root, 'early'))).toBe(false)
+
+      await svc.initialize()
+      await svc.close()
+      const later = join(root, 'late', 'out.parquet')
+      await handleJsonToParquet({ json_data: [{ a: 1 }], output_path: later }, svc)
+      expect(existsSync(join(root, 'late'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

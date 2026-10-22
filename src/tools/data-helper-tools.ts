@@ -129,7 +129,9 @@ export async function handleJsonToParquet(
     // Directory creation happens in Node, outside the engine sandbox, so it is
     // skipped when a sandbox is active; the COPY below is then refused by the engine.
     const outputDir = path.dirname(output_path)
-    if ((duckdb.sandboxLevel ?? 'off') === 'off' && !fs.existsSync(outputDir)) {
+    // sandboxLevel reads 'off' before initialization and after close(), so only trust it
+    // once the service is ready; an unready service never touches the filesystem.
+    if (duckdb.isReady() && duckdb.sandboxLevel === 'off' && !fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true })
     }
 
