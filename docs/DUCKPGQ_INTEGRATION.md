@@ -46,9 +46,10 @@ Complete guide for integrating and using DuckPGQ Property Graph extension with D
 | 1.4.x               | 7705c5c         | ✅          | ✅           | ✅            | ❌                | Functional          |
 | 1.5.0               | aec2e25         | ✅          | ✅           | ✅            | ❌                | Historical          |
 | 1.5.4               | f386a6cf        | ✅          | ✅           | ✅            | ❌                | Previous            |
+| 1.5.5               | —               | —           | —            | —             | —                 | **No binary found** |
 | **1.5.6** (current) | **61f5d082**    | **✅**      | **✅**       | **✅**        | **❌**            | **Functional**      |
 
-**Current Package (1.7.0)**: `@duckdb/node-api` is pinned exactly to `1.5.6-r.2` (DuckDB 1.5.6). DuckPGQ revision `61f5d082` was used for release validation; it is not pinned in the package or npm lockfile. By default, the runtime executes `INSTALL duckpgq FROM community` without a revision, so a fresh installation may obtain a different community build for the same DuckDB engine and platform. `DUCKPGQ_VERSION`, when supplied with the community source, is forwarded as an explicit `VERSION` request; the package does not set it automatically.
+**Current Package (1.7.1)**: `@duckdb/node-api` is pinned exactly to `1.5.6-r.2` (DuckDB 1.5.6). DuckPGQ revision `61f5d082` was used for release validation; it is not pinned in the package or npm lockfile. By default, the runtime executes `INSTALL duckpgq FROM community` without a revision, so a fresh installation may obtain a different community build for the same DuckDB engine and platform. `DUCKPGQ_VERSION`, when supplied with the community source, is forwarded as an explicit `VERSION` request; the package does not set it automatically.
 
 Keep the DuckDB engine pin until a matching DuckPGQ binary and native graph queries are verified for the replacement engine and each supported platform.
 

@@ -269,7 +269,7 @@ Still requires edge variable binding: `[e:Label]` not `[:Label]`.
 
 ## Validated on DuckDB 1.5.6 (2026-10-22)
 
-**Environment**: Linux x64, Node.js 22.22.0 (the plugin test suite also on 20.20.0 and 24.19.0), `@duckdb/node-api@1.5.6-r.2`, DuckDB `v1.5.6`. DuckPGQ `61f5d082` and Onager `ab472a7` (`onager_version()` = `0.4.0`) were force-installed from the community repository for this run (`FORCE INSTALL ... FROM community`). The sections above are the DuckDB 1.5.4 / 1.5.0 history and are unchanged.
+**Environment**: Linux x64, Node.js 22.22.0 (the plugin test suite also on 20.20.0 and 24.19.0), `@duckdb/node-api@1.5.6-r.2`, DuckDB `v1.5.6`. DuckPGQ `61f5d082` and Onager `ab472a7` (`onager_version()` = `0.4.0`) were force-installed from the community repository for this run (`FORCE INSTALL ... FROM community`). The sections above are the DuckDB 1.5.4 / 1.5.0 history, kept as written.
 
 **Result: 15/20 ✅ — identical to the 1.5.4 baseline.** Same five ❌ for the same reasons: T4.5 ALL SHORTEST (not implemented), T7.3b WHERE in bounded patterns, T7.5 Onager (INTEGER ids, BIGINT required), T7.6 standalone Kleene guard, T7.7 anonymous edge. No regression and no improvement.
 
@@ -281,11 +281,12 @@ Still requires edge variable binding: `[e:Label]` not `[:Label]`.
 
 ### Differences vs 1.5.4
 
-| Item                      | DuckDB 1.5.4 (`f386a6c`)                                       | DuckDB 1.5.6 (`61f5d082`)                                          | Class                                           |
-| ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| Extension version string  | `f386a6c`                                                      | `61f5d082`                                                         | expected                                        |
-| T7.5 error text           | `onager_pagerank requires (src, dst) columns to be BIGINT ...` | `onager_ctr_pagerank requires (src, dst) columns to be BIGINT ...` | cosmetic (Onager wording); still ❌, same cause |
-| Every other row and count | —                                                              | identical (all 20 checks, all rows)                                | none                                            |
+| Item                      | DuckDB 1.5.4 (`f386a6c`) | DuckDB 1.5.6 (`61f5d082`)           | Class    |
+| ------------------------- | ------------------------ | ----------------------------------- | -------- |
+| Extension version string  | `f386a6c`                | `61f5d082`                          | expected |
+| Every other row and count | —                        | identical (all 20 checks, all rows) | none     |
+
+On fresh community installs of both engines the T7.5 error text is the same (`onager_ctr_pagerank requires (src, dst) columns to be BIGINT ...`). A wording difference seen in the first comparison came from the 1.5.4 control run, which used a stale locally cached Onager (see "Onager on 1.5.6" below), not from the engine.
 
 ### What changed in DuckPGQ between the two refs
 

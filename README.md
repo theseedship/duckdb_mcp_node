@@ -5,15 +5,15 @@
 
 Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server with federation, graph algorithms, and human-in-the-loop security.
 
-**v1.7.0** — Security hardening update. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
+**v1.7.1** — DuckDB 1.5.6 update on top of the 1.7.0 security hardening. DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
 
-> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
+> **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.1 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
 ```bash
-npm install @seed-ship/duckdb-mcp-native@1.7.0
+npm install @seed-ship/duckdb-mcp-native@1.7.1
 ```
 
-For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.0` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
+For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7.1` explicitly and restart the MCP client. Updating this package does not automatically update already installed or pinned versions.
 
 ## Features
 
@@ -26,9 +26,9 @@ For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7
 - **Process Mining**: 3 tools for workflow analysis from Parquet files
 - **DuckLake-style Snapshots**: built-in lightweight snapshots + time travel on Parquet files (self-contained emulation; the official `ducklake` extension is separately installable on DuckDB ≥ 1.5.2)
 - **DuckPGQ**: SQL:2023 property graph queries + native CSR algorithms (PageRank, WCC, clustering)
-- **Onager (opt-in)**: ~65 native graph analytics table functions (betweenness, louvain, dijkstra, link prediction, …) via `ENABLE_ONAGER=true` — alpha extension
+- **Onager (opt-in)**: ~64 native graph analytics functions (53 table + 11 scalar: betweenness, louvain, dijkstra, link prediction, …) via `ENABLE_ONAGER=true` — alpha extension
 - **Geospatial Graphs**: GEOMETRY + CRS vertex tables work with DuckPGQ graph algorithms
-- **MCP SDK 1.30.0**: Elicitation API and connect() guard
+- **MCP SDK 1.32.1**: Elicitation API and connect() guard
 
 ## Version and Compatibility
 
@@ -36,7 +36,7 @@ For CLI/MCP configurations using `npx`, select `@seed-ship/duckdb-mcp-native@1.7
 | --------------------------- | --------------------------------------------------------- |
 | `@duckdb/node-api`          | **`1.5.6-r.2` (exact pin; DuckDB 1.5.6)**                 |
 | DuckPGQ community extension | `61f5d082` validated on DuckDB 1.5.6; not revision-pinned |
-| `@modelcontextprotocol/sdk` | 1.30.0                                                    |
+| `@modelcontextprotocol/sdk` | 1.32.1                                                    |
 | Axios / dotenv / ws / Zod   | 1.20.0 / 17.4.2 / 8.21.3 / 4.6.5                          |
 
 DuckDB is pinned to 1.5.6 (bumped from 1.5.4): upgrading its Node API requires a matching DuckPGQ binary for the target DuckDB version and platform, followed by native graph-query validation. Keep the exact `@duckdb/node-api` pin when updating other dependencies. DuckPGQ is installed separately with `INSTALL duckpgq FROM community`: `61f5d082` identifies the revision used for release validation on DuckDB 1.5.6 (`f386a6cf` on DuckDB 1.5.4), not a revision locked by this package. A fresh installation may obtain a newer community build for the same engine and platform.
@@ -151,7 +151,7 @@ npm test              # Run tests
 
 ### MotherDuck Cloud
 
-> MotherDuck supported DuckDB clients 1.4.x through **1.5.4** (as of July 2026). This package now runs DuckDB 1.5.6, which has **not** been checked against MotherDuck's supported window: verify [MotherDuck's version lifecycle](https://motherduck.com/docs/troubleshooting/version-lifecycle-schedules/) for current ranges per region before relying on the `motherduck.*` tools.
+> MotherDuck lists DuckDB clients up to **1.5.6** as supported ([version lifecycle](https://motherduck.com/docs/troubleshooting/version-lifecycle-schedules/), checked 2026-10-22), which is the engine this package runs. The `motherduck.*` tools have not been exercised against a live MotherDuck workspace on 1.5.6: check the lifecycle page for current ranges per region before relying on them.
 
 | Tool                         | Description                 |
 | ---------------------------- | --------------------------- |
@@ -296,7 +296,7 @@ DUCKPGQ_SOURCE=community  # Default, no custom URL needed
 
 ### Onager Graph Analytics (companion community extension)
 
-[Onager](https://github.com/CogitatorTech/onager) is a separate community extension (CogitatorTech, Rust + C++; `0.4.0` on DuckDB 1.5.6, `0.1.0-alpha.6` when first validated on 1.5.4 — pre-1.0, treat as **alpha**) that loads alongside DuckPGQ on DuckDB ≥ 1.5.4 and ships **65 native graph table functions** — a NetworkX-class toolkit in SQL:
+[Onager](https://github.com/CogitatorTech/onager) is a separate community extension (CogitatorTech, Rust + C++; `0.4.0` on DuckDB 1.5.6, `0.1.0-alpha.6` when first validated on 1.5.4 — pre-1.0, treat as **alpha**) that loads alongside DuckPGQ on DuckDB ≥ 1.5.4 and ships **~64 native graph functions (53 table + 11 scalar)** — a NetworkX-class toolkit in SQL:
 
 | Family (prefix)          | Functions                                                                                                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

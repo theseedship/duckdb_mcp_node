@@ -5,14 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.1] - 2026-10-22
 
 ### Changed
 
-- **DuckDB 1.5.4 → 1.5.6**: `@duckdb/node-api` bumped `1.5.4-r.1` → `1.5.6-r.2` (exact pin retained). The lockfile change is limited to `@duckdb/node-api`, `@duckdb/node-bindings` and its eight platform packages.
+- **DuckDB 1.5.4 → 1.5.6**: `@duckdb/node-api` bumped `1.5.4-r.1` → `1.5.6-r.2` (exact pin retained). The lockfile change is limited to `@duckdb/node-api`, `@duckdb/node-bindings` and its eight platform packages. This includes the upstream 1.5.5 and 1.5.6 bug-fix releases (1.5.5 backported out-of-bounds fixes, [duckdb/duckdb#23197](https://github.com/duckdb/duckdb/pull/23197); 1.5.6 unifies C-API symbol versioning for clients and extensions, [duckdb/duckdb#24362](https://github.com/duckdb/duckdb/pull/24362)). DuckPGQ and Onager publish 1.5.6-specific builds. The upstream notes for both releases mention no change to the settings the engine sandbox relies on, and the sandbox tests behave identically (see Validation). 1.5.5 has no DuckPGQ build, so the package moves from 1.5.4 straight to 1.5.6.
 - **DuckPGQ**: the community build for DuckDB 1.5.x is `61f5d082` (was `f386a6cf` on 1.5.4). The three commits between the two refs change only the DuckDB and CI-tools submodule pins, the CI workflow version tags and `.gitignore`; they contain no extension source change.
 - **Onager** (optional, `ENABLE_ONAGER=true`): `INSTALL onager FROM community` resolves to `ab472a7` (`onager_version()` = `0.4.0`) on DuckDB 1.5.6. On the day of the check the same install resolved `eaaf2ea` (`0.3.0`) on DuckDB 1.5.4.
-- Documentation: README and `docs/DUCKPGQ_INTEGRATION.md` compatibility tables, the `CLAUDE.md` status line and the code comment recording the engine used to validate the sandbox are current for 1.5.6; a dated 1.5.6 section is appended to `docs/duckpgq/CAPABILITY_REPORT_1.5.md` (the 1.5.4 and 1.5.0 history is unchanged).
+- **Dependencies (audit refresh)**: lockfile-only update, the declared ranges are unchanged. `@modelcontextprotocol/sdk` 1.30.0 → 1.32.1 (runtime; two high advisories), `follow-redirects` 1.16.0 → 1.16.1 (runtime, via Axios), `proxy-addr` 2.0.7 → 2.0.8 (runtime, via Express; critical), `hono` 4.13.7 → 4.13.13 and `ip-address` 10.7.3 → 10.7.4 (runtime, via the SDK), and dev-only patch updates of Vite 8.3.5, Rolldown 1.2.15, PostCSS, nanoid and source-map-js. These advisories were published after 1.7.0; without this refresh the required `npm audit --audit-level=high` check fails on the 1.7.0 lockfile. It is clean again; four moderate advisories remain in the dev-only Vitest tooling.
+- Documentation: README (headline, install snippets, MotherDuck note) and `docs/DUCKPGQ_INTEGRATION.md` compatibility tables, the `CLAUDE.md` status line and the code comment recording the engine used to validate the sandbox are current for 1.5.6 / 1.7.1; a dated 1.5.6 section is appended to `docs/duckpgq/CAPABILITY_REPORT_1.5.md` (the 1.5.4 and 1.5.0 history rows are kept as written). The 1.7.0 entries are now dated 2026-10-03, the day it was published.
 
 ### Validation
 
@@ -22,11 +23,12 @@ Linux x64, DuckDB `v1.5.6`:
 - Engine sandbox (`MCP_SANDBOX`, added in 1.7.0): the `service.sandbox`, `service.sandbox-network` (localhost canary, with the official `httpfs` for `v1.5.6` provisioned by `.github/scripts/prepare-sandbox-tests.mjs`), `service.lifecycle`, `service` and `service-onager` tests pass 65/65 with a per-test result list identical to 1.5.4. A differential probe of 40 engine-level vectors at each of the three sandbox levels found no behavioural difference; only an internal catalog sequence number and a directory path inside one error message differ.
 - DuckPGQ capability suite (`tests/duckpgq-1.5-capabilities.ts`): 15/20 ✅ with the same five ❌, and every result row identical to 1.5.4. The companion scripts `test:duckpgq`, `test:duckpgq:syntax` and `test:duckpgq:failures` produce output identical to 1.5.4.
 - Onager through `DuckDBService` (`ENABLE_ONAGER=true`): loads (`onagerLoaded === true`) and the pagerank, louvain, betweenness, dijkstra, adamic_adar and density queries return rows. With an unloadable Onager binary the service stays usable, and `ONAGER_STRICT_MODE=true` rejects initialization, as documented.
-- Not validated: platforms other than Linux x64 (the DuckPGQ and Onager 1.5.6 binaries exist for the same platforms as the 1.5.4 ones, which is availability only) and MotherDuck compatibility with DuckDB 1.5.6.
+- With the refreshed dependencies (MCP SDK 1.32.1): the same 564 passed / 26 skipped, the sandbox-network canary 2/2, the `stage-npm` tests 9/9, build and `npm pack`, and an MCP stdio session under `MCP_SECURITY_MODE=production` (initialize, 40 tools listed, a SQL call) all pass.
+- Not validated: platforms other than Linux x64 (the DuckPGQ and Onager 1.5.6 binaries exist for the same platforms as the 1.5.4 ones, which is availability only) and a live MotherDuck workspace on DuckDB 1.5.6 (MotherDuck's version lifecycle page lists 1.5.6 as supported).
 
 See [CAPABILITY_REPORT_1.5.md](duckpgq/CAPABILITY_REPORT_1.5.md) for the item-by-item comparison.
 
-## [1.7.0] - Pending coordinated release
+## [1.7.0] - 2026-10-03
 
 ### Security
 
@@ -40,7 +42,6 @@ See [CAPABILITY_REPORT_1.5.md](duckpgq/CAPABILITY_REPORT_1.5.md) for the item-by
 - Users of 1.6.2 and earlier should upgrade, enable production or strict mode for untrusted SQL, and restart their application or MCP client. `NODE_ENV=production` alone does not enable this protection.
 - `no-local-fs` is an explicit compatibility option for trusted SQL with independently restricted network access; it is not network isolation. The development default remains `off`.
 - Strict mode disables external imports, exports and S3. Both hardened modes disable disk-backed `mcp://` imports. In-memory SQL remains available.
-- Publication uses npm staged approval. This version becomes installable only after a maintainer approves the staged package with 2FA.
 
 ## [1.6.2] - 2026-09-14
 
