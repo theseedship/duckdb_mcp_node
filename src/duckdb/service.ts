@@ -201,11 +201,16 @@ export class DuckDBService {
       's3_region',
       's3_endpoint',
     ]
-    const result = await this.connection.run(
-      `SELECT name FROM duckdb_settings() WHERE name IN (${names.map((n) => `'${n}'`).join(', ')})`
-    )
-    for (const row of await result.getRowObjectsJson()) {
-      await this.connection.run(`RESET ${String(row.name)}`)
+    // Reset unconditionally: DuckDB 2.0 no longer lists these legacy settings in
+    // duckdb_settings() although current_setting() still returns the imported
+    // values, so a listing-based loop would silently do nothing there. RESET
+    // fails only when httpfs is not loaded, in which case nothing was imported.
+    for (const name of names) {
+      try {
+        await this.connection.run(`RESET ${name}`)
+      } catch {
+        // httpfs not loaded: the setting does not exist and holds nothing.
+      }
     }
     await this.clearProxyCredentials(level)
   }
@@ -564,29 +569,23 @@ export class DuckDBService {
     } catch (error: any) {
       const errorMessage = error?.message || String(error)
 
-      // Check if this is a known compatibility issue
-      const isCompatibilityIssue =
-        errorMessage.includes('HTTP 404') || errorMessage.includes('duckpgq')
-      const isDuckDB14x = true // We're using DuckDB 1.4.x
+      // No community binary for this DuckDB version / platform (HTTP 404 from the
+      // community repository). Expected on brand-new engines and on platforms the
+      // extension does not build for; the database keeps working without graphs.
+      const noBinary = source === 'community' && errorMessage.includes('HTTP 404')
 
-      if (isCompatibilityIssue && isDuckDB14x && source === 'community') {
-        // Expected issue: DuckPGQ community binaries not yet available for DuckDB 1.4.x
-        logger.info(
-          'DuckPGQ community binaries not yet available for DuckDB 1.4.x (as of 2025-10-20). ' +
-            'This is expected and non-blocking. Options: ' +
-            '1) Wait for official 1.4.x release, ' +
-            '2) Use DUCKPGQ_SOURCE=edge (if available), ' +
-            '3) Use DUCKPGQ_SOURCE=custom with a compatible build. ' +
-            'Database continues to work normally for non-graph queries. ' +
+      if (noBinary) {
+        logger.warn(
+          'No DuckPGQ community binary is available for this DuckDB version and platform. ' +
+            'Database continues to work normally for non-graph queries. Options: ' +
+            'wait for a community build, or use DUCKPGQ_SOURCE=custom with a compatible build. ' +
             'Set ENABLE_DUCKPGQ=false to suppress this message. ' +
-            'See: https://github.com/cwida/duckpgq-extension/issues/276'
+            `Original error: ${errorMessage}`
         )
 
-        // Don't throw in non-strict mode for this expected case
         if (strictMode) {
           throw new Error(
-            `DuckPGQ strict mode enabled but extension unavailable for DuckDB 1.4.x. ` +
-              `Try DUCKPGQ_SOURCE=edge or custom. Original error: ${errorMessage}`
+            `DuckPGQ strict mode enabled but no community binary is available for this DuckDB version/platform. Original error: ${errorMessage}`
           )
         }
       } else {

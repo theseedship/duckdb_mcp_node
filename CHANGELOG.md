@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.3] (2026-10-22)
+
+### Changed
+
+- **security (forward-compatible):** the hardened levels now reset the environment-derived S3 settings unconditionally. On DuckDB 2.0 these legacy settings are no longer listed by `duckdb_settings()` while `current_setting()` still returns the imported values, so the 1.7.2 listing-based reset would have silently done nothing there. Behaviour on DuckDB 1.5.6 is unchanged.
+- **deps:** Vitest tooling 4.1.11 → 4.1.12 (dev only); clears the remaining moderate `npm audit` advisories.
+- **duckpgq:** the message shown when no community binary exists no longer claims DuckDB 1.4.x; it names the actual cause (no build for this engine version / platform).
+
 ## [1.7.2] (2026-10-22)
 
 ### Security
