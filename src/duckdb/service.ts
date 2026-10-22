@@ -185,7 +185,7 @@ export class DuckDBService {
 
   /**
    * Apply engine-level sandboxing to the live connection. Validated on DuckDB
-   * 1.5.4: disabling LocalFileSystem+HTTPFileSystem blocks arbitrary local file
+   * 1.5.4 and 1.5.6: disabling LocalFileSystem+HTTPFileSystem blocks arbitrary local file
    * read/write and raw HTTP reads, but S3FileSystem can still access network
    * endpoints. This compatibility posture is not an SSRF boundary. 'strict'
    * uses enable_external_access=false (a one-way latch) to block all external

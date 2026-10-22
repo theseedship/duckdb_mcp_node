@@ -1,6 +1,18 @@
 # Changelog
 
-## [1.7.0] (pending coordinated release)
+## [1.7.1] (2026-10-22)
+
+### Changed
+
+- **duckdb:** Upgrade DuckDB 1.5.4 → 1.5.6 (`@duckdb/node-api` `1.5.4-r.1` → `1.5.6-r.2`, exact pin retained). This includes the upstream 1.5.5 and 1.5.6 bug-fix releases (1.5.5 backported out-of-bounds fixes, [duckdb/duckdb#23197](https://github.com/duckdb/duckdb/pull/23197)); 1.5.5 has no DuckPGQ build, so the package moves from 1.5.4 straight to 1.5.6.
+- **duckpgq:** The community build for DuckDB 1.5.x is now `61f5d082` (was `f386a6cf` on 1.5.4); the capability report stays at 15/20 ✅ with identical results.
+- 564 tests pass and 26 are skipped on 1.5.6, the same counts as on 1.5.4; the engine sandbox (`MCP_SANDBOX`) tests behave identically.
+- **onager:** The community build resolved for 1.5.6 is `0.4.0` (`ab472a7`); `onagerLoaded` and the documented graceful degradation are unchanged.
+- **deps:** Refresh dependencies to clear `npm audit` findings published after 1.7.0 (lockfile only, the declared ranges are unchanged): `@modelcontextprotocol/sdk` 1.30.0 → 1.32.1 (two high advisories), `follow-redirects` 1.16.1, `proxy-addr` 2.0.8 (critical, reached through Express), `hono` 4.13.13, `ip-address` 10.7.4, plus patch updates of the dev-only Vite, Rolldown, PostCSS, nanoid and source-map-js. `npm audit --audit-level=high` is clean again; four moderate advisories remain in the dev-only Vitest tooling.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the validation details.
+
+## [1.7.0] (2026-10-03)
 
 ### Security
 
@@ -10,7 +22,7 @@
 - Refresh compatible transitive dependencies for registry audit fixes.
 - Thanks to **Zureno** for coordinated disclosure.
 
-See [docs/CHANGELOG.md](docs/CHANGELOG.md) for upgrade notes. npm installation is available only after staged-package approval.
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for upgrade notes.
 
 ## [1.6.2] (2026-09-14)
 

@@ -1,7 +1,7 @@
 # DuckPGQ Capability Report — DuckDB 1.5.x
 
-**DuckDB**: v1.5.4 "Variegata" (was validated on v1.5.0 first)
-**DuckPGQ**: `f386a6cf` for 1.5.4 (was `aec2e25` for 1.5.0)
+**DuckDB**: v1.5.6 "Variegata" (latest validation, 2026-10-22; validated on v1.5.4 and, first, on v1.5.0)
+**DuckPGQ**: `61f5d082` for 1.5.6 (was `f386a6cf` for 1.5.4 and `aec2e25` for 1.5.0)
 **Spatial**: loaded (for GEOMETRY/CRS tests)
 **Test script**: `tests/duckpgq-1.5-capabilities.ts`
 
@@ -11,8 +11,9 @@
 | ---------- | ---------- | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2026-03-12 | v1.5.0     | `aec2e25`      | 15/20 ✅     | initial validation                                                                                                                                                                                                                                                                                                                   |
 | 2026-07-03 | **v1.5.4** | **`f386a6cf`** | **15/20 ✅** | **bump validated — zero regression.** DuckPGQ finally builds+loads on a recent DuckDB (1.5.1/1.5.2/1.5.3 never had a working community binary; see cwida/duckpgq-extension#305/#307). Onager (`onager_pagerank`) is now _present_ on 1.5.4 (absent on 1.5.1) — requires BIGINT src/dst columns. All 510 plugin tests green on 1.5.4. |
+| 2026-10-22 | **v1.5.6** | **`61f5d082`** | **15/20 ✅** | **bump validated — zero regression.** All 20 result sets identical to 1.5.4 (see "Validated on DuckDB 1.5.6" below). Onager `0.4.0` (`ab472a7`) loads. 564 plugin tests green.                                                                                                                                                       |
 
-The 5 ❌ below are identical across 1.5.0 and 1.5.4 — all are known DuckPGQ limitations or intentional safety guards, not regressions:
+The 5 ❌ below are identical across 1.5.0, 1.5.4 and 1.5.6 — all are known DuckPGQ limitations or intentional safety guards, not regressions:
 
 - **T4.5 ALL SHORTEST** — not implemented upstream yet
 - **T7.3b WHERE in bounded patterns** — edge variable not bindable in `->{n,m}` (upstream limitation)
@@ -263,3 +264,45 @@ Still requires edge variable binding: `[e:Label]` not `[:Label]`.
 3. **Geospatial graph tools**: Combine GEOMETRY vertex tables with graph algorithms for location-aware analysis.
 
 4. **Keep iterative SQL fallback**: Graph tools should still work without DuckPGQ (graceful degradation).
+
+---
+
+## Validated on DuckDB 1.5.6 (2026-10-22)
+
+**Environment**: Linux x64, Node.js 22.22.0 (the plugin test suite also on 20.20.0 and 24.19.0), `@duckdb/node-api@1.5.6-r.2`, DuckDB `v1.5.6`. DuckPGQ `61f5d082` and Onager `ab472a7` (`onager_version()` = `0.4.0`) were force-installed from the community repository for this run (`FORCE INSTALL ... FROM community`). The sections above are the DuckDB 1.5.4 / 1.5.0 history, kept as written.
+
+**Result: 15/20 ✅ — identical to the 1.5.4 baseline.** Same five ❌ for the same reasons: T4.5 ALL SHORTEST (not implemented), T7.3b WHERE in bounded patterns, T7.5 Onager (INTEGER ids, BIGINT required), T7.6 standalone Kleene guard, T7.7 anonymous edge. No regression and no improvement.
+
+### Method
+
+1. **Control before the bump**: the unmodified suite (`npx tsx tests/duckpgq-1.5-capabilities.ts`) was run on DuckDB 1.5.4 with DuckPGQ `f386a6c`: 15/20 ✅.
+2. **After the bump**: the same command on DuckDB 1.5.6 with DuckPGQ `61f5d082`: 15/20 ✅.
+3. **Deep comparison**: a copy of the suite that prints every result row (the original prints the first three) was run against both engines and the two outputs were compared line by line.
+
+### Differences vs 1.5.4
+
+| Item                      | DuckDB 1.5.4 (`f386a6c`) | DuckDB 1.5.6 (`61f5d082`)           | Class    |
+| ------------------------- | ------------------------ | ----------------------------------- | -------- |
+| Extension version string  | `f386a6c`                | `61f5d082`                          | expected |
+| Every other row and count | —                        | identical (all 20 checks, all rows) | none     |
+
+On fresh community installs of both engines the T7.5 error text is the same (`onager_ctr_pagerank requires (src, dst) columns to be BIGINT ...`). A wording difference seen in the first comparison came from the 1.5.4 control run, which used a stale locally cached Onager (see "Onager on 1.5.6" below), not from the engine.
+
+### What changed in DuckPGQ between the two refs
+
+`f386a6cf...61f5d082` is three commits ("Update to v1.5.1", "Update DuckPGQ to v1.5.6", "Update gitignore"). They change the `duckdb` and `extension-ci-tools` submodule pins, the CI workflow version tags and `.gitignore`; the GitHub compare patch contains no extension source change. `61f5d082` is therefore a rebuild of the same extension sources against DuckDB 1.5.6, which is consistent with the identical results.
+
+### Companion scripts
+
+`npm run test:duckpgq` (5/5 ✅), `npm run test:duckpgq:syntax` and `npm run test:duckpgq:failures` were run with `ALLOW_UNSIGNED_EXTENSIONS=true` on both engines. Their complete output on 1.5.6 is identical to the 1.5.4 run, apart from the random tip printed by `dotenv`. The syntax and failure scripts catalogue unsupported syntax and exited 0 on both engines, so the comparison is by output, not by exit code. Their headers still mention DuckPGQ `7705c5c` / DuckDB 1.4.x (obsolete labels, no functional effect).
+
+### Onager on 1.5.6
+
+- Fresh community install on a clean `HOME`: DuckDB 1.5.6 resolves Onager `ab472a7` (`0.4.0`); the same check on DuckDB 1.5.4 resolved `eaaf2ea` (`0.3.0`). The control run on 1.5.4 earlier the same day used an older locally cached copy, `6165e7c` (`0.1.0-alpha.6`), which is the version the earlier sections of this report describe.
+- On a 5-node test graph with BIGINT ids, `onager_ctr_pagerank`, `onager_cmm_louvain`, `onager_ctr_betweenness`, `onager_pth_dijkstra(..., source = 1)`, `onager_lnk_adamic_adar` and `onager_mtr_density` return rows through `DuckDBService` (`ENABLE_ONAGER=true`, `onagerLoaded === true`). For pagerank, betweenness, louvain, dijkstra and density the rows are identical to a fresh DuckDB 1.5.4 install (`eaaf2ea`).
+- INTEGER ids are still rejected (T7.5): cast to BIGINT.
+- Graceful degradation still behaves as documented: with an Onager binary built for 1.5.4 planted in the 1.5.6 extension directory (an isolated `HOME`), `initialize()` resolves with `onagerLoaded === false` and the service stays usable; with `ONAGER_STRICT_MODE=true` it rejects with `Onager strict mode enabled but load failed`.
+
+### Binary availability on other platforms (HTTP HEAD, community repository)
+
+DuckPGQ and Onager binaries for DuckDB 1.5.6 exist for the same platforms as for 1.5.4: DuckPGQ answers 200 on `linux_amd64`, `linux_arm64`, `osx_amd64`, `osx_arm64`, `windows_amd64` and `windows_amd64_mingw` (404 on the musl builds, `windows_arm64` and `wasm_mvp`); Onager answers 200 on `linux_amd64`, `linux_arm64`, `osx_arm64` and `windows_amd64` (404 elsewhere). This is availability only: just `linux_amd64` was validated natively. For DuckDB 1.5.5, DuckPGQ answers 404 on `linux_amd64`, so there is no 1.5.5 build to validate against.
