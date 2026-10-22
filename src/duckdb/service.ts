@@ -491,6 +491,9 @@ export class DuckDBService {
    * - DUCKPGQ_VERSION: Specific version to install (optional)
    * - DUCKPGQ_STRICT_MODE: If true, throw error on load failure
    *
+   * On DuckDB >= 2.0 the SQL/PGQ grammar is then enabled for the connection
+   * (see enableDuckPGQGrammar).
+   *
    * @throws Error if DUCKPGQ_STRICT_MODE=true and load fails
    */
   private async loadDuckPGQ(): Promise<void> {
@@ -506,6 +509,7 @@ export class DuckDBService {
 
     let installCommand: string
     let sourceDescription: string = 'unknown source'
+    let extensionLoaded = false
 
     try {
       // Build install command based on source
@@ -563,6 +567,7 @@ export class DuckDBService {
         ${installCommand};
         LOAD duckpgq;
       `)
+      extensionLoaded = true
 
       // Success! Log available features
       logger.info(
@@ -609,6 +614,53 @@ export class DuckDBService {
 
       // In non-strict mode, continue without DuckPGQ
       // Database is still functional for non-graph queries
+    }
+
+    if (extensionLoaded) {
+      await this.enableDuckPGQGrammar(strictMode)
+    }
+  }
+
+  /**
+   * Enable the DuckPGQ SQL/PGQ grammar on the service connection (DuckDB >= 2.0).
+   *
+   * DuckDB 2.0 made grammar extensions opt-in per connection: CREATE PROPERTY GRAPH
+   * and GRAPH_TABLE are only parsed after `SET active_grammar_extensions = ['duckpgq']`
+   * (a new connection needs its own SET). On 1.x the setting does not exist and the
+   * grammar is always active, so the SET is gated on the engine's major version.
+   *
+   * MUST run before applyEngineHardening(): `lock_configuration=true` rejects any
+   * later SET. A failure degrades like other DuckPGQ load failures: warn, and throw
+   * only when DUCKPGQ_STRICT_MODE=true.
+   *
+   * @throws Error if DUCKPGQ_STRICT_MODE=true and the grammar cannot be enabled
+   */
+  private async enableDuckPGQGrammar(strictMode: boolean): Promise<void> {
+    if (!this.connection) return
+
+    try {
+      const result = await this.connection.run('SELECT version() AS version')
+      const rows = await result.getRowObjectsJson()
+      const engineVersion = String(rows[0]?.version) // e.g. 'v2.0.0'
+      const major = Number(/^v?(\d+)\./.exec(engineVersion)?.[1])
+      if (!(major >= 2)) return
+
+      await this.connection.run("SET active_grammar_extensions = ['duckpgq']")
+      logger.info(
+        `DuckPGQ SQL/PGQ grammar enabled on DuckDB ${engineVersion} (active_grammar_extensions)`
+      )
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error)
+      logger.warn(
+        `Failed to enable the DuckPGQ SQL/PGQ grammar (SET active_grammar_extensions): ${errorMessage}. ` +
+          'Database will continue without graph features.'
+      )
+
+      if (strictMode) {
+        throw new Error(
+          `DuckPGQ strict mode enabled but grammar activation failed: ${errorMessage}`
+        )
+      }
     }
   }
 
