@@ -7,6 +7,8 @@ Native TypeScript implementation of DuckDB MCP (Model Context Protocol) server w
 
 **v1.7.3** — Maintenance release on DuckDB 1.5.6 (forward-compatible credential reset, test tooling update). DuckDB is pinned to 1.5.6 (`@duckdb/node-api` `1.5.6-r.2`).
 
+> **Pre-release `2.0.0-next.1` on DuckDB 2.0.1** (`npm i @seed-ship/duckdb-mcp-native@next`): grammar opt-in per connection, new storage format, known upstream wrong-result bugs. See [CHANGELOG.md](CHANGELOG.md). `latest` stays on 1.7.x.
+
 > **Security update:** users of 1.6.2 and earlier should upgrade to 1.7.0 or later (1.7.3 recommended) and enable `MCP_SECURITY_MODE=production` or `MCP_SANDBOX=strict` when SQL can be influenced by untrusted input. Restart the process after updating. Review the [security settings and compatibility changes](#security): strict mode disables external data access, including S3. We thank **Zureno** for reporting this issue through coordinated disclosure.
 
 ```bash

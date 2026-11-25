@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-next.1] - 2026-11-25
+
+Pre-release published under the npm `next` tag for host qualification on DuckDB 2.0.1. `latest` stays on 1.7.x.
+
+### Changed
+
+- **Engine:** `@duckdb/node-api` `2.0.1-r.1` (exact pin; DuckDB `v2.0.1`), from the `exp/duckdb-2.0` probe (2.0.0-r.1).
+- **DuckPGQ grammar opt-in:** `loadDuckPGQ()` runs `SET active_grammar_extensions = ['duckpgq']` after a successful `LOAD`, gated on the engine major version, before `applyEngineHardening()` (`lock_configuration=true` rejects any later `SET`). A failure warns, and throws only with `DUCKPGQ_STRICT_MODE=true`. The opt-in is per connection: hosts with connection pools must issue it on every connection.
+
+### Security
+
+- **`RESET GLOBAL` for environment-derived S3 settings.** On DuckDB 2.0.1, `RESET s3_access_key_id` keeps the value imported from `AWS_ACCESS_KEY_ID` (verified: `v2.0.0` returns `NULL` after a plain `RESET`, `v2.0.1` returns the canary). `clearEnvDerivedS3Settings` now issues `RESET GLOBAL` for the five legacy settings; verified on 1.5.4, 1.5.6, 2.0.0 and 2.0.1, on the resetting connection and on a second connection. Behind the locked configuration, 2.0.1 then reports the settings as "not in the catalog" instead of `NULL`; the network canary test accepts either, provided no imported value is readable. Exploitable only on 2.0.1 without this fix, with a hardened sandbox, `AWS_*` variables in the environment, S3 configured (httpfs loaded) and SQL reaching the service; never shipped.
+
+### Validation (Linux x64, DuckDB `v2.0.1`, 2026-11-25)
+
+- `check:all`: 625 passed, 27 skipped; sandbox network canary, DuckPGQ and sandbox suites with `DUCKDB_SANDBOX_NETWORK_TESTS=1`: 64/64; build and `npm pack` OK.
+- DuckPGQ `7e300af593`: capability script 16/20 (15/20 on 2.0.0; remaining failures are DuckPGQ limits: `ALL SHORTEST`, Kleene `*` alone, WHERE on a bounded path, and an Onager BIGINT cast in the script). 48 concurrent `ANY SHORTEST` queries on 16 connections of one instance: 0 errors, results identical to a sequential run; a connection without the opt-in fails with a parser error.
+- Onager `e7b2ce5f55` is now available for 2.0.1; `service-onager.test.ts` 4/4 with `ENABLE_ONAGER=true`.
+- Reopening `.duckdb` files created by 1.5.4, 1.5.6 and 2.0.0 (read-write and read-only): data, types, view, index and a persisted property graph intact. Files created by 2.0.1 are rejected by 1.5.x ("version number 999").
+- S3: legacy `SET s3_*` and `CREATE SECRET (TYPE s3, ...)` accepted; public HTTPS parquet reads work. Not tested against a live MinIO.
+
+### Known issues
+
+- Wrong results still reproduce on 2.0.1: duckdb#27641 and duckdb#27652 (open). duckdb#27692 (busy-loop) open, not tested.
+- New 2.0 statements were spot-checked against the sandbox only; the 1.7.0 red-team pass was not repeated on 2.0.
+- MotherDuck 2.0 client support unverified; no DuckPGQ `osx_amd64` build; DuckPGQ performance was not re-measured on 2.0.1 (2.0.0 was slower on `CREATE PROPERTY GRAPH` and 1-hop queries).
+
 ## [1.7.3] - 2026-10-22
 
 ### Changed

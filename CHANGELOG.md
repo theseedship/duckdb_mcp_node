@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0-next.1] (2026-11-25) — pre-release (`npm i @seed-ship/duckdb-mcp-native@next`)
+
+Pre-release on **DuckDB 2.0.1** for host qualification. `latest` stays on 1.7.x (DuckDB 1.5.6).
+
+### Breaking
+
+- **Engine:** `@duckdb/node-api` `1.5.6-r.2` → `2.0.1-r.1` (exact pin). Hosts that use their own `@duckdb/node-api` must move to the same version.
+- **SQL/PGQ grammar is opt-in per connection on DuckDB 2.x.** The service enables it on its own connection before the sandbox locks the configuration. Hosts that open their own connections must run `SET active_grammar_extensions = ['duckpgq']` on **each** connection, or `CREATE PROPERTY GRAPH` / `GRAPH_TABLE` fail with a parser error.
+- **Storage:** `.duckdb` files created by 2.0.1 cannot be opened by DuckDB 1.5.x. Existing 1.5.x files open and stay readable by 1.5.x after 2.0.1 writes; a rollback of new files needs an export or `STORAGE_VERSION 'v1.5.0'` at creation.
+
+### Security
+
+- **Environment credentials on DuckDB 2.0.1.** A plain `RESET` no longer clears the `s3_*` values imported from `AWS_*`, so `current_setting('s3_secret_access_key')` returned the environment value in `strict` and `no-local-fs`. The hardened levels now use `RESET GLOBAL`, which also clears them for every connection of the instance (a plain `RESET` was session-scoped on 1.5.x and 2.0.0 as well). Published 1.7.x releases are not affected.
+
+### Known issues (why this is not `latest` yet)
+
+- DuckDB 2.0.1 still returns wrong results for [duckdb#27641](https://github.com/duckdb/duckdb/issues/27641) (`sum()` over a LEFT JOIN with an empty side) and [duckdb#27652](https://github.com/duckdb/duckdb/issues/27652) (outer-join simplification).
+- The 2.0 statement surface (extension repositories, `CONNECT`, `IN connection` secrets) has only spot checks against the sandbox, not a full review.
+- MotherDuck support for 2.0 clients is unverified. No DuckPGQ build for macOS x86_64.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for details.
+
 ## [1.7.3] (2026-10-22)
 
 ### Changed

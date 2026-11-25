@@ -205,9 +205,12 @@ export class DuckDBService {
     // duckdb_settings() although current_setting() still returns the imported
     // values, so a listing-based loop would silently do nothing there. RESET
     // fails only when httpfs is not loaded, in which case nothing was imported.
+    // GLOBAL is required from DuckDB 2.0.1: a plain RESET there keeps the
+    // env-derived value (verified on 2.0.1; 1.5.4, 1.5.6 and 2.0.0 clear it
+    // with either form). @since v2.0.0
     for (const name of names) {
       try {
-        await this.connection.run(`RESET ${name}`)
+        await this.connection.run(`RESET GLOBAL ${name}`)
       } catch (error) {
         // Only an unknown setting is harmless (httpfs not loaded, so nothing was
         // imported). Any other failure must fail closed, like the rest of hardening.

@@ -118,7 +118,18 @@ describe.skipIf(!networkTests)('sandbox with loaded httpfs and a localhost canar
     for (const level of ['strict', 'no-local-fs'] as const) {
       const svc = await mk(level)
       expect(JSON.stringify(await svc.executeQuery(settingsSql))).not.toContain('ENVCANARY')
-      const direct = await svc.executeQuery<{ k: unknown; s: unknown; t: unknown }>(directSql)
+      // After RESET GLOBAL the settings are unset: 1.5.x and 2.0.0 return NULL,
+      // while 2.0.1 behind the locked configuration reports them as not in the
+      // catalog. Both are fine as long as the imported values are unreadable.
+      let direct: unknown
+      try {
+        direct = await svc.executeQuery<{ k: unknown; s: unknown; t: unknown }>(directSql)
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        expect(message).toMatch(/not in the catalog/i)
+        expect(message).not.toContain('ENVCANARY')
+        continue
+      }
       expect(direct).toEqual([{ k: null, s: null, t: null }])
     }
   })

@@ -242,7 +242,7 @@ describe('DuckDBService security sandbox', () => {
     // must not depend on the listing. Without httpfs loaded the RESETs fail
     // with "not in the catalog" and must be ignored, not skipped.
     for (const level of ['strict', 'no-local-fs'] as const) {
-      it(`${level}: issues RESET for all five legacy settings before locking`, async () => {
+      it(`${level}: issues RESET GLOBAL for all five legacy settings before locking`, async () => {
         const run = vi.spyOn(DuckDBConnection.prototype, 'run')
         try {
           const svc = await mk({ sandbox: level })
@@ -255,8 +255,8 @@ describe('DuckDBService security sandbox', () => {
             's3_region',
             's3_endpoint',
           ]) {
-            const at = statements.indexOf(`RESET ${name}`)
-            expect(at, `RESET ${name} was not issued`).toBeGreaterThanOrEqual(0)
+            const at = statements.indexOf(`RESET GLOBAL ${name}`)
+            expect(at, `RESET GLOBAL ${name} was not issued`).toBeGreaterThanOrEqual(0)
             expect(at).toBeLessThan(statements.indexOf('SET lock_configuration=true'))
           }
         } finally {
@@ -272,7 +272,8 @@ describe('DuckDBService security sandbox', () => {
         sql: string,
         ...rest: any[]
       ) {
-        if (String(sql).trim() === 'RESET s3_region') throw new Error('simulated engine failure')
+        if (String(sql).trim() === 'RESET GLOBAL s3_region')
+          throw new Error('simulated engine failure')
         return original.call(this, sql, ...rest)
       })
       try {
